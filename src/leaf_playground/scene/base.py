@@ -2,8 +2,8 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from .data.profile import Role, ROLE_TYPES
-from .data.environment import EnvironmentVariable, ENVIRONMENT_VARIABLE_TYPES
+from ..data.profile import Role, ROLE_TYPES
+from ..data.environment import EnvironmentVariable, ENVIRONMENT_VARIABLE_TYPES
 
 
 @dataclass

@@ -5,7 +5,7 @@ from typing import Callable, Dict, List
 from uuid import UUID
 
 from .agent import Agent
-from .scene import Scene, SceneLogBody, SceneSubClsBuildingConfig
+from .scene.base import Scene, SceneLogBody, SceneSubClsBuildingConfig
 from .data.environment import EnvironmentVariable
 from .data.profile import Role
 
