@@ -1,5 +1,6 @@
+import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, List, Optional
 from uuid import UUID
 
 from .base import Data
@@ -17,7 +18,7 @@ class Message(Data):
     :param content: content of the message
     :type content: Any
     :param timestamp: the timestamp that the message is sent
-    :type timestamp: int
+    :type timestamp: float
     """
 
     sender_id: UUID
@@ -38,12 +39,35 @@ class TextMessage(Message):
     :param content: content of the message
     :type content: str
     :param timestamp: the timestamp that the message is sent
-    :type timestamp: int
+    :type timestamp: float
     """
     content: str
 
 
+@dataclass
+class JSONMessage(TextMessage):
+
+    def parse_content(self, required_fields: Optional[List[str]] = None, **kwargs) -> dict:
+        """
+        Parse message content(must be a json format string) into a dict and check if all required fields are obtained.
+        :param required_fields: fields that must be contained in the parsed dict, defaults to None
+        :type required_fields: Optional[List[str]]
+        :param kwargs: additional key word arguments that will be passed into `json.loads`
+        :return: a dictionary parsed from the message content
+        :rtype: dict
+        """
+
+        data = json.loads(self.content, **kwargs)
+        if required_fields and not all(f in data for f in required_fields):
+            raise KeyError(
+                f"required fields are {required_fields}, but not all of them found in the parsed dict."
+            )
+
+        return data
+
+
 MESSAGE_TYPES = {
     "base": Message,
-    "text": TextMessage
+    "text": TextMessage,
+    "json": JSONMessage
 }
