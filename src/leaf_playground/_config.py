@@ -1,6 +1,5 @@
 import json
 from abc import abstractmethod
-from typing import Type
 
 from pydantic import BaseModel
 
@@ -18,7 +17,7 @@ class _Config(BaseModel):
 
 
 class _Configurable:
-    _config_type: Type[_Config] = _Config
+    _config_type = _Config
 
     def __init__(self, config: "_Configurable._config_type"):
         self.config = config

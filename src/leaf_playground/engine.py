@@ -1,7 +1,6 @@
 import random
-from abc import abstractmethod, ABC
-from dataclasses import dataclass
-from typing import Callable, Dict, List
+from abc import abstractmethod
+from typing import Dict, List
 from uuid import UUID
 
 from .agent import Agent

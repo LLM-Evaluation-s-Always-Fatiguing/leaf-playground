@@ -1,17 +1,17 @@
 from abc import abstractmethod
-from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Set, Any
 from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 from .data.message import Message, TextMessage, JSONMessage
 from .data.game_event import GameEvent
 from .data.profile import Profile
 
 
-@dataclass
-class Agent:
-    profile: Profile
+class Agent(BaseModel):
+    profile: Profile = Field(default=...)
 
     @property
     def id(self) -> UUID:
@@ -26,27 +26,25 @@ class Agent:
         raise NotImplementedError()
 
 
-@dataclass
 class LLMAgent(Agent):
-    llm_backend: Callable[[str, Optional[dict]], str]
+    llm_backend: Callable[[str, Optional[dict]], str] = Field(default=...)
 
     @abstractmethod
     def act(self, *args, **kwargs) -> TextMessage:
         raise NotImplementedError()
 
 
-@dataclass
 class LLMChatter(LLMAgent):
-    profile_format_template: str
-    profile_format_fields: List[str]
-    message_format_template: str
-    message_format_fields: List[str]
-    prompt_constructor: Callable[[str, List[str]], str]
-    max_his_num: int = field(default=8)
-    additional_backend_params: Optional[dict] = field(default=None)
+    profile_format_template: str = Field(default=...)
+    profile_format_fields: Set[str] = Field(default=...)
+    message_format_template: str = Field(default=...)
+    message_format_fields: Set[str] = Field(default=...)
+    prompt_constructor: Callable[[str, List[str]], str] = Field(default=...)
+    max_his_num: int = Field(default=8)
+    additional_backend_params: Optional[dict] = Field(default=None)
     message_type: type = TextMessage
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         def valid_fields(param, data_cls, param_name):
             fields_space = set(data_cls.__annotations__.keys())
             param_fields = set(param)
@@ -89,6 +87,5 @@ class LLMChatter(LLMAgent):
         return self._construct_message(response)
 
 
-@dataclass
 class LLMGamer(LLMAgent):
     pass  # TODO: impl

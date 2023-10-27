@@ -1,13 +1,13 @@
-from dataclasses import dataclass
 from uuid import UUID
+
+from pydantic import Field
 
 from .base import Data
 
 
-@dataclass
 class GameEvent(Data):
-    id: UUID
-    timestamp: float
-    type: str
-    description: str
-    detail: Data
+    id: UUID = Field(default=...)
+    timestamp: float = Field(default=...)
+    type: str = Field(default=...)
+    description: str = Field(default=...)
+    detail: Data = Field(default=...)

@@ -1,21 +1,20 @@
-from dataclasses import dataclass, field
 from typing import Optional
 from uuid import UUID
+
+from pydantic import Field
 
 from .base import Data
 
 
-@dataclass
 class Role(Data):
-    name: str
-    description: str
+    name: str = Field(default=...)
+    description: str = Field(default=...)
 
 
-@dataclass
 class Profile(Data):
-    id: UUID
-    name: str
-    role: Optional[Role] = field(default=None)
+    id: UUID = Field(default=...)
+    name: str = Field(default=...)
+    role: Optional[Role] = Field(default=None)
 
 
 ROLE_TYPES = {"base": Role}

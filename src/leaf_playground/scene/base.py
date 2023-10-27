@@ -1,32 +1,33 @@
 from abc import abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
 
+from pydantic import BaseModel, Field
+
+from .._schema import _Schema
+from .._config import _Config, _Configurable
 from ..data.profile import Role, ROLE_TYPES
 from ..data.environment import EnvironmentVariable, ENVIRONMENT_VARIABLE_TYPES
 
 
-@dataclass
-class RoleDefinition:
-    name: str
-    description: str
-    type: str
-    role_num: int
-    template: str
-    template_fields: List[str]
+class RoleDefinition(BaseModel):
+    name: str = Field(default=...)
+    description: str = Field(default=...)
+    type: str = Field(default=...)
+    role_num: int = Field(default=...)
+    template: str = Field(default=...)
+    template_fields: Set[str] = Field(default=...)
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         if self.type not in ROLE_TYPES:
             types = list(ROLE_TYPES.keys())
             raise ValueError(f"Types of Role are {types}, bug get {self.type}")
 
 
-@dataclass
-class RoleSchema:
-    num_participants: int
-    definitions: List[RoleDefinition]
+class RoleSchema(_Schema):
+    num_participants: int = Field(default=...)
+    definitions: Set[RoleDefinition] = Field(default=...)
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         if self.num_participants != sum([definition.role_num for definition in self.definitions]):
             raise ValueError("'num_participants' must equal to the sum of all roles' 'role_num'")
 
@@ -47,22 +48,20 @@ class RoleSchema:
         return name2definitions[name]
 
 
-@dataclass
-class EnvironmentVariableDefinition:
-    name: str
-    description: str
-    type: str
-    template: str
-    template_fields: List[str]
+class EnvironmentVariableDefinition(BaseModel):
+    name: str = Field(default=...)
+    description: str = Field(default=...)
+    type: str = Field(default=...)
+    template: str = Field(default=...)
+    template_fields: List[str] = Field(default=...)
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         if self.type not in ENVIRONMENT_VARIABLE_TYPES:
             types = list(ENVIRONMENT_VARIABLE_TYPES.keys())
             raise ValueError(f"Types of EnvironmentVariable are {types}, bug get {self.type}")
 
 
-@dataclass
-class EnvironmentSchema:
+class EnvironmentSchema(_Schema):
     definitions: List[EnvironmentVariableDefinition]
 
     def valid(self, env_vars: List[EnvironmentVariable]):
@@ -82,25 +81,23 @@ class EnvironmentSchema:
         return name2definitions[name]
 
 
-@dataclass
-class SceneSchema:
-    name: str
-    description: str
-    role_schema: RoleSchema
-    environment_schema: EnvironmentSchema
+class SceneSchema(_Schema):
+    name: str = Field(default=...)
+    description: str = Field(default=...)
+    role_schema: RoleSchema = Field(default=...)
+    environment_schema: EnvironmentSchema = Field(default=...)
 
     def valid(self, roles: List[Role], env_vars: List[EnvironmentVariable]):
         self.role_schema.valid(roles)
         self.environment_schema.valid(env_vars)
 
 
-@dataclass
-class SceneLogBody:
-    turn_id: int
-    turn_step_id: int
-    global_step_id: int
-    event: Optional[dict] = field(default=None)
-    message: Optional[dict] = field(default=None)
+class SceneLogBody(BaseModel):
+    turn_id: int = Field(default=...)
+    turn_step_id: int = Field(default=...)
+    global_step_id: int = Field(default=...)
+    event: Optional[dict] = Field(default=None)
+    message: Optional[dict] = Field(default=None)
 
     def format(
         self,
@@ -111,8 +108,13 @@ class SceneLogBody:
         return template.format(**data)
 
 
-class Scene:
+class SceneConfig(_Config):
+    pass
+
+
+class Scene(_Configurable):
     schema: SceneSchema
+    _config_type = SceneConfig
 
     def __int__(self, roles: List[Role], env_vars: List[EnvironmentVariable]):
         self.schema.valid(roles=roles, env_vars=env_vars)
@@ -120,6 +122,10 @@ class Scene:
         self.roles = {role.name: role for role in roles}
         self.environment = {env_var.name: env_var for env_var in env_vars}
         self._logs: List[SceneLogBody] = []
+
+    @classmethod
+    def from_config(cls, config: SceneConfig) -> SceneConfig:
+        pass  # TODO
 
     @property
     def name(self):
@@ -199,11 +205,10 @@ class Scene:
         return type(config.cls_name, (Scene,), kwds)
 
 
-@dataclass
-class SceneSubClsBuildingConfig:
-    cls_name: str
-    schema: SceneSchema
-    is_terminal_impl: Callable[[], bool]
-    init_impl: Optional[Callable[[*Any, List[Role], List[EnvironmentVariable]], None]] = None
-    new_attrs: Optional[Dict[str, Any]] = None
-    new_methods: Optional[Dict[str, Callable]] = None
+class SceneSubClsBuildingConfig(BaseModel):
+    cls_name: str = Field(default=...)
+    schema: SceneSchema = Field(default=...)
+    is_terminal_impl: Callable[[], bool] = Field(default=...)
+    init_impl: Optional[Callable[[*Any, List[Role], List[EnvironmentVariable]], None]] = Field(default=None)
+    new_attrs: Optional[Dict[str, Any]] = Field(default=None)
+    new_methods: Optional[Dict[str, Callable]] = Field(default=None)

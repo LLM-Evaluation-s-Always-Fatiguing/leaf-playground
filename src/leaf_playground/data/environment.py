@@ -1,12 +1,12 @@
 import random
 from abc import abstractmethod
-from dataclasses import dataclass, field
 from typing import Any, List, Set, Optional
+
+from pydantic import Field
 
 from .base import Data
 
 
-@dataclass
 class EnvironmentVariable(Data):
     """
     Environment variable of a scene that can be updated in different ways
@@ -18,16 +18,15 @@ class EnvironmentVariable(Data):
     :param current_value: the value that the environment variable holds for current phase
     :type current_value: Any
     """
-    name: str
-    description: str
-    current_value: Any
+    name: str = Field(default=...)
+    description: str = Field(default=...)
+    current_value: Any = Field(default=...)
 
     @abstractmethod
     def update(self, *args, **kwargs):
         return
 
 
-@dataclass
 class RandomnessEnvironmentVariable(EnvironmentVariable):
     """
     A subtype of EnvironmentVariable whose current_value is updated by choose value from a space randomly
@@ -38,9 +37,9 @@ class RandomnessEnvironmentVariable(EnvironmentVariable):
     :type current_value: Optional[Any]
     """
     random_space: Set[Any]
-    current_value: Optional[Any] = field(default=None)
+    current_value: Optional[Any] = Field(default=None)
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         if self.current_value is None:
             self.update()
         if self.current_value not in self.random_space:
@@ -53,31 +52,15 @@ class RandomnessEnvironmentVariable(EnvironmentVariable):
         """
         Update current_value
 
-        :param exclude_current:
+        :param exclude_current: whether exclude current value from random space when choose a new value
         :return: None
-        :rtype: None
         """
         choices = self.random_space
         if exclude_current:
             choices -= {self.current_value}
         self.current_value = random.choice(list(choices))
 
-    def to_dict(self, include: Optional[List[str]] = None, exclude: Optional[List[str]] = None) -> dict:
-        data = super().to_dict()
-        data["random_space"] = list(data["random_space"])
-        return self._filter_fields(data, include, exclude)
 
-    @classmethod
-    def from_dict(cls, data: dict) -> "RandomnessEnvironmentVariable":
-        return cls(
-            name=data["name"],
-            description=data["description"],
-            random_space=set(data["random_space"]),
-            current_value=data["current_value"]
-        )
-
-
-@dataclass
 class ChainedEnvironmentVariable(EnvironmentVariable):
     """
     A subtype of EnvironmentVariable whose potential values is defined in a chain and
@@ -91,10 +74,10 @@ class ChainedEnvironmentVariable(EnvironmentVariable):
     :type recurrent: bool
     """
     chain: List[Any]
-    current_value: Optional[Any] = field(default=None)
-    recurrent: bool = field(default=False)
+    current_value: Optional[Any] = Field(default=None)
+    recurrent: bool = Field(default=False)
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         if self.current_value is None:
             self.current_value = self.chain[0]
         if self.current_value not in self.chain:
@@ -110,7 +93,6 @@ class ChainedEnvironmentVariable(EnvironmentVariable):
             self.current_value = self.chain[next_position]
 
 
-@dataclass
 class NumericEnvironmentVariable(EnvironmentVariable):
     """
     A subtype of EnvironmentVariable whose value can be updated by using numeric operators.
@@ -123,10 +105,10 @@ class NumericEnvironmentVariable(EnvironmentVariable):
     """
 
     current_value: float
-    le: Optional[float] = field(default=None)
-    ge: Optional[float] = field(default=None)
+    le: Optional[float] = Field(default=None)
+    ge: Optional[float] = Field(default=None)
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
         self._check_value_legality(value=self.current_value, value_name="current_value")
 
     def _check_value_legality(self, value: float, value_name: str = "value") -> None:
@@ -154,7 +136,6 @@ class NumericEnvironmentVariable(EnvironmentVariable):
         self.update(new_value)
 
 
-@dataclass
 class ConstantEnvironmentVariable(EnvironmentVariable):
     """
     A subtype of EnvironmentVariable whose values are unchangeable.
