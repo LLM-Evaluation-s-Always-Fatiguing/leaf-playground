@@ -19,7 +19,12 @@ class _Config(BaseModel):
 class _Configurable:
     _config_type = _Config
 
-    def __init__(self, config: "_Configurable._config_type"):
+    def __init__(self, config: _config_type):
+        if not isinstance(config, self._config_type):
+            raise TypeError(
+                f"required '{self._config_type.__name__}' type config, "
+                f"but get '{config.__class__.__name__}'"
+            )
         self.config = config
 
     def __init_subclass__(cls, **kwargs):
