@@ -10,4 +10,8 @@ First, clone the project; Then, `cd` into the project and install from the sourc
 
 ### GaoKao Bench
 
-We provide a ready to run script to run `gaokao_bench` simulation project: `examples/run_gaokao_bench_simulation.py`
+We provide a script to run `gaokao_bench` simulation project in `examples`, you can execute the following command to run this script: 
+
+```shell
+python exampels/run_gaokao_bench_simulation.py --openai_api_key [YOUR_OPENAI_API_KEY]
+```
