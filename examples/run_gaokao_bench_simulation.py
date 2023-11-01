@@ -1,4 +1,11 @@
+from argparse import ArgumentParser
+
 from leaf_playground.zoo.gaokao_bench.engine import GaoKaoBench, GaoKaoBenchConfig
+
+
+parser = ArgumentParser()
+parser.add_argument("--openai_api_key", type=str)
+args = parser.parse_args()
 
 
 config = GaoKaoBenchConfig(
@@ -9,7 +16,7 @@ config = GaoKaoBenchConfig(
                     "profile_data": {"name": "William"},
                     "backend_config_data": {
                         "model": "gpt-3.5-turbo-instruct",
-                        "api_key": "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",
+                        "api_key": args.openai_api_key,
                         "completion_hyper_params": {"max_tokens": 2}
                     },
                     "backend_obj": {"obj": "OpenAIBackend", "module": "leaf_playground.llm_backend.openai"}
