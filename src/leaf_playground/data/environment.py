@@ -147,12 +147,3 @@ class ConstantEnvironmentVariable(EnvironmentVariable):
     def __setattr__(self, key, value):
         if key in self.__dict__:
             raise TypeError(f"{self.__class__.__name__}.{key} is unchangeable.")
-
-
-ENVIRONMENT_VARIABLE_TYPES = {
-    "base": EnvironmentVariable,
-    "randomness": RandomnessEnvironmentVariable,
-    "chained": ChainedEnvironmentVariable,
-    "numeric": NumericEnvironmentVariable,
-    "constant": ConstantEnvironmentVariable
-}

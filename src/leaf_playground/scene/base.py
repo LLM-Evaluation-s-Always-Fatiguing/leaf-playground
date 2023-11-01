@@ -1,31 +1,31 @@
+import json
+import time
+from datetime import datetime
 from abc import abstractmethod
+from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, FilePath
 
 from .._schema import _Schema
 from .._config import _Config, _Configurable
-from ..data.profile import Role, ROLE_TYPES
-from ..data.environment import EnvironmentVariable, ENVIRONMENT_VARIABLE_TYPES
+from ..data.profile import Role
+from ..data.environment import EnvironmentVariable
+from ..utils.import_util import dynamically_import_obj, DynamicObject
 
 
 class RoleDefinition(BaseModel):
     name: str = Field(default=...)
     description: str = Field(default=...)
-    type: str = Field(default=...)
+    type: DynamicObject = Field(default=...)
     role_num: int = Field(default=...)
     template: str = Field(default=...)
     template_fields: Set[str] = Field(default=...)
 
-    def model_post_init(self, __context: Any) -> None:
-        if self.type not in ROLE_TYPES:
-            types = list(ROLE_TYPES.keys())
-            raise ValueError(f"Types of Role are {types}, bug get {self.type}")
-
 
 class RoleSchema(_Schema):
     num_participants: int = Field(default=...)
-    definitions: Set[RoleDefinition] = Field(default=...)
+    definitions: List[RoleDefinition] = Field(default=...)
 
     def model_post_init(self, __context: Any) -> None:
         if self.num_participants != sum([definition.role_num for definition in self.definitions]):
@@ -41,7 +41,7 @@ class RoleSchema(_Schema):
         for name, role in name2roles.items():
             definition = name2definitions[name]
             assert definition.description == role.description
-            assert ROLE_TYPES[definition.type].__name__ == role.__class__.__name__
+            assert isinstance(role, dynamically_import_obj(definition.type))
 
     def get_definition(self, name: str) -> RoleDefinition:
         name2definitions = {definition.name: definition for definition in self.definitions}
@@ -51,18 +51,13 @@ class RoleSchema(_Schema):
 class EnvironmentVariableDefinition(BaseModel):
     name: str = Field(default=...)
     description: str = Field(default=...)
-    type: str = Field(default=...)
+    type: DynamicObject = Field(default=...)
     template: str = Field(default=...)
-    template_fields: List[str] = Field(default=...)
-
-    def model_post_init(self, __context: Any) -> None:
-        if self.type not in ENVIRONMENT_VARIABLE_TYPES:
-            types = list(ENVIRONMENT_VARIABLE_TYPES.keys())
-            raise ValueError(f"Types of EnvironmentVariable are {types}, bug get {self.type}")
+    template_fields: Set[str] = Field(default=...)
 
 
 class EnvironmentSchema(_Schema):
-    definitions: List[EnvironmentVariableDefinition]
+    definitions: List[EnvironmentVariableDefinition] = Field(default=...)
 
     def valid(self, env_vars: List[EnvironmentVariable]):
         assert len(self.definitions) == len(env_vars)
@@ -74,7 +69,7 @@ class EnvironmentSchema(_Schema):
         for name, variable in name2variables.items():
             definition = name2definitions[name]
             assert definition.description == variable.description
-            assert ENVIRONMENT_VARIABLE_TYPES[definition.type].__name__ == variable.__class__.__name__
+            assert isinstance(variable, dynamically_import_obj(definition.type))
 
     def get_definition(self, name: str) -> EnvironmentVariableDefinition:
         name2definitions = {definition.name: definition for definition in self.definitions}
@@ -91,41 +86,97 @@ class SceneSchema(_Schema):
         self.role_schema.valid(roles)
         self.environment_schema.valid(env_vars)
 
+    @property
+    def num_participants(self):
+        return self.role_schema.num_participants
+
 
 class SceneLogBody(BaseModel):
-    turn_id: int = Field(default=...)
-    turn_step_id: int = Field(default=...)
-    global_step_id: int = Field(default=...)
+    time: datetime = Field(default_factory=lambda: datetime.utcnow())
     event: Optional[dict] = Field(default=None)
     message: Optional[dict] = Field(default=None)
 
     def format(
         self,
         template: str,
-        fields: List[str]
+        fields: Set[str]
     ) -> str:
         data = {f: self.__getattribute__(f) for f in fields}
         return template.format(**data)
 
 
+class RoleConfig(_Config):
+    role_data: Optional[dict] = Field(default=None)
+    role_file: Optional[FilePath] = Field(default=None, pattern=r".*.json")
+    role_obj: DynamicObject = Field(
+        default=DynamicObject(obj="Role", module="leaf_playground.data.profile")
+    )
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.role_data is None and self.role_file is None:
+            raise ValueError("at least on of role_data and role_file is specified")
+
+    @property
+    def role(self) -> Role:
+        if self.role_data is None:
+            with open(self.role_file, "r", encoding="utf-8") as f:
+                self.role_data = json.load(f)
+        return dynamically_import_obj(self.role_obj)(**self.role_data)
+
+
+class EnvironmentVarConfig(_Config):
+    env_var_data: Optional[dict] = Field(default=None)
+    env_var_file: Optional[FilePath] = Field(default=None, pattern=r".*.json")
+    env_var_obj: DynamicObject = Field(
+        default=DynamicObject(obj="EnvironmentVariable", module="leaf_playground.data.environment")
+    )
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.env_var_data is None and self.env_var_file is None:
+            raise ValueError("at least one of env_var_data and env_var_file is specified")
+
+    @property
+    def env_var(self) -> EnvironmentVariable:
+        if self.env_var_data is None:
+            with open(self.env_var_file, "r", encoding="utf-8") as f:
+                self.env_var_data = json.load(f)
+        return dynamically_import_obj(self.env_var_obj)(**self.env_var_data)
+
+
 class SceneConfig(_Config):
-    pass
+    role_configs: List[RoleConfig] = Field(default=...)
+    env_var_configs: List[EnvironmentVarConfig] = Field(default=...)
+
+    @property
+    def roles(self) -> List[Role]:
+        return [role_config.role for role_config in self.role_configs]
+
+    @property
+    def env_vars(self) -> List[EnvironmentVariable]:
+        return [env_var_config.env_var for env_var_config in self.env_var_configs]
 
 
 class Scene(_Configurable):
     schema: SceneSchema
-    _config_type = SceneConfig
+    config_obj = SceneConfig
 
-    def __int__(self, roles: List[Role], env_vars: List[EnvironmentVariable]):
+    def __init__(self, config: config_obj):
+        super().__init__(config=config)
+
+        roles = self.config.roles
+        env_vars = self.config.env_vars
         self.schema.valid(roles=roles, env_vars=env_vars)
 
         self.roles = {role.name: role for role in roles}
-        self.environment = {env_var.name: env_var for env_var in env_vars}
+        self.environments = {env_var.name: env_var for env_var in env_vars}
+
         self._logs: List[SceneLogBody] = []
 
+        self._init()
+
     @classmethod
-    def from_config(cls, config: SceneConfig) -> SceneConfig:
-        pass  # TODO
+    def from_config(cls, config: SceneConfig) -> "Scene":
+        return cls(config=config)
 
     @property
     def name(self):
@@ -135,11 +186,15 @@ class Scene(_Configurable):
     def description(self):
         return self.schema.description
 
+    @property
+    def logs(self):
+        return self._logs
+
     def get_role(self, name: str) -> Role:
         return self.roles[name]
 
     def get_env_var(self, name: str) -> EnvironmentVariable:
-        return self.environment[name]
+        return self.environments[name]
 
     def display_role(
         self,
@@ -162,53 +217,75 @@ class Scene(_Configurable):
     ) -> Optional[EnvironmentVariable]:
         env_var = self.get_env_var(name)
         template = self.schema.environment_schema.get_definition(name).template
-        fields = self.schema.role_schema.get_definition(name).template_fields
+        fields = self.schema.environment_schema.get_definition(name).template_fields
         displayer(env_var.format(template, fields))
         if return_obj:
             return env_var
 
-    def display_logs(
-        self,
+    @staticmethod
+    def _display_log(
         template: str,
-        fields: List[str],
-        displayer: Callable[[str], None] = print,
-        return_obj: bool = False
-    ) -> Optional[List[SceneLogBody]]:
-        for log in self._logs:
-            displayer(log.format(template, fields))
-        if return_obj:
-            return self._logs
+        fields: Set[str],
+        log: SceneLogBody,
+        displayer: Callable[[str], None]
+    ) -> None:
+        displayer(log.format(template, fields))
+
+    def stream_logs(
+        self,
+        template: str = "[{time}] :: EVENT - {event} :: MESSAGE - {message}",
+        fields: Set[str] = {"time", "event", "message"},
+        displayer: Callable[[str], None] = partial(print, flush=True)
+    ):
+        # this is a very ugly implementation
+
+        cur = 0
+        while True:
+            if cur >= len(self._logs):
+                time.sleep(0.1)
+            else:
+                self._display_log(template=template, fields=fields, log=self._logs[cur], displayer=displayer)
+                cur += 1
+                if self.is_terminal() and cur == len(self._logs):
+                    break
 
     def append_log(self, log: SceneLogBody):
         self._logs.append(log)
 
     @classmethod
     def display_schema(cls, displayer: Callable[[str], None] = print) -> None:
-        displayer(repr(cls.schema))
+        displayer(cls.schema.model_dump_json(indent=2))
 
     @abstractmethod
     def is_terminal(self) -> bool:
         return True
 
+    def _init(self) -> None:
+        pass
+
     @classmethod
-    def build_sub_cls(
-        cls,
-        config: "SceneSubClsBuildingConfig"
-    ):
-        kwds = {"schema": config.schema, "is_terminal": config.is_terminal_impl}
+    def implement_sub_cls(cls, config: "SceneSubClsImplConfig"):
+        kwds = {
+            "schema": config.scene_schema,
+            "config_obj": dynamically_import_obj(config.config_obj),
+            "is_terminal": config.is_terminal_impl,
+        }
         if config.init_impl is not None:
-            kwds["__init__"] = config.init_impl
+            kwds["_init"] = config.init_impl
         if config.new_attrs is not None:
             kwds.update(config.new_attrs)
         if config.new_methods is not None:
             kwds.update(config.new_methods)
-        return type(config.cls_name, (Scene,), kwds)
+        return type(config.cls_name, (cls,), kwds)
 
 
-class SceneSubClsBuildingConfig(BaseModel):
+class SceneSubClsImplConfig(BaseModel):
     cls_name: str = Field(default=...)
-    schema: SceneSchema = Field(default=...)
-    is_terminal_impl: Callable[[], bool] = Field(default=...)
-    init_impl: Optional[Callable[[*Any, List[Role], List[EnvironmentVariable]], None]] = Field(default=None)
+    scene_schema: SceneSchema = Field(default=...)
+    is_terminal_impl: Callable[[Scene], bool] = Field(default=...)
+    config_obj: DynamicObject = Field(
+        default=DynamicObject(obj="SceneConfig", module="leaf_playground.scene.base")
+    )
+    init_impl: Optional[Callable[[Scene], None]] = Field(default=None)
     new_attrs: Optional[Dict[str, Any]] = Field(default=None)
     new_methods: Optional[Dict[str, Callable]] = Field(default=None)

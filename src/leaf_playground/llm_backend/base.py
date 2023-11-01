@@ -15,10 +15,10 @@ class LLMBackendConfig(_Config):
 
 
 class LLMBackend(_Configurable):
-    _config_type = LLMBackendConfig
+    config_obj = LLMBackendConfig
 
     @classmethod
-    def from_config(cls, config: _config_type) -> "LLMBackend":
+    def from_config(cls, config: config_obj) -> "LLMBackend":
         return cls(config=config)
 
     @abstractmethod

@@ -1,5 +1,6 @@
 import importlib
 import importlib.machinery
+from functools import partial
 from types import ModuleType
 from typing import Optional, Any
 
@@ -26,3 +27,15 @@ def dynamically_import_obj(o: DynamicObject):
             o.source_file.name, o.source_file.as_posix()
         ).load_module()
     return module.__dict__[o.obj]
+
+
+class DynamicFn(BaseModel):
+    fn: DynamicObject = Field(default=...)
+    default_kwargs: Optional[dict] = Field(default=None)
+
+
+def dynamically_import_fn(f: DynamicFn):
+    fn = dynamically_import_obj(f.fn)
+    if f.default_kwargs is not None:
+        fn = partial(fn, **f.default_kwargs)
+    return fn

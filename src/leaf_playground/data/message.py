@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import Any, List, Optional
 from uuid import UUID
 
@@ -15,16 +16,19 @@ class Message(Data):
     :type sender_id: UUID
     :param sender_name: the name of the agent who send the message
     :type sender_name: str
+    :param sender_role_name: the name of the agent's role
+    :type sender_role_name: str
     :param content: content of the message
     :type content: Any
-    :param timestamp: the timestamp that the message is sent
-    :type timestamp: float
+    :param time: the time that the message is sent
+    :type time: datetime
     """
 
     sender_id: UUID = Field(default=...)
     sender_name: str = Field(default=...)
+    sender_role_name: str = Field(default=...)
     content: Any = Field(default=...)
-    timestamp: float = Field(default=...)
+    time: datetime = Field(default_factory=lambda: datetime.utcnow())
 
 
 class TextMessage(Message):
@@ -59,9 +63,3 @@ class JSONMessage(TextMessage):
 
         return data
 
-
-MESSAGE_TYPES = {
-    "base": Message,
-    "text": TextMessage,
-    "json": JSONMessage
-}

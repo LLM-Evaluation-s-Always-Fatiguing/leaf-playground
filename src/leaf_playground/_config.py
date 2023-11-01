@@ -17,18 +17,18 @@ class _Config(BaseModel):
 
 
 class _Configurable:
-    _config_type = _Config
+    config_obj = _Config
 
-    def __init__(self, config: _config_type):
-        if not isinstance(config, self._config_type):
+    def __init__(self, config: config_obj):
+        if not isinstance(config, self.config_obj):
             raise TypeError(
-                f"required '{self._config_type.__name__}' type config, "
+                f"required '{self.config_obj.__name__}' type config, "
                 f"but get '{config.__class__.__name__}'"
             )
         self.config = config
 
     def __init_subclass__(cls, **kwargs):
-        if cls._config_type == _Config or not issubclass(cls._config_type, _Config):
+        if cls.config_obj == _Config or not issubclass(cls.config_obj, _Config):
             raise ValueError(
                 "'_config_type' must be _Config's sub-class and can't be _Config itself, "
                 "which means, when design a _Configurable class, you must also design a "
@@ -51,6 +51,6 @@ class _Configurable:
         raise NotImplementedError()
 
     @classmethod
-    def from_file(cls, file_path: str) -> "_Configurable":
-        config = cls._config_type.load(file_path)
+    def from_config_file(cls, file_path: str) -> "_Configurable":
+        config = cls.config_obj.load(file_path)
         return cls.from_config(config)

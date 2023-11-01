@@ -1,5 +1,5 @@
 from typing import Optional
-from uuid import UUID
+from uuid import uuid4, UUID
 
 from pydantic import Field
 
@@ -12,10 +12,6 @@ class Role(Data):
 
 
 class Profile(Data):
-    id: UUID = Field(default=...)
+    id: UUID = Field(default_factory=lambda: uuid4())
     name: str = Field(default=...)
     role: Optional[Role] = Field(default=None)
-
-
-ROLE_TYPES = {"base": Role}
-PROFILE_TYPES = {"base": Profile}

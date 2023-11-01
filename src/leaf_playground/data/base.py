@@ -1,6 +1,15 @@
-from typing import Set
+import json
+from typing import List, Set
 
 from pydantic import BaseModel
+
+
+def _get_value(data: dict, field_chain: List[str]):
+    field = field_chain.pop(0)
+    value = data[field]
+    if field_chain:
+        return _get_value(value, field_chain)
+    return value
 
 
 class Data(BaseModel):
@@ -19,4 +28,11 @@ class Data(BaseModel):
         :return: a formatted string
         :rtype: str
         """
-        return template.format(**self.model_dump(include=fields))
+        raw_data = json.loads(self.model_dump_json())
+        data = dict()
+        for field in fields:
+            field_chain = field.split(".")
+            field_key = "_".join(field_chain)
+            data[field_key] = _get_value(raw_data, field_chain)
+
+        return template.format(**data)
