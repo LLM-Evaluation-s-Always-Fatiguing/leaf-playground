@@ -18,6 +18,14 @@ class Message(Data):
     :type sender_name: str
     :param sender_role_name: the name of the agent's role
     :type sender_role_name: str
+    :param receiver_ids: the id of agents who can see the message,
+        defaults to None, means anyone can see the message
+    :type receiver_ids: List[UUID] | None
+    :param receiver_names: the name of agents who can see the message,
+        defaults to None, means anyone can see the message
+    :type receiver_names: List[str] | None
+    :param receiver_role_names: the role name of agents who can see the message,
+        defaults to None, means anyone can see the message
     :param content: content of the message
     :type content: Any
     :param time: the time that the message is sent
@@ -27,6 +35,9 @@ class Message(Data):
     sender_id: UUID = Field(default=...)
     sender_name: str = Field(default=...)
     sender_role_name: str = Field(default=...)
+    receiver_ids: Optional[List[UUID]] = Field(default=None)
+    receiver_names: Optional[List[str]] = Field(default=None)
+    receiver_role_names: Optional[List[str]] = Field(default=None)
     content: Any = Field(default=...)
     time: datetime = Field(default_factory=lambda: datetime.utcnow())
 
