@@ -17,7 +17,7 @@ class HuggingFaceBackendConfig(LLMBackendConfig):
     tokenizer_name_or_path: Optional[str] = Field(default=None)
     revision: str = Field(default="main")
     low_cpu_mem_usage: bool = Field(default=True)
-    torch_dtype: str = Field(default="float16", regex="(float16|bfloat16)")
+    torch_dtype: str = Field(default="float16", pattern="(float16|bfloat16)")
     device: Optional[Union[int, str]] = Field(default=None)
     max_memory: Optional[Dict[Union[str, int], str]] = Field(default=None)
     device_map: Union[str, Dict[str, Union[int, str]]] = Field(default="auto")
