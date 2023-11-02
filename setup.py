@@ -7,7 +7,8 @@ requirements = [
     "datasets",
     "openai",
     "torch>=2.0.0",
-    "transformers"
+    "transformers",
+    "sentencepiece"
 ]
 
 setup(
