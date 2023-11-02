@@ -4,7 +4,7 @@ from leaf_playground.zoo.gaokao_bench.engine import GaoKaoBench, GaoKaoBenchConf
 
 parser = ArgumentParser()
 parser.add_argument("--openai_api_key", type=str)
-parser.add_argument("--hf_model_name_or_path", type=str, default="baichuan-inc/Baichuan2-7B-Base")
+parser.add_argument("--hf_model_name_or_path", type=str, default="THUDM/chatglm3-6b-32k")
 parser.add_argument("--trust_remote_code", action="store_true")
 parser.add_argument("--use_fast_tokenizer", action="store_true")
 args = parser.parse_args()
