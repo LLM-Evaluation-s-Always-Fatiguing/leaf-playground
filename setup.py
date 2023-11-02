@@ -8,7 +8,8 @@ requirements = [
     "openai",
     "torch>=2.0.0",
     "transformers",
-    "sentencepiece"
+    "sentencepiece",
+    "accelerate"
 ]
 
 setup(
