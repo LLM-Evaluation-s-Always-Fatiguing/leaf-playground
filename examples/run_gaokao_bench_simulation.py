@@ -58,6 +58,8 @@ config = GaoKaoBenchConfig(
 )
 
 if __name__ == "__main__":
+    import asyncio
+
     engine = GaoKaoBench(config=config)
     engine.start()
     engine.export_logs("./gaokao_bench_simulation_log.jsonl")

@@ -1,13 +1,17 @@
+import asyncio
 import json
 from abc import abstractmethod
 from collections import defaultdict
-from typing import Dict, List, Optional, Any
-from threading import Thread
+from enum import Enum
+from functools import partial
+from typing import Any, Callable, List, Optional, Set
 
 from pydantic import Field, FilePath
 
 from .._config import _Config, _Configurable
 from ..agent import Agent
+from ..data.message import Message
+from ..data.log_body import LogBody
 from ..scene.base import Scene
 from ..utils.import_util import dynamically_import_obj, DynamicObject
 
@@ -44,6 +48,12 @@ class EngineConfig(_Config):
         return self.scene_obj.instance
 
 
+class EngineState(Enum):
+    PENDING = 0
+    RUNNING = 1
+    FINISHED = 2
+
+
 class Engine(_Configurable):
     config_obj = EngineConfig
 
@@ -61,22 +71,56 @@ class Engine(_Configurable):
             if len(participant_names) != role_num:
                 raise ValueError(f"required {role_num} {role_name}, but get {len(participant_names)}")
 
+        self._logs: List[LogBody] = []
+        self._messages: List[Message] = []
+        self._state = EngineState.PENDING
+
+    @property
+    def state(self):
+        return self._state
+
     @abstractmethod
     def _assign_roles(self, agents: List[Agent]) -> List[Agent]:
         raise NotImplementedError()
 
     @abstractmethod
-    def _run(self):
+    async def _run(self):
         raise NotImplementedError()
 
-    def start(self):
-        self._run()
-        Thread(target=self.scene.stream_logs,).start()
+    async def _stream_logs(
+        self,
+        template: str = "[{time}] :: EVENT - {event} :: MESSAGE - {message}",
+        fields: Set[str] = {"time", "event", "message"},
+        displayer: Callable[[str], None] = partial(print, flush=True)
+    ):
+        cur = 0
+        while True:
+            if cur >= len(self._logs):
+                await asyncio.sleep(0.1)
+            else:
+                displayer(self._logs[cur].format(template, fields))
+                cur += 1
+                await asyncio.sleep(0.1)
+            if self._state == EngineState.FINISHED:
+                for log in self._logs[cur:]:
+                    displayer(log.format(template, fields))
+                break
 
     def export_logs(self, file: str):
         with open(file, "w", encoding="utf-8") as f:
-            for log in self.scene.logs:
+            for log in self._logs:
                 f.write(log.model_dump_json(by_alias=True) + "\n")
+
+    def start(self):
+        async def _run_wrapper():
+            self._state = EngineState.RUNNING
+            await self._run()
+            self._state = EngineState.FINISHED
+
+        async def _start():
+            await asyncio.gather(_run_wrapper(), self._stream_logs())
+
+        asyncio.get_event_loop().run_until_complete(_start())
 
     @classmethod
     def from_config(cls, config: config_obj) -> "Engine":

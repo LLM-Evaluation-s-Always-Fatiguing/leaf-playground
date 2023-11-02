@@ -5,8 +5,8 @@ from threading import Thread
 from .agent import Student, Teacher, TeacherConfig
 from .dataset import format_data
 from .scene import GaoKaoScene
+from ...data.log_body import LogBody
 from ...engine.base import Engine, EngineConfig
-from ...scene.base import SceneLogBody
 from ...utils.import_util import dynamically_import_obj
 
 
@@ -40,18 +40,18 @@ class GaoKaoBench(Engine):
                 agent.profile.role = self.scene.get_role("考官")
         return agents
 
-    def _run(self):
+    async def _run(self):
         async def stu_act(stu, message, prefix):
-            self.scene.append_log(
-                SceneLogBody(
+            self._logs.append(
+                LogBody(
                     event={
                         "content": f"{stu.name}({stu.role_name}) answering the question..."
                     }
                 )
             )
             resp = await stu.a_act([message], response_prefix=prefix)
-            self.scene.append_log(
-                SceneLogBody(message=resp.model_dump(include={"content", "sender_name", "sender_role_name"}))
+            self._logs.append(
+                LogBody(message=resp.model_dump(include={"content", "sender_name", "sender_role_name"}))
             )
 
         async def batch_stu_act(message, prefix):
@@ -61,23 +61,23 @@ class GaoKaoBench(Engine):
                 ]
             )
 
-        self.scene.append_log(SceneLogBody(event={"content": "Examine Start"}))
+        self._logs.append(LogBody(event={"content": "Examine Start"}))
         while not self.scene.is_terminal():
             teacher_msg, student_prefix = format_data(self.scene.get_data())
-            self.scene.append_log(SceneLogBody(event={"content": "Session Start"}))
-            self.scene.append_log(
-                SceneLogBody(
+            self._logs.append(LogBody(event={"content": "Session Start"}))
+            self._logs.append(
+                LogBody(
                     event={
                         "content": f"{self.teacher.name}({self.teacher.role_name}) sending a question..."
                     }
                 )
             )
             teacher_message = self.teacher.act(teacher_msg)
-            self.scene.append_log(
-                SceneLogBody(
+            self._logs.append(
+                LogBody(
                     message=teacher_message.model_dump(include={"content", "sender_name", "sender_role_name"})
                 )
             )
-            asyncio.get_event_loop().run_until_complete(batch_stu_act(teacher_message, student_prefix))
-            self.scene.append_log(SceneLogBody(event={"content": "Session End"}))
-        self.scene.append_log(SceneLogBody(event={"content": "Examine End"}))
+            await batch_stu_act(teacher_message, student_prefix)
+            self._logs.append(LogBody(event={"content": "Session End"}))
+        self._logs.append(LogBody(event={"content": "Examine End"}))

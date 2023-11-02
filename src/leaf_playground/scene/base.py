@@ -1,8 +1,6 @@
 import json
-import time
 from datetime import datetime
 from abc import abstractmethod
-from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from pydantic import BaseModel, Field, FilePath
@@ -91,20 +89,6 @@ class SceneSchema(_Schema):
         return self.role_schema.num_participants
 
 
-class SceneLogBody(BaseModel):
-    time: datetime = Field(default_factory=lambda: datetime.utcnow())
-    event: Optional[dict] = Field(default=None)
-    message: Optional[dict] = Field(default=None)
-
-    def format(
-        self,
-        template: str,
-        fields: Set[str]
-    ) -> str:
-        data = {f: self.__getattribute__(f) for f in fields}
-        return template.format(**data)
-
-
 class RoleConfig(_Config):
     role_data: Optional[dict] = Field(default=None)
     role_file: Optional[FilePath] = Field(default=None, pattern=r".*.json")
@@ -170,8 +154,6 @@ class Scene(_Configurable):
         self.roles = {role.name: role for role in roles}
         self.environments = {env_var.name: env_var for env_var in env_vars}
 
-        self._logs: List[SceneLogBody] = []
-
         self._init()
 
     @classmethod
@@ -185,10 +167,6 @@ class Scene(_Configurable):
     @property
     def description(self):
         return self.schema.description
-
-    @property
-    def logs(self):
-        return self._logs
 
     def get_role(self, name: str) -> Role:
         return self.roles[name]
@@ -221,36 +199,6 @@ class Scene(_Configurable):
         displayer(env_var.format(template, fields))
         if return_obj:
             return env_var
-
-    @staticmethod
-    def _display_log(
-        template: str,
-        fields: Set[str],
-        log: SceneLogBody,
-        displayer: Callable[[str], None]
-    ) -> None:
-        displayer(log.format(template, fields))
-
-    def stream_logs(
-        self,
-        template: str = "[{time}] :: EVENT - {event} :: MESSAGE - {message}",
-        fields: Set[str] = {"time", "event", "message"},
-        displayer: Callable[[str], None] = partial(print, flush=True)
-    ):
-        # this is a very ugly implementation
-
-        cur = 0
-        while True:
-            if cur >= len(self._logs):
-                time.sleep(0.1)
-            else:
-                self._display_log(template=template, fields=fields, log=self._logs[cur], displayer=displayer)
-                cur += 1
-                if self.is_terminal() and cur == len(self._logs):
-                    break
-
-    def append_log(self, log: SceneLogBody):
-        self._logs.append(log)
 
     @classmethod
     def display_schema(cls, displayer: Callable[[str], None] = print) -> None:
