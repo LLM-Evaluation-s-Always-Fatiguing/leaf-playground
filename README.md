@@ -15,5 +15,5 @@ First, clone the project; Then, `cd` into the project and install from the sourc
 We provide a script to run `gaokao_bench` simulation project in `examples`, you can execute the following command to run this script: 
 
 ```shell
-python exampels/run_gaokao_bench_simulation.py --openai_api_key [YOUR_OPENAI_API_KEY]
+python exampels/run_gaokao_bench_simulation.py --openai_api_key {YOUR_OPENAI_API_KEY} --hf_model_name_or_path {HF_MODEL} [--trust_remote_code] [--use_fast_tokenizer]
 ```
