@@ -76,10 +76,12 @@ class HuggingFaceBackend(LLMBackend):
         if result_processor:
             res_proc = result_processor
         gen_conf = self.config.generation_config
+        gen_conf.update(
+            **{"pad_token_id": self._pipeline.tokenizer.pad_token_id or self._pipeline.tokenizer.eos_token_id}
+        )
         res = self._pipeline(
             prompt,
             return_full_text=False,
-            handle_long_generation="hole",
             generation_config=GenerationConfig(**gen_conf)
         )
         return res_proc(res)
