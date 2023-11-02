@@ -5,6 +5,8 @@
 
 First, clone the project; Then, `cd` into the project and install from the source by running `pip install .`
 
+> Note: if you want to run LLMs locally, you should install pytorch with CUDA support manually before installing this project.
+
 
 ## Examples
 

@@ -7,7 +7,9 @@ from .._config import _Config, _Configurable
 
 
 class LLMBackendChatCompletionInput(BaseModel):
-    pass
+
+    def format(self, *args, **kwargs):
+        raise NotImplementedError()
 
 
 class LLMBackendConfig(_Config):
