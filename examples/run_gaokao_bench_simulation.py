@@ -5,6 +5,7 @@ from leaf_playground.zoo.gaokao_bench.engine import GaoKaoBench, GaoKaoBenchConf
 parser = ArgumentParser()
 parser.add_argument("--openai_api_key", type=str)
 parser.add_argument("--hf_model_name_or_path", type=str, default="baichuan-inc/Baichuan2-7B-Base")
+parser.add_argument("--trust_remote_code", action="default_true")
 args = parser.parse_args()
 
 config = GaoKaoBenchConfig(
@@ -27,6 +28,7 @@ config = GaoKaoBenchConfig(
                     "profile_data": {"name": "Jordan"},
                     "backend_config_data": {
                         "model_name_or_path": args.hf_model_name_or_path,
+                        "trust_remote_code": args.trust_remote_code,
                         "device": 0,
                         "generation_config": {"max_new_tokens": 2}
                     },
