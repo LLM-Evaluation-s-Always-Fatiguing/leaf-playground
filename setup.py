@@ -1,6 +1,6 @@
 from setuptools import setup, Extension, find_packages
 
-version = "0.0.1.dev0"
+version = "0.0.1.dev1"
 
 requirements = [
     "pydantic>=2.0.0",
