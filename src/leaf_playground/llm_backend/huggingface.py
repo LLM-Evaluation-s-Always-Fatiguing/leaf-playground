@@ -42,8 +42,7 @@ class HuggingFaceBackend(LLMBackend):
             truncation_side="left",
             trust_remote_code=self.config.trust_remote_code
         )
-        if not tokenizer.pad_token_id:
-            tokenizer.pad_token_id = tokenizer.eos_token_id
+        # TODO: specify pad_token_id to eos_token_id if it not exists using new way that transformers now supports
 
         max_memory = self.config.max_memory
         if max_memory:
