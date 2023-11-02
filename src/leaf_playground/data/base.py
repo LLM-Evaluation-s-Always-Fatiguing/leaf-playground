@@ -6,6 +6,8 @@ from pydantic import BaseModel
 
 def _get_value(data: dict, field_chain: List[str]):
     field = field_chain.pop(0)
+    if field.isdigit():
+        field = int(field)
     value = data[field]
     if field_chain:
         return _get_value(value, field_chain)
