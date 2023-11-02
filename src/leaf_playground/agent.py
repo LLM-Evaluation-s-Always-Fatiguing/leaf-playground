@@ -154,12 +154,21 @@ class TextCompletionAgent(LLMAgent):
     async def _a_respond(self, prompt: str) -> str:
         return (await self.llm_backend.a_completion(prompt)).strip()
 
-    def _construct_message(self, response: str) -> TextMessage:
+    def _construct_message(
+        self,
+        response: str,
+        receiver_ids: Optional[List[UUID]] = None,
+        receiver_names: Optional[List[str]] = None,
+        receiver_role_names: Optional[List[str]] = None,
+    ) -> TextMessage:
         try:
             return self.config.message_type(
                 sender_id=self.id,
                 sender_name=self.name,
                 sender_role_name=self.role_name,
+                receiver_ids=receiver_ids,
+                receiver_names=receiver_names,
+                receiver_role_names=receiver_role_names,
                 content=response,
                 timestamp=datetime.utcnow().timestamp()
             )
@@ -172,24 +181,40 @@ class TextCompletionAgent(LLMAgent):
     def act(
         self,
         messages: List[TextMessage],
-        response_prefix: Optional[str] = None,
         *args,
+        response_prefix: Optional[str] = None,
+        receiver_ids: Optional[List[UUID]] = None,
+        receiver_names: Optional[List[str]] = None,
+        receiver_role_names: Optional[List[str]] = None,
         **kwargs
     ) -> TextMessage:
         prompt = self._build_prompt(messages, response_prefix)
         response = self._respond(prompt)
-        return self._construct_message(response)
+        return self._construct_message(
+            response,
+            receiver_ids=receiver_ids,
+            receiver_names=receiver_names,
+            receiver_role_names=receiver_role_names
+        )
 
     async def a_act(
         self,
         messages: List[TextMessage],
-        response_prefix: Optional[str] = None,
         *args,
+        response_prefix: Optional[str] = None,
+        receiver_ids: Optional[List[UUID]] = None,
+        receiver_names: Optional[List[str]] = None,
+        receiver_role_names: Optional[List[str]] = None,
         **kwargs
     ) -> TextMessage:
         prompt = self._build_prompt(messages, response_prefix)
         response = await self._a_respond(prompt)
-        return self._construct_message(response)
+        return self._construct_message(
+            response,
+            receiver_ids=receiver_ids,
+            receiver_names=receiver_names,
+            receiver_role_names=receiver_role_names
+        )
 
 
 class ChatCompletionAgent(LLMAgent):

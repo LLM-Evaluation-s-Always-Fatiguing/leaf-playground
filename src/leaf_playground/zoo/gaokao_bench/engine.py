@@ -1,9 +1,8 @@
 import asyncio
 from typing import List, Any
-from threading import Thread
 
-from .agent import Student, Teacher, TeacherConfig
-from .dataset import format_data
+from .agent import Student, Teacher
+from .dataset import format_student_prompt, format_teacher_prompt
 from .scene import GaoKaoScene
 from ...data.log_body import LogBody
 from ...engine.base import Engine, EngineConfig
@@ -41,43 +40,50 @@ class GaoKaoBench(Engine):
         return agents
 
     async def _run(self):
-        async def stu_act(stu, message, prefix):
+        async def questioning_phase(data: dict, teacher: Teacher):
+            prompt = format_teacher_prompt(data)
+
             self._logs.append(
                 LogBody(
                     event={
-                        "content": f"{stu.name}({stu.role_name}) answering the question..."
+                        "content": f"{teacher.name}({teacher.role_name}) sending a question..."
                     }
                 )
             )
-            resp = await stu.a_act([message], response_prefix=prefix)
+            message = teacher.act(prompt)
+            self._message_pool.put_message(message)
             self._logs.append(
-                LogBody(message=resp.model_dump(include={"content", "sender_name", "sender_role_name"}))
+                LogBody(
+                    message=message.model_dump(
+                        include={"content", "sender_name", "sender_role_name", "receiver_role_names"}
+                    )
+                )
             )
 
-        async def batch_stu_act(message, prefix):
-            await asyncio.gather(
-                *[
-                    stu_act(stu, message, prefix) for stu in self.students
-                ]
+        async def answering_phase(data: dict, student: Student):
+            prompt = format_student_prompt(data)
+
+            self._logs.append(
+                LogBody(
+                    event={
+                        "content": f"{student.name}({student.role_name}) answering the question..."
+                    }
+                )
+            )
+            histories = self._message_pool.get_messages(student)
+            message = student.act(histories, receiver_role_names=["考官"], response_prefix=prompt)
+            self._message_pool.put_message(message)
+            self._logs.append(
+                LogBody(
+                    message=message.model_dump(
+                        include={"content", "sender_name", "sender_role_name", "receiver_role_names"}
+                    )
+                )
             )
 
         self._logs.append(LogBody(event={"content": "Examine Start"}))
         while not self.scene.is_terminal():
-            teacher_msg, student_prefix = format_data(self.scene.get_data())
-            self._logs.append(LogBody(event={"content": "Session Start"}))
-            self._logs.append(
-                LogBody(
-                    event={
-                        "content": f"{self.teacher.name}({self.teacher.role_name}) sending a question..."
-                    }
-                )
-            )
-            teacher_message = self.teacher.act(teacher_msg)
-            self._logs.append(
-                LogBody(
-                    message=teacher_message.model_dump(include={"content", "sender_name", "sender_role_name"})
-                )
-            )
-            await batch_stu_act(teacher_message, student_prefix)
-            self._logs.append(LogBody(event={"content": "Session End"}))
+            data = self.scene.get_data()
+            await questioning_phase(data, self.teacher)
+            await asyncio.gather(*[answering_phase(data, student) for student in self.students])
         self._logs.append(LogBody(event={"content": "Examine End"}))

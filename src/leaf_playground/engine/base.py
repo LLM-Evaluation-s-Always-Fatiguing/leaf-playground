@@ -10,7 +10,7 @@ from pydantic import Field, FilePath
 
 from .._config import _Config, _Configurable
 from ..agent import Agent
-from ..data.message import Message
+from ..data.message import Message, MessagePool
 from ..data.log_body import LogBody
 from ..scene.base import Scene
 from ..utils.import_util import dynamically_import_obj, DynamicObject
@@ -72,7 +72,7 @@ class Engine(_Configurable):
                 raise ValueError(f"required {role_num} {role_name}, but get {len(participant_names)}")
 
         self._logs: List[LogBody] = []
-        self._messages: List[Message] = []
+        self._message_pool: MessagePool = MessagePool()
         self._state = EngineState.PENDING
 
     @property

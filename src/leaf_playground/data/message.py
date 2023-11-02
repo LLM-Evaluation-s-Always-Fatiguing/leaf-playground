@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import Field
 
+import leaf_playground.agent
 from .base import Data
 
 
@@ -40,6 +41,44 @@ class Message(Data):
     receiver_role_names: Optional[List[str]] = Field(default=None)
     content: Any = Field(default=...)
     time: datetime = Field(default_factory=lambda: datetime.utcnow())
+
+
+class MessagePool(Data):
+    """
+    A global message pool to cache all agents' messages in one engine run
+
+    :param messages: messages that all agents send in one engine run
+    :type messages: List[Message]
+    """
+
+    messages: List[Message] = Field(default=[])
+
+    def clear(self):
+        """Clear cached messages, at the start of each engine run, this method should be called"""
+        self.messages = []
+
+    def put_message(self, message: Message):
+        """Put one message into the cache"""
+        self.messages.append(message)
+
+    def get_messages(self, agent: "leaf_playground.agent.Agent") -> List[Message]:
+        """
+        Get messages that sent by the agent or is visible by the agent
+
+        :param agent: agent who want to retrieve messages
+        :type agent: Agent
+        :return: a list of messages that are sent by or visible by the agent
+        :rtype: List[Message]
+        """
+        messages = []
+        for message in self.messages:
+            if not any([message.receiver_ids, message.receiver_names, message.receiver_role_names]) \
+                    or (message.receiver_ids and agent.id in message.receiver_ids) \
+                    or (message.receiver_names and agent.name in message.receiver_names) \
+                    or (message.receiver_role_names and agent.role_name in message.receiver_role_names) \
+                    or agent.id == message.sender_id:
+                messages.append(message)
+        return messages
 
 
 class TextMessage(Message):
