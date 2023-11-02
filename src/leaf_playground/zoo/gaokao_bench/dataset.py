@@ -142,9 +142,11 @@ def load_hf_dataset(config: DatasetConfig) -> Dataset:
     return dataset
 
 
-def format_data(data: dict) -> List[str]:
+def format_teacher_prompt(data: dict) -> str:
     template = DS_TYPE2TEMPLATE[data["type"]]
-    teacher_msg = template["teacher_prompt"].format(**{f: data[f] for f in template["teacher_fields"]})
-    student_msg = template["student_prompt"]
+    prompt = template["teacher_prompt"].format(**{f: data[f] for f in template["teacher_fields"]})
+    return prompt
 
-    return [teacher_msg, student_msg]
+
+def format_student_prompt(data: dict) -> str:
+    return DS_TYPE2TEMPLATE[data["type"]]["student_prompt"]
