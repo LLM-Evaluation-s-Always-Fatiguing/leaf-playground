@@ -86,7 +86,7 @@ class DSQAEngine(Engine):
                 )
             )
 
-            return {"name": examinee.name, "id": examinee.id, "answer": message.content}
+            return {"name": examinee.name, "id": str(examinee.id), "answer": message.content}
 
         self._logs.append(LogBody(event={"content": "Examine Start"}))
         while not self.scene.is_terminal():
