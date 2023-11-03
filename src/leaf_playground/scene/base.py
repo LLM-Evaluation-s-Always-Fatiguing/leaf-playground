@@ -15,10 +15,10 @@ from ..utils.import_util import dynamically_import_obj, DynamicObject
 class RoleDefinition(BaseModel):
     name: str = Field(default=...)
     description: str = Field(default=...)
-    type: DynamicObject = Field(default=...)
+    type: DynamicObject = Field(default=DynamicObject(obj="Role", module="leaf_playground.data.profile"))
     role_num: int = Field(default=-1, ge=-1)
-    template: str = Field(default=...)
-    template_fields: Set[str] = Field(default=...)
+    template: str = Field(default="RoleDefinition :: name={name}; description={description}")
+    template_fields: Set[str] = Field(default={"name", "description"})
 
     def model_post_init(self, __context: Any) -> None:
         if self.role_num == 0:
@@ -61,9 +61,14 @@ class RoleSchema(_Schema):
 class EnvironmentVariableDefinition(BaseModel):
     name: str = Field(default=...)
     description: str = Field(default=...)
-    type: DynamicObject = Field(default=...)
-    template: str = Field(default=...)
-    template_fields: Set[str] = Field(default=...)
+    type: DynamicObject = Field(
+        default=DynamicObject(
+            obj="EnvironmentVariable",
+            module="leaf_playground.data.environment"
+        )
+    )
+    template: str = Field(default="EnvironmentVariableDefinition :: name={name}; description={description}")
+    template_fields: Set[str] = Field(default={"name", "description"})
 
 
 class EnvironmentSchema(_Schema):
