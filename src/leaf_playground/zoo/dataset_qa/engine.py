@@ -102,4 +102,4 @@ class DSQAEngine(Engine):
     def export_examine_results(self, file: str):
         with open(file, "w", encoding="utf-8") as f:
             for exam_res in self.examine_results:
-                f.write(json.dumps(exam_res) + "\n")
+                f.write(json.dumps(exam_res, ensure_ascii=False) + "\n")
