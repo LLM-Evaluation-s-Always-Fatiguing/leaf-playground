@@ -101,7 +101,7 @@ class Engine(_Configurable):
         cur = 0
         while True:
             if cur >= len(self._logs):
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.001)
             else:
                 displayer(self._logs[cur].format(template, fields))
                 cur += 1
@@ -109,6 +109,7 @@ class Engine(_Configurable):
             if self._state == EngineState.FINISHED:
                 for log in self._logs[cur:]:
                     displayer(log.format(template, fields))
+                    await asyncio.sleep(0.1)
                 break
 
     def export_logs(self, file: str):
