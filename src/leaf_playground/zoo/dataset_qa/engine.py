@@ -95,7 +95,7 @@ class DSQAEngine(Engine):
             if self.scene.config.dataset_config.golden_answer_column:
                 label = data[self.scene.config.dataset_config.golden_answer_column]
             question = await questioning_phase(data, self.examiner)
-            answers = await asyncio.gather(*[answering_phase(data, student) for student in self.examinees])
+            answers = await asyncio.gather(*[answering_phase(student) for student in self.examinees])
             self.examine_results.append({"question": question, "answers": answers, "label": label})
         self._logs.append(LogBody(event={"content": "Examine End"}))
 
