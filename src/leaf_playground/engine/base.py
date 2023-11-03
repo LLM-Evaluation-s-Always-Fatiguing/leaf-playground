@@ -63,6 +63,15 @@ class Engine(_Configurable):
         self.scene: Scene = self.config.scene
         self.participants = self._assign_roles(self.config.agents)
 
+        self._valid_participants()
+
+        self._logs: List[LogBody] = []
+        self._message_pool: MessagePool = MessagePool()
+        self._state = EngineState.PENDING
+
+    def _valid_participants(self):
+        if self.scene.schema.num_participants == -1:
+            return
         role2participants = defaultdict(list)
         for participant in self.participants:
             role2participants[participant.role_name].append(participant.name)
@@ -70,10 +79,6 @@ class Engine(_Configurable):
             role_num = self.scene.schema.role_schema.get_definition(role_name).role_num
             if len(participant_names) != role_num:
                 raise ValueError(f"required {role_num} {role_name}, but get {len(participant_names)}")
-
-        self._logs: List[LogBody] = []
-        self._message_pool: MessagePool = MessagePool()
-        self._state = EngineState.PENDING
 
     @property
     def state(self):

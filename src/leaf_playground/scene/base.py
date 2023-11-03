@@ -16,18 +16,30 @@ class RoleDefinition(BaseModel):
     name: str = Field(default=...)
     description: str = Field(default=...)
     type: DynamicObject = Field(default=...)
-    role_num: int = Field(default=...)
+    role_num: int = Field(default=-1, ge=-1)
     template: str = Field(default=...)
     template_fields: Set[str] = Field(default=...)
 
+    def model_post_init(self, __context: Any) -> None:
+        if self.role_num == 0:
+            raise ValueError("role_num can't be 0")
+
 
 class RoleSchema(_Schema):
-    num_participants: int = Field(default=...)
+    num_participants: int = Field(default=-1, ge=-1)
     definitions: List[RoleDefinition] = Field(default=...)
 
     def model_post_init(self, __context: Any) -> None:
-        if self.num_participants != sum([definition.role_num for definition in self.definitions]):
-            raise ValueError("'num_participants' must equal to the sum of all roles' 'role_num'")
+        if self.num_participants == 0:
+            raise ValueError("num_participants can't be 0")
+        if self.num_participants != -1:
+            if any(definition.role_num == -1 for definition in self.definitions):
+                raise ValueError(
+                    "we can't infer the total number of participants when there are some role_definition's "
+                    "'role_num' is -1 but 'num_participants' is a certain positive number"
+                )
+            if self.num_participants != sum([definition.role_num for definition in self.definitions]):
+                raise ValueError("'num_participants' must equal to the sum of all roles' 'role_num'")
 
     def valid(self, roles: List[Role]):
         assert len(self.definitions) == len(roles)

@@ -35,7 +35,7 @@ GaoKaoSceneSchema = SceneSchema(
     name="仿高考面试",
     description="以中国式高考为考核内容的面试场景，有一名考官和一名考生，考官负责提出问题（可能会给定候选答案），考生对考官的提问进行回答",
     role_schema=RoleSchema(
-        num_participants=3,
+        num_participants=-1,
         definitions=[
             RoleDefinition(
                 name="考官",
@@ -55,7 +55,7 @@ GaoKaoSceneSchema = SceneSchema(
                     obj="Role",
                     module="leaf_playground.data.profile"
                 ),
-                role_num=2,
+                role_num=-1,
                 template=ROLE_DEF_TEMPLATE,
                 template_fields=ROLE_DEF_TEMPLATE_FIELDS
             )
