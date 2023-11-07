@@ -5,7 +5,7 @@ version = "0.0.1.dev1"
 requirements = [
     "pydantic>=2.0.0",
     "datasets",
-    "openai",
+    "openai<1.0.0",
     "torch>=2.0.0",
     "transformers",
     "sentencepiece",
