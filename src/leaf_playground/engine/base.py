@@ -25,8 +25,7 @@ class ObjConfig(_Config):
         if not self.config_data and not self.config_file:
             raise ValueError("at least config_data or config_file should be specified")
 
-    @property
-    def instance(self):
+    def creat_instance(self):
         if not self.config_data:
             with open(self.config_file, "r", encoding="utf-8") as f:
                 self.config_data = json.load(f)
@@ -39,13 +38,11 @@ class EngineConfig(_Config):
     agents_obj: List[ObjConfig] = Field(default=...)
     scene_obj: ObjConfig = Field(default=...)
 
-    @property
-    def agents(self) -> List[Agent]:
-        return [agent_obj.instance for agent_obj in self.agents_obj]
+    def create_agents(self) -> List[Agent]:
+        return [agent_obj.creat_instance() for agent_obj in self.agents_obj]
 
-    @property
-    def scene(self) -> Scene:
-        return self.scene_obj.instance
+    def create_scene(self) -> Scene:
+        return self.scene_obj.creat_instance()
 
 
 class EngineState(Enum):
@@ -60,8 +57,8 @@ class Engine(_Configurable):
     def __init__(self, config: config_obj):
         super().__init__(config=config)
 
-        self.scene: Scene = self.config.scene
-        self.participants = self._assign_roles(self.config.agents)
+        self.scene: Scene = self.config.create_scene()
+        self.participants = self._assign_roles(self.config.create_agents())
 
         self._valid_participants()
 
