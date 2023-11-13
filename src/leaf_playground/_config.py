@@ -1,0 +1,56 @@
+import json
+from abc import abstractmethod
+
+from pydantic import BaseModel
+
+
+class _Config(BaseModel):
+
+    def save(self, file_path: str):
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(self.model_dump(by_alias=True), f, indent=2)
+
+    @classmethod
+    def load(cls, file_path: str):
+        kwargs = json.load(open(file_path, "r", encoding="utf-8"))
+        return cls(**kwargs)
+
+
+class _Configurable:
+    config_obj = _Config
+
+    def __init__(self, config: config_obj):
+        if not isinstance(config, self.config_obj):
+            raise TypeError(
+                f"required '{self.config_obj.__name__}' type config, "
+                f"but get '{config.__class__.__name__}'"
+            )
+        self.config = config
+
+    def __init_subclass__(cls, **kwargs):
+        if cls.config_obj == _Config or not issubclass(cls.config_obj, _Config):
+            raise ValueError(
+                "'_config_type' must be _Config's sub-class and can't be _Config itself, "
+                "which means, when design a _Configurable class, you must also design a "
+                "_Config class and override '_config_type' of the new _Configurable class "
+                "with the new _Config class."
+            )
+
+    def to_dict(self, **kwargs) -> dict:
+        return self.config.model_dump(**kwargs)
+
+    def to_json(self, **kwargs) -> str:
+        return self.config.model_dump_json(**kwargs)
+
+    def save_config(self, file_path: str):
+        self.config.save(file_path)
+
+    @classmethod
+    @abstractmethod
+    def from_config(cls, config: _Config) -> "_Configurable":
+        raise NotImplementedError()
+
+    @classmethod
+    def from_config_file(cls, file_path: str) -> "_Configurable":
+        config = cls.config_obj.load(file_path)
+        return cls.from_config(config)
