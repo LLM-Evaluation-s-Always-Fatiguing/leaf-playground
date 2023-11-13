@@ -18,7 +18,7 @@ config = GaoKaoBenchConfig(
                     "backend_config_data": {
                         "model": "gpt-3.5-turbo-instruct",
                         "api_key": args.openai_api_key,
-                        "completion_hyper_params": {"max_tokens": 2}
+                        "completion_kwargs": {"max_tokens": 2}
                     },
                     "backend_obj": {"obj": "OpenAIBackend", "module": "leaf_playground.llm_backend.openai"}
                 },
