@@ -7,7 +7,7 @@ requirements = [
     "datasets",
     "openai>=1.0.0",
     "torch>=2.0.0",
-    "transformers",
+    "transformers[agent]",
     "sentencepiece",
     "accelerate"
 ]
