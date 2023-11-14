@@ -36,7 +36,7 @@ class RandomnessEnvironmentVariable(EnvironmentVariable):
     :param current_value: the value that the environment variable holds for current phase
     :type current_value: Optional[Any]
     """
-    random_space: Set[Any]
+    random_space: Set[Any] = Field(default=...)
     current_value: Optional[Any] = Field(default=None)
 
     def model_post_init(self, __context: Any) -> None:
@@ -73,7 +73,7 @@ class ChainedEnvironmentVariable(EnvironmentVariable):
     :param recurrent: whether the chain is a recurrent chain
     :type recurrent: bool
     """
-    chain: List[Any]
+    chain: List[Any] = Field(default=...)
     current_value: Optional[Any] = Field(default=None)
     recurrent: bool = Field(default=False)
 
@@ -104,7 +104,7 @@ class NumericEnvironmentVariable(EnvironmentVariable):
     :param ge: the environment variable's minimum value, if is None, there is no minimum constrain
     """
 
-    current_value: float
+    current_value: float = Field(default=...)
     le: Optional[float] = Field(default=None)
     ge: Optional[float] = Field(default=None)
 
