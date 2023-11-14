@@ -5,7 +5,6 @@ from uuid import UUID
 
 from pydantic import Field
 
-import leaf_playground.agent
 from .base import Data
 
 
