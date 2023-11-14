@@ -155,7 +155,7 @@ class SceneInfo(_Configurable):
         }
         self.roles = {
             role_name: getattr(self.config.roles, role_name)
-            for role_name in self.config.roles.model_fields.keys()
+            for role_name in self.config.roles.model_fields.keys() if role_name != "roles_agent_num"
         }
         self.roles_agent_num = self.config.roles.roles_agent_num
 
