@@ -177,6 +177,8 @@ class SceneInfo(_Configurable):
     config_obj = SceneInfoConfigBase
     config: config_obj
 
+    obj_for_import: DynamicObject = DynamicObject(obj="SceneInfo", module="leaf_playground.core.scene_info")
+
     def __init__(self, config: config_obj):
         super().__init__(config=config)
 

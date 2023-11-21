@@ -45,6 +45,10 @@ class GeneralMCQExamineSceneInfo(SceneInfo):
     config_obj = GeneralMCQExamineSceneInfoConfig
     config: config_obj
 
+    obj_for_import = DynamicObject(
+        obj="GeneralMCQExamineSceneInfo", module="leaf_playground.zoo.general_mcq_examine.scene_info"
+    )
+
     def __init__(self, config: config_obj):
         super().__init__(config=config)
 
