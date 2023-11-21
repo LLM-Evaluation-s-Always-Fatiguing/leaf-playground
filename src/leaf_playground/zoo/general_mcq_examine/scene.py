@@ -21,17 +21,7 @@ from leaf_playground.zoo.general_mcq_examine.scene_info import (
 )
 
 
-class GeneralMCQExamineSceneInfoObjConfig(SceneInfoObjConfig):
-    scene_info_obj: DynamicObject = Field(
-        DynamicObject(
-            obj="GeneralMCQExamineSceneInfo",
-            module="leaf_playground.zoo.general_mcq_examine.scene_info"
-        )
-    )
-
-
 class GeneralMCQExamineSceneConfig(SceneConfig):
-    scene_info: GeneralMCQExamineSceneInfoObjConfig = Field(default=...)
     dataset_config: DatasetConfig = Field(default=...)
 
 
@@ -94,7 +84,6 @@ class GeneralMCQExamineScene(Scene):
 
 
 __all__ = [
-    "GeneralMCQExamineSceneInfoObjConfig",
     "GeneralMCQExamineSceneConfig",
     "GeneralMCQExamineScene"
 ]
