@@ -46,12 +46,5 @@ scene = GeneralMCQExamineScene.from_config(config=scene_config)
 
 
 if __name__ == "__main__":
-    import json
-
-    from leaf_playground.data.log_body import LogBody
-
-    with open("log_body_schema_serialization_mode.json", "w", encoding="utf-8") as f:
-        json.dump((LogBody.model_json_schema(mode="serialization")), f, indent=4, ensure_ascii=False)
-
     scene.start(websocket=None)
     scene.export_logs("logs.jsonl")
