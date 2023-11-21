@@ -10,9 +10,9 @@ from ..data.profile import Profile, Role
 from ..utils.import_util import dynamically_import_obj, DynamicObject
 
 
-class SceneAgentObjInfo(BaseModel):
-    obj_description: str = Field(default=...)
-    obj: DynamicObject = Field(default=...)
+class SceneAgentMetadata(BaseModel):
+    description: str = Field(default=...)
+    actions: Dict[str, str] = Field(default=...)
 
 
 class SceneAgentConfig(_Config):
@@ -71,10 +71,10 @@ class SceneAgent(_Configurable):
         return cls(config=config)
 
     @classmethod
-    def get_obj_info(cls):
-        return SceneAgentObjInfo(
-            obj_description=cls.description,
-            obj=cls.obj_for_import
+    def get_metadata(cls):
+        return SceneAgentMetadata(
+            description=cls.description,
+            actions={action_name: str(action_signature) for action_name, action_signature in cls._actions.items()},
         )
 
 
@@ -153,7 +153,7 @@ class SceneStaticAgent(SceneAgent):
 
 
 __all__ = [
-    "SceneAgentObjInfo",
+    "SceneAgentMetadata",
     "SceneAgentConfig",
     "SceneAgent",
     "SceneAIAgentConfig",
