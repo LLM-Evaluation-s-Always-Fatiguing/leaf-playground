@@ -6,6 +6,7 @@ from pydantic import create_model, BaseModel, Field
 from pydantic.fields import FieldInfo
 
 from .const import ZOO_ROOT
+from .._config import _Config
 from ..core.scene import Scene, SceneConfig, SceneInfoObjConfig, SceneAgentObjConfig, SceneAgentsObjConfig
 from ..core.scene_info import SceneMetaData, SceneInfo, SceneInfoConfigBase
 from ..core.scene_agent import SceneAgentConfig, SceneAgent, SceneAgentMetadata
@@ -131,16 +132,16 @@ async def get_scene(scene_id: str) -> SceneDetail:
         scene_metadata=scene_full["scene_metadata"],
         agents_metadata=scene_full["agents_metadata"],
         role_agents_num=scene_full["role_agents_num"],
-        scene_info_config_schema=scene_full["scene_info_config_class"].model_json_schema(by_alias=True),
+        scene_info_config_schema=scene_full["scene_info_config_class"].get_json_schema(by_alias=True),
         agents_config_schemas={
-            agent_id: agent_config_class.model_json_schema(by_alias=True) for agent_id, agent_config_class in
+            agent_id: agent_config_class.get_json_schema(by_alias=True) for agent_id, agent_config_class in
             scene_full["agent_config_classes"].items()
         },
         additional_config_schema=create_model(
             __model_name="AdditionalConfigTemp",
-            __base__=BaseModel,
+            __base__=_Config,
             **scene_full["scene_config_additional_fields"]
-        ).model_json_schema(by_alias=True)
+        ).get_json_schema(by_alias=True)
     )
 
     return scene_detail

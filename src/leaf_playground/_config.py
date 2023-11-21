@@ -1,7 +1,9 @@
 import json
+import inspect
 from abc import abstractmethod
+from typing import Literal, Type
 
-from pydantic import BaseModel
+from pydantic import create_model, BaseModel
 
 
 class _Config(BaseModel):
@@ -14,6 +16,21 @@ class _Config(BaseModel):
     def load(cls, file_path: str):
         kwargs = json.load(open(file_path, "r", encoding="utf-8"))
         return cls(**kwargs)
+
+    @classmethod
+    def get_json_schema(cls, by_alias: bool = False, mode: Literal['validation', 'serialization'] = 'validation'):
+        def _create_new_annotation(annotation: Type):
+            if not inspect.isclass(annotation) or not issubclass(annotation, BaseModel):
+                return annotation
+            anno_fields = {
+                f_name: f_info for f_name, f_info in annotation.model_fields.items() if not f_info.exclude
+            }
+            for f_name, f_info in anno_fields.items():
+                f_info.annotation = _create_new_annotation(f_info.annotation)
+                anno_fields[f_name] = (f_info.annotation, f_info)
+            return create_model(__model_name=f"{annotation.__name__}Temp", __base__=BaseModel, **anno_fields)
+
+        return _create_new_annotation(cls).model_json_schema(by_alias=by_alias, mode=mode)
 
 
 class _Configurable:
