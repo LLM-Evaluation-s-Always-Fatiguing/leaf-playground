@@ -128,6 +128,11 @@ class SceneMetaData(Data):
     role_definitions: List[RoleDefinition] = Field(default=...)
     env_definitions: List[EnvVarDefinition] = Field(default=...)
 
+    def get_roles_agent_num(self) -> Dict[str, int]:
+        return {
+            role.name: role.num_agents for role in self.role_definitions
+        }
+
 
 class SceneInfoConfigBase(_Config):
     name: str = Field(default=...)
