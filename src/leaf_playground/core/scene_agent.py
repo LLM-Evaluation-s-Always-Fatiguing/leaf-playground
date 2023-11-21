@@ -80,7 +80,7 @@ class SceneAgent(_Configurable):
 
 class SceneAIAgentConfig(SceneAgentConfig):
     ai_backend_config: AIBackendConfig = Field(default=...)
-    ai_backend_obj: DynamicObject = Field(default=...)
+    ai_backend_obj: DynamicObject = Field(default=..., exclude=True)
 
     def model_post_init(self, __context) -> None:
         self.valid(self.ai_backend_config, self.ai_backend_obj)

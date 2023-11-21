@@ -27,6 +27,7 @@ def _partially_instantiate_model(cls: Type[BaseModel], __model_name: str, **fiel
         f_info.annotation = f_annotation
         f_info.default = f_value
         f_info.frozen = True
+        f_info.exclude = True
         fields[f_name] = (f_annotation, f_info)
 
     return create_model(
@@ -93,7 +94,7 @@ class RolesConfigBase(BaseModel):
                 agent_type=definition.agent_type
             )
             f_default = f_annotation()
-            fields[f_name] = (f_annotation, FieldInfo(default=f_default, annotation=f_annotation))
+            fields[f_name] = (f_annotation, FieldInfo(default=f_default, annotation=f_annotation, exclude=True))
             name2cls[f_name] = f_annotation
 
         roles_agent_num = {definition.name: definition.num_agents for definition in definitions}
@@ -135,9 +136,9 @@ class SceneMetaData(Data):
 
 
 class SceneInfoConfigBase(_Config):
-    name: str = Field(default=...)
-    description: str = Field(default=...)
-    roles: RolesConfigBase = Field(default=...)
+    name: str = Field(default=..., exclude=True)
+    description: str = Field(default=..., exclude=True)
+    roles: RolesConfigBase = Field(default=..., exclude=True)
     environments: EnvVarsConfigBase = Field(default=...)
 
     @classmethod
@@ -158,9 +159,9 @@ class SceneInfoConfigBase(_Config):
 
         fields.update(
             **{
-                "name": (Literal[name], FieldInfo(default=name, annotation=Literal[name])),
-                "description": (Literal[description], FieldInfo(default=description, annotation=Literal[description])),
-                "roles": (roles_config_model, FieldInfo(default=roles_config_model(), annotation=roles_config_model)),
+                "name": (Literal[name], FieldInfo(default=name, annotation=Literal[name], exclude=True)),
+                "description": (Literal[description], FieldInfo(default=description, annotation=Literal[description], exclude=True)),
+                "roles": (roles_config_model, FieldInfo(default=roles_config_model(), annotation=roles_config_model, exclude=True)),
                 "environments": (envs_config_model, FieldInfo(annotation=envs_config_model)),
             }
         )

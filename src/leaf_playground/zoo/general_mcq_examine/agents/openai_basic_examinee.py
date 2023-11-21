@@ -20,7 +20,8 @@ from leaf_playground.zoo.general_mcq_examine.scene_agent import (
 class OpenAIBasicExamineeConfig(AIBaseExamineeConfig):
     ai_backend_config: OpenAIBackendConfig = Field(default=...)
     ai_backend_obj: DynamicObject = Field(
-        default=DynamicObject(obj="OpenAIBackend", module="leaf_playground.ai_backend.openai")
+        default=DynamicObject(obj="OpenAIBackend", module="leaf_playground.ai_backend.openai"),
+        exclude=True
     )
 
 
