@@ -1,9 +1,8 @@
 from typing import Dict, List, Optional, Union, Any
 
 from pydantic import Field
-from transformers import HfAgent, Tool, RemoteTool, PipelineTool
 
-from .base import AgentConfig, Agent
+from .base import AIBackend, AIBackendConfig
 from .._config import _Config
 from ..data.tool import HFTool
 
@@ -20,8 +19,6 @@ class HFLocalModelConfig(_Config):
     use_fast_tokenizer: bool = Field(default=False)
     trust_remote_code: bool = Field(default=False)
     use_safetensors: bool = Field(default=False)
-    batch_size: int = Field(default=-1)
-    generation_config: dict = Field(default={"max_new_tokens": 32, "num_beams": 1, "do_sample": True})
 
     def prepare_model_tokenizer(self):
         import torch
@@ -63,7 +60,7 @@ class OpenAIConfig(_Config):
     model: str = Field(default="text-davinci-003")
 
 
-class HFAgentConfig(AgentConfig):
+class HFAgentBackendConfig(AIBackendConfig):
     remote_endpoint_config: Optional[HFRemoteEndpointConfig] = Field(default=None)
     local_model_config: Optional[HFLocalModelConfig] = Field(default=None)
     openai_config: Optional[OpenAIConfig] = Field(default=None)
@@ -82,6 +79,8 @@ class HFAgentConfig(AgentConfig):
             )
 
     def create_hf_agent(self):
+        from transformers import HfAgent, Tool
+
         payload = {
             "chat_prompt_template": self.chat_prompt_template,
             "run_prompt_template": self.run_prompt_template,
@@ -99,9 +98,39 @@ class HFAgentConfig(AgentConfig):
         return HfAgent(**payload)
 
 
-class HFAgent(Agent):
-    config_obj = HFAgentConfig
+class HFPipelineBackendConfig(HFLocalModelConfig):
+
+    def prepare_pipeline(self):
+        from transformers import TextGenerationPipeline
+
+        model, tokenizer = self.prepare_model_tokenizer()
+        return TextGenerationPipeline(model=model, tokenizer=tokenizer)
+
+
+class HFAgentBackend(AIBackend):
+    config_obj = HFAgentBackendConfig
     config: config_obj
 
     def __init__(self, config: config_obj):
         super().__init__(config=config)
+        self.hf_agent = self.config.create_hf_agent()
+
+
+class HFPipelineBackend(AIBackend):
+    config_obj = HFPipelineBackendConfig
+    config: config_obj
+
+    def __init__(self, config: config_obj):
+        super().__init__(config=config)
+        self.pipeline = self.config.prepare_pipeline()
+
+
+__all__ = [
+    "HFLocalModelConfig",
+    "HFRemoteEndpointConfig",
+    "OpenAIConfig",
+    "HFAgentBackendConfig",
+    "HFAgentBackend",
+    "HFPipelineBackendConfig",
+    "HFPipelineBackend",
+]
