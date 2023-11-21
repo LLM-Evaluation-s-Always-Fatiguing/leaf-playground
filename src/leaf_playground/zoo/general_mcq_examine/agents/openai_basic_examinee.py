@@ -50,17 +50,20 @@ class OpenAIBasicExaminee(AIBaseExaminee):
         examiner_msg = question.content.text
 
         if is_chat_model:
-            resp = await client.chat.completions.create(
-                messages=[
-                    ChatCompletionSystemMessageParam(role="system", content=system_msg),
-                    ChatCompletionUserMessageParam(role="user", content=examiner_msg),
-                ],
-                model=model,
-                max_tokens=2
-            )
+            try:
+                resp = await client.chat.completions.create(
+                    messages=[
+                        ChatCompletionSystemMessageParam(role="system", content=system_msg),
+                        ChatCompletionUserMessageParam(role="user", content=examiner_msg),
+                    ],
+                    model=model,
+                    max_tokens=2
+                )
+            except:
+                resp = None
             return ExamineeAnswer(
                 question_id=question.question_id,
-                content=Text(text=resp.choices[0].message.content),
+                content=Text(text=resp.choices[0].message.content if resp else ""),
                 sender=self.profile,
                 receivers=[examiner]
             )
@@ -70,14 +73,17 @@ class OpenAIBasicExaminee(AIBaseExaminee):
                 f"{examiner.name}({examiner.role.name}): {examiner_msg}\n"
                 f"{self.name}({self.role_name}): the answer is "
             )
-            resp = await client.completions.create(
-                prompt=prompt,
-                model=model,
-                max_tokens=2
-            )
+            try:
+                resp = await client.completions.create(
+                    prompt=prompt,
+                    model=model,
+                    max_tokens=2
+                )
+            except:
+                resp = None
             return ExamineeAnswer(
                 question_id=question.question_id,
-                content=Text(text=resp.choices[0].text),
+                content=Text(text=resp.choices[0].text if resp else ""),
                 sender=self.profile,
                 receivers=[examiner]
             )
