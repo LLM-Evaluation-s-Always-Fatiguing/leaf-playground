@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Tuple, Type, TypedDict
 
-from fastapi import status, FastAPI, HTTPException
+from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketException, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import create_model, BaseModel, Field
 from pydantic.fields import FieldInfo
@@ -147,8 +147,7 @@ async def get_scene(scene_id: str) -> SceneDetail:
     return scene_detail
 
 
-@app.post("/test/create_scene/", response_class=JSONResponse)
-async def test_create_scene(payload: SceneCreatePayload) -> JSONResponse:
+def _create_scene(payload: SceneCreatePayload) -> Scene:
     scene_full = SCENES[payload.id]
     scene_config_class = scene_full["scene_config_class"]
 
@@ -169,6 +168,18 @@ async def test_create_scene(payload: SceneCreatePayload) -> JSONResponse:
         scene_agents=scene_agents_obj_config,
         **payload.additional_config_data
     )
-    scene_full["scene_class"].from_config(config=scene_config)
+    scene = scene_full["scene_class"].from_config(config=scene_config)
+    return scene
+
+
+@app.websocket("/run_scene")
+async def run_scene(websocket: WebSocket, scene_creation_payload: SceneCreatePayload) -> None:
+    scene = _create_scene(payload=scene_creation_payload)
+    await scene.a_start(websocket=websocket)
+
+
+@app.post("/test/create_scene/", response_class=JSONResponse)
+async def test_create_scene(scene_creation_payload: SceneCreatePayload) -> JSONResponse:
+    _create_scene(payload=scene_creation_payload)
 
     return JSONResponse(content="create scene successfully")
