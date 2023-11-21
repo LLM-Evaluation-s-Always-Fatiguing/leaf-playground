@@ -222,6 +222,14 @@ class Scene(_Configurable):
 
         asyncio.new_event_loop().run_until_complete(_start())
 
+    async def a_start(self, websocket: Optional[WebSocket] = None):
+        async def _run_wrapper():
+            self.state = SceneState.RUNNING
+            await self._run()
+            self.state = SceneState.FINISHED
+
+        await asyncio.gather(_run_wrapper(), self._stream_logs(websocket))
+
     @classmethod
     def from_config(cls, config: config_obj) -> "Scene":
         return cls(config=config)
