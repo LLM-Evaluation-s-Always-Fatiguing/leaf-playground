@@ -14,3 +14,9 @@ class HFTool(Tool):
     model_repo_id: Optional[str] = Field(default=None)
     token: Optional[str] = Field(default=None)
     remote: bool = Field(default=False)
+
+
+__all__ = [
+    "Tool",
+    "HFTool"
+]
