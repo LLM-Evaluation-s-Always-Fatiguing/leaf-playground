@@ -99,6 +99,7 @@ class Scene(_Configurable):
 
     metadata: SceneMetaData
     dynamic_agent_base_classes: List[Type[SceneAgent]]
+    scene_info_class: Type[SceneInfo]
 
     def __init__(self, config: config_obj):
         super().__init__(config=config)
@@ -248,6 +249,15 @@ class Scene(_Configurable):
             classes.extend(find_subclasses(search_dir, base_cls))
 
         return classes
+
+    @classmethod
+    def get_scene_info_class(cls) -> Type[SceneInfo]:
+        try:
+            return cls.scene_info_class
+        except:
+            raise ValueError(
+                "scene_info_class not found, please specify scene_info_class in your scene class"
+            )
 
 
 __all__ = [

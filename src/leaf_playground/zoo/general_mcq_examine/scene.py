@@ -17,6 +17,7 @@ from leaf_playground.zoo.general_mcq_examine.scene_agent import (
 )
 from leaf_playground.zoo.general_mcq_examine.scene_info import (
     general_mcq_examine_scene_metadata,
+    GeneralMCQExamineSceneInfo
 )
 
 
@@ -40,6 +41,7 @@ class GeneralMCQExamineScene(Scene):
 
     metadata = general_mcq_examine_scene_metadata
     dynamic_agent_base_classes = [AIBaseExaminee]
+    scene_info_class = GeneralMCQExamineSceneInfo
 
     def __init__(self, config: config_obj):
         super().__init__(config=config)
