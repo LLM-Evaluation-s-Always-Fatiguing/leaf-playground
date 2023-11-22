@@ -38,3 +38,6 @@ class Data(BaseModel):
             data[field_key] = _get_value(raw_data, field_chain)
 
         return template.format(**data)
+
+
+__all__ = ["Data"]

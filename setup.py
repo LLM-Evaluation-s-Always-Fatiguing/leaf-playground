@@ -1,15 +1,16 @@
 from setuptools import setup, Extension, find_packages
 
-version = "0.0.1.dev1"
+version = "0.1.0.dev0"
 
 requirements = [
     "pydantic>=2.0.0",
     "datasets",
-    "openai<1.0.0",
+    "openai>=1.0.0",
     "torch>=2.0.0",
-    "transformers",
+    "transformers[agent]",
     "sentencepiece",
-    "accelerate"
+    "accelerate",
+    "fastapi[all]"
 ]
 
 setup(
