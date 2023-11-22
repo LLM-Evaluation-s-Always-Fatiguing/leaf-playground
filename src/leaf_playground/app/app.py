@@ -46,10 +46,15 @@ class ScenesBrief(BaseModel):
     scenes: List[SceneBrief] = Field(default=...)
 
 
+class SceneAgentConfigPayload(BaseModel):
+    agent_id: str = Field(default=...)
+    agent_config_data: dict = Field(default=...)
+
+
 class SceneCreatePayload(BaseModel):
     id: str = Field(default=...)
     scene_info_config_data: dict = Field(default=...)
-    scene_agents_config_data: Dict[str, dict] = Field(default=...)
+    scene_agents_config_data: List[SceneAgentConfigPayload] = Field(default=...)
     additional_config_data: Dict[str, Any] = Field(default=...)
 
 
@@ -158,9 +163,9 @@ def _create_scene(payload: SceneCreatePayload) -> Scene:
     scene_agents_obj_config = SceneAgentsObjConfig(
         agents=[
             SceneAgentObjConfig(
-                agent_config_data=agent_config_data,
-                agent_obj=scene_full["agent_classes"][agent_id].obj_for_import
-            ) for agent_id, agent_config_data in payload.scene_agents_config_data.items()
+                agent_config_data=agent_config_payload.agent_config_data,
+                agent_obj=scene_full["agent_classes"][agent_config_payload.agent_id].obj_for_import
+            ) for agent_config_payload in payload.scene_agents_config_data
         ]
     )
     scene_config = scene_config_class(
