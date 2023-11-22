@@ -1,10 +1,17 @@
 import importlib
 import importlib.machinery
+import inspect
+import glob
+import os
 from functools import partial
-from types import ModuleType
-from typing import Optional, Any
+from pathlib import Path
+from typing import Any, List, Optional, Type
 
 from pydantic import BaseModel, Field, FilePath
+
+
+_IMPORTED_OBJECTS = {}
+_IMPORTED_FUNCTIONS = {}
 
 
 class DynamicObject(BaseModel):
@@ -18,24 +25,66 @@ class DynamicObject(BaseModel):
         if self.module and self.source_file:
             raise ValueError("can't specify 'module' and 'source_file' at the same time.")
 
+    def __hash__(self):
+        return hash((self.obj, self.module, self.source_file))
+
 
 def dynamically_import_obj(o: DynamicObject):
+    if o in _IMPORTED_OBJECTS:
+        return _IMPORTED_OBJECTS[o]
     if o.module is not None:
         module = importlib.import_module(o.module)
     else:
         module = importlib.machinery.SourceFileLoader(
             o.source_file.name, o.source_file.as_posix()
         ).load_module()
-    return module.__dict__[o.obj]
+    obj = module.__dict__[o.obj]
+    _IMPORTED_OBJECTS[o] = obj
+    return obj
 
 
 class DynamicFn(BaseModel):
     fn: DynamicObject = Field(default=...)
     default_kwargs: Optional[dict] = Field(default=None)
 
+    def __hash__(self):
+        return hash((self.fn, self.default_kwargs))
+
 
 def dynamically_import_fn(f: DynamicFn):
+    if f in _IMPORTED_FUNCTIONS:
+        return _IMPORTED_FUNCTIONS[f]
     fn = dynamically_import_obj(f.fn)
     if f.default_kwargs is not None:
         fn = partial(fn, **f.default_kwargs)
+    _IMPORTED_FUNCTIONS[f] = fn
     return fn
+
+
+def find_subclasses(package_path: str, base_class: Type) -> List[DynamicObject]:
+    classes = []
+
+    for file in glob.glob(os.path.join(package_path, f'**/*.py'), recursive=True):
+        module_path = Path(file)
+        module = importlib.machinery.SourceFileLoader(
+            module_path.name, module_path.as_posix()
+        ).load_module()
+
+        for name, obj in module.__dict__.items():
+            if not inspect.isclass(obj):
+                continue
+            if issubclass(obj, base_class) and obj != base_class and obj.__module__ == module.__name__:
+                classes.append(
+                    DynamicObject(obj=name, source_file=module_path.absolute())
+                )
+
+    return classes
+
+
+__all__ = [
+    "DynamicObject",
+    "DynamicFn",
+    "dynamically_import_obj",
+    "dynamically_import_fn",
+    "find_subclasses",
+]
