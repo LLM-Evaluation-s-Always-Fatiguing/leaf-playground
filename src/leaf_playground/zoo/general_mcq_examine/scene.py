@@ -3,10 +3,10 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from leaf_playground.core.scene import Scene, SceneConfig, SceneInfoObjConfig
+from leaf_playground.core.scene import Scene, SceneConfig
 from leaf_playground.data.log_body import LogBody
 from leaf_playground.data.media import MediaType
-from leaf_playground.utils.import_util import DynamicObject
+from leaf_playground.data.socket_data import SocketData, SocketDataType
 from leaf_playground.zoo.general_mcq_examine.dataset_utils import prepare_dataset, DatasetConfig
 from leaf_playground.zoo.general_mcq_examine.scene_agent import (
     Examiner,
@@ -46,15 +46,18 @@ class GeneralMCQExamineScene(Scene):
         async def examinee_answer(examinee: AIBaseExaminee, q: ExaminerQuestion) -> None:
             answer: ExamineeAnswer = await examinee.answer_question(question=q, examiner=self.examiner.profile)
             self.message_pool.put_message(answer)
-            self.logs.append(
-                LogBody(
-                    index=len(self.logs),  # not thread safe
-                    references=[q],
-                    response=answer,
-                    media_type=MediaType.TEXT,
-                    ground_truth=None,
-                    eval_result=None,
-                    narrator=f"examinee [{examinee.name}] answered question [{q.question_id}]"
+            self.socket_cache.append(
+                SocketData(
+                    type=SocketDataType.LOG,
+                    data=LogBody(
+                        index=len(self.socket_cache),  # not thread safe
+                        references=[q],
+                        response=answer,
+                        media_type=MediaType.TEXT,
+                        ground_truth=None,
+                        eval_result=None,
+                        narrator=f"examinee [{examinee.name}] answered question [{q.question_id}]"
+                    ).model_dump()
                 )
             )
 
@@ -64,15 +67,18 @@ class GeneralMCQExamineScene(Scene):
                 receivers=[examinee.profile for examinee in self.examinees]
             )
             self.message_pool.put_message(question)
-            self.logs.append(
-                LogBody(
-                    index=len(self.logs),  # not thread safe
-                    references=None,
-                    response=question,
-                    media_type=MediaType.TEXT,
-                    ground_truth=None,
-                    eval_result=None,
-                    narrator=f"examiner sent question [{question.question_id}] to all examinees"
+            self.socket_cache.append(
+                SocketData(
+                    type=SocketDataType.LOG,
+                    data=LogBody(
+                        index=len(self.socket_cache),  # not thread safe
+                        references=None,
+                        response=question,
+                        media_type=MediaType.TEXT,
+                        ground_truth=None,
+                        eval_result=None,
+                        narrator=f"examiner sent question [{question.question_id}] to all examinees"
+                    ).model_dump()
                 )
             )
 

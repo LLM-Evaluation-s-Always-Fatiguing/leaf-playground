@@ -1,5 +1,8 @@
+import asyncio
+
 from leaf_playground.ai_backend.openai import OpenAIBackendConfig
 from leaf_playground.core.scene import SceneAgentsObjConfig, SceneAgentObjConfig, SceneInfoObjConfig
+from leaf_playground.data.log_body import LogBody
 from leaf_playground.data.profile import Profile
 from leaf_playground.utils.import_util import dynamically_import_obj
 from leaf_playground.zoo.general_mcq_examine.dataset_utils import DatasetConfig
@@ -42,9 +45,22 @@ scene_config = GeneralMCQExamineSceneConfig(
         }
     )
 )
-scene = GeneralMCQExamineScene.from_config(config=scene_config)
+
+
+def display_log(log: LogBody):
+    narrator = log.narrator
+    sender = log.response.sender.name
+    sender_role = log.response.sender.role.name
+    content = log.response.content.text.strip()
+    print(f"({narrator})\n", flush=True)
+    print(f"{sender}({sender_role}): {content}\n", flush=True)
+
+
+async def run_scene():
+    scene = GeneralMCQExamineScene.from_config(config=scene_config)
+    await asyncio.gather(scene.a_start(), scene.stream_logs(display_log))
+    scene.export_logs("logs.jsonl")
 
 
 if __name__ == "__main__":
-    scene.start(websocket=None)
-    scene.export_logs("logs.jsonl")
+    asyncio.run(run_scene())

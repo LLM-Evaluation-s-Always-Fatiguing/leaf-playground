@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, List, Tuple, Type, TypedDict
 
 from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketException, WebSocketDisconnect
@@ -183,7 +184,7 @@ async def run_scene(websocket: WebSocket) -> None:
 
     scene_creation_payload = SceneCreatePayload(**await websocket.receive_json())
     scene = _create_scene(payload=scene_creation_payload)
-    await scene.a_start(websocket=websocket)
+    await asyncio.gather(scene.a_start(), scene.stream_sockets(websocket))
 
 
 @app.post("/test/create_scene/", response_class=JSONResponse)
