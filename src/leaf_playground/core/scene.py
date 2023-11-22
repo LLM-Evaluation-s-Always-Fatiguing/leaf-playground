@@ -4,7 +4,7 @@ import random
 from abc import abstractmethod
 from itertools import chain
 from os.path import dirname, join
-from typing import Any, List, Optional, Type
+from typing import Any, Callable, List, Type
 
 from fastapi import WebSocket
 from pydantic import Field, ValidationError
@@ -14,6 +14,7 @@ from .scene_info import SceneInfo, SceneInfoConfigBase, SceneMetaData, SceneStat
 from .._config import _Config, _Configurable
 from ..data.log_body import LogBody
 from ..data.message import MessagePool
+from ..data.socket_data import SocketData, SocketDataType
 from ..utils.import_util import dynamically_import_obj, find_subclasses, DynamicObject
 
 
@@ -110,7 +111,7 @@ class Scene(_Configurable):
         self._valid_agent_num()
         self._post_init_agents()
 
-        self.logs: List[LogBody] = []
+        self.socket_cache: List[SocketData] = []
         self.message_pool: MessagePool = MessagePool()
         self.state = SceneState.PENDING
 
@@ -176,57 +177,60 @@ class Scene(_Configurable):
     async def _run(self):
         pass
 
-    async def _stream_logs(self, websocket: Optional[WebSocket] = None):
+    async def stream_sockets(self, websocket: WebSocket):
         cur = 0
-        while True:
-            if cur >= len(self.logs):
+        while self.state != SceneState.FINISHED:
+            if cur >= len(self.socket_cache):
                 await asyncio.sleep(0.001)
             else:
-                if websocket:
-                    await websocket.send_json(self.logs[cur].model_dump_json())
-                else:
-                    log = self.logs[cur]
-                    print(
-                        f"{log.response.sender.name}({log.response.sender.role.name}): "
-                        f"{self.logs[cur].response.content}"
-                    )
-                    await asyncio.sleep(0.1)
+                await websocket.send_json(self.socket_cache[cur].model_dump_json())
+                await asyncio.sleep(0.001)
                 cur += 1
-            if self.state == SceneState.FINISHED:
-                for log in self.logs[cur:]:
-                    if websocket:
-                        await websocket.send_json(log.model_dump_json())
+        for socket in self.socket_cache[cur:]:
+            await websocket.send_json(socket.model_dump_json())
+
+    async def stream_logs(self, log_handler: Callable[[LogBody], Any] = print):
+        cur = 0
+        while self.state != SceneState.FINISHED:
+            if cur >= len(self.socket_cache):
+                await asyncio.sleep(0.001)
+            else:
+                socket = self.socket_cache[cur]
+                if socket.type == SocketDataType.LOG:
+                    if asyncio.iscoroutinefunction(log_handler):
+                        await log_handler(socket.data)
                     else:
-                        print(
-                            f"{log.response.sender.name}({log.response.sender.role.name}): "
-                            f"{self.logs[cur].response.content}"
-                        )
-                        await asyncio.sleep(0.1)
-                break
+                        log_handler(socket.data)
+                await asyncio.sleep(0.001)
+                cur += 1
+        for socket in self.socket_cache[cur:]:
+            if socket.type == SocketDataType.LOG:
+                if asyncio.iscoroutinefunction(log_handler):
+                    await log_handler(socket.data)
+                else:
+                    log_handler(socket.data)
 
     def export_logs(self, file: str):
         with open(file, "w", encoding="utf-8") as f:
-            for log in self.logs:
-                f.write(log.model_dump_json(by_alias=True) + "\n")
+            for socket in self.socket_cache:
+                if socket.type == SocketDataType.LOG:
+                    f.write(socket.data.model_dump_json(by_alias=True) + "\n")
 
-    def start(self, websocket: Optional[WebSocket] = None):
+    def start(self):
         async def _run_wrapper():
             self.state = SceneState.RUNNING
             await self._run()
             self.state = SceneState.FINISHED
 
-        async def _start():
-            await asyncio.gather(_run_wrapper(), self._stream_logs(websocket))
+        asyncio.new_event_loop().run_until_complete(_run_wrapper())
 
-        asyncio.new_event_loop().run_until_complete(_start())
-
-    async def a_start(self, websocket: Optional[WebSocket] = None):
+    async def a_start(self):
         async def _run_wrapper():
             self.state = SceneState.RUNNING
             await self._run()
             self.state = SceneState.FINISHED
 
-        await asyncio.gather(_run_wrapper(), self._stream_logs(websocket))
+        await asyncio.gather(_run_wrapper())
 
     @classmethod
     def from_config(cls, config: config_obj) -> "Scene":
