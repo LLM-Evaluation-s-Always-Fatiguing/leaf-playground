@@ -178,8 +178,6 @@ class Scene(_Configurable):
 
     async def _stream_logs(self, websocket: Optional[WebSocket] = None):
         cur = 0
-        if websocket:
-            await websocket.accept()
         while True:
             if cur >= len(self.logs):
                 await asyncio.sleep(0.001)

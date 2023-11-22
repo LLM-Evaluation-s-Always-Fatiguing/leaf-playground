@@ -178,7 +178,10 @@ def _create_scene(payload: SceneCreatePayload) -> Scene:
 
 
 @app.websocket("/run_scene")
-async def run_scene(websocket: WebSocket, scene_creation_payload: SceneCreatePayload) -> None:
+async def run_scene(websocket: WebSocket) -> None:
+    await websocket.accept()
+
+    scene_creation_payload = SceneCreatePayload(**await websocket.receive_json())
     scene = _create_scene(payload=scene_creation_payload)
     await scene.a_start(websocket=websocket)
 
