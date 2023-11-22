@@ -11,6 +11,7 @@ from ..utils.import_util import dynamically_import_obj, DynamicObject
 
 
 class SceneAgentMetadata(BaseModel):
+    cls_name: str = Field(default=...)
     description: str = Field(default=...)
     actions: Dict[str, str] = Field(default=...)
 
@@ -73,6 +74,7 @@ class SceneAgent(_Configurable):
     @classmethod
     def get_metadata(cls):
         return SceneAgentMetadata(
+            cls_name=cls.__name__,
             description=cls.description,
             actions={action_name: str(action_signature) for action_name, action_signature in cls._actions.items()},
         )
