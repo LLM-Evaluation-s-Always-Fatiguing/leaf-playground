@@ -178,9 +178,10 @@ class SceneInfo(_Configurable):
     config_obj = SceneInfoConfigBase
     config: config_obj
 
-    obj_for_import: DynamicObject = DynamicObject(obj="SceneInfo", module="leaf_playground.core.scene_info")
+    obj_for_import: DynamicObject
 
     def __init__(self, config: config_obj):
+        self.__valid_class_attributes()
         super().__init__(config=config)
 
         self.name: str = self.config.name
@@ -194,6 +195,14 @@ class SceneInfo(_Configurable):
             for role_name in self.config.roles.model_fields.keys() if role_name != "roles_agent_num"
         }
         self.roles_agent_num: Dict[str, int] = self.config.roles.roles_agent_num
+
+    def __valid_class_attributes(self):
+        if not hasattr(self, "obj_for_import"):
+            raise AttributeError(f"class attribute obj_for_import not found, must specify in your scene info class")
+        if self.__class__.__name__ != self.obj_for_import.obj:
+            raise ValueError(
+                f"obj_for_import isn't correct, should be {self.__class__.__name__}, got {self.obj_for_import.obj}"
+            )
 
     @classmethod
     def from_config(cls, config: config_obj) -> "SceneInfo":

@@ -103,6 +103,7 @@ class Scene(_Configurable):
     scene_info_class: Type[SceneInfo]
 
     def __init__(self, config: config_obj):
+        self.__valid_class_attributes()
         super().__init__(config=config)
 
         self.scene_info: SceneInfo = self.config.scene_info.create_instance()
@@ -114,6 +115,18 @@ class Scene(_Configurable):
         self.socket_cache: List[SocketData] = []
         self.message_pool: MessagePool = MessagePool()
         self.state = SceneState.PENDING
+
+    def __valid_class_attributes(self):
+        if not hasattr(self, "metadata"):
+            raise ValueError("metadata not found, please specify in your scene class")
+        if not hasattr(self, "dynamic_agent_base_classes"):
+            raise ValueError(
+                "dynamic_agent_base_classes not found, please specify in your scene class"
+            )
+        if not hasattr(self, "scene_info_class"):
+            raise ValueError(
+                "scene_info_class not found, please specify in your scene class"
+            )
 
     def _init_static_agents(self) -> List[SceneAgent]:
         agents = []
@@ -198,9 +211,9 @@ class Scene(_Configurable):
                 socket = self.socket_cache[cur]
                 if socket.type == SocketDataType.LOG:
                     if asyncio.iscoroutinefunction(log_handler):
-                        await log_handler(socket.data)
+                        await log_handler(LogBody(**socket.data))
                     else:
-                        log_handler(socket.data)
+                        log_handler(LogBody(**socket.data))
                 await asyncio.sleep(0.001)
                 cur += 1
         for socket in self.socket_cache[cur:]:
