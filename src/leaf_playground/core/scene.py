@@ -219,15 +219,15 @@ class Scene(_Configurable):
         for socket in self.socket_cache[cur:]:
             if socket.type == SocketDataType.LOG:
                 if asyncio.iscoroutinefunction(log_handler):
-                    await log_handler(socket.data)
+                    await log_handler(LogBody(**socket.data))
                 else:
-                    log_handler(socket.data)
+                    log_handler(LogBody(**socket.data))
 
     def export_logs(self, file: str):
         with open(file, "w", encoding="utf-8") as f:
             for socket in self.socket_cache:
                 if socket.type == SocketDataType.LOG:
-                    f.write(socket.data.model_dump_json(by_alias=True) + "\n")
+                    f.write(LogBody(**socket.data).model_dump_json(by_alias=True) + "\n")
 
     def start(self):
         async def _run_wrapper():
