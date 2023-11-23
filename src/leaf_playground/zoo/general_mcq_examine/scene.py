@@ -1,5 +1,5 @@
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import Field
 
@@ -21,6 +21,11 @@ from leaf_playground.zoo.general_mcq_examine.scene_info import (
 )
 
 
+class GeneralMCQExamineSceneLogBody(LogBody):
+    references: Optional[List[Union[ExaminerQuestion, ExamineeAnswer]]] = Field(default=None)
+    response: Union[ExaminerQuestion, ExamineeAnswer] = Field(default=...)
+
+
 class GeneralMCQExamineSceneConfig(SceneConfig):
     dataset_config: DatasetConfig = Field(default=...)
 
@@ -32,6 +37,7 @@ class GeneralMCQExamineScene(Scene):
     metadata = general_mcq_examine_scene_metadata
     dynamic_agent_base_classes = [AIBaseExaminee]
     scene_info_class = GeneralMCQExamineSceneInfo
+    log_body_class =
 
     def __init__(self, config: config_obj):
         super().__init__(config=config)
