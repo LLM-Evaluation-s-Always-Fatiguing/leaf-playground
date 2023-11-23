@@ -117,9 +117,6 @@ class SceneAIAgent(SceneAgent):
     config_obj = SceneAIAgentConfig
     config: config_obj
 
-    description: str
-    obj_for_import: DynamicObject
-
     def __init__(self, config: config_obj):
         super().__init__(config=config)
 
@@ -133,9 +130,6 @@ class SceneHumanAgentConfig(SceneAgentConfig):
 class SceneHumanAgent(SceneAgent):
     config_obj = SceneHumanAgentConfig
     config: config_obj
-
-    description: str
-    obj_for_import: DynamicObject
 
     def __init__(self, config: config_obj):
         super().__init__(config=config)
@@ -157,9 +151,6 @@ class SceneStaticAgentConfig(SceneAgentConfig):
 class SceneStaticAgent(SceneAgent):
     config_obj = SceneStaticAgentConfig
     config: config_obj
-
-    description: str
-    obj_for_import: DynamicObject
 
     def __init__(self, config: config_obj):
         if not config.profile.role:
