@@ -70,7 +70,11 @@ def find_subclasses(package_path: str, base_class: Type) -> List[DynamicObject]:
             module_path.name, module_path.as_posix()
         ).load_module()
 
-        for name, obj in module.__dict__.items():
+        if not hasattr(module, "__all__"):
+            continue
+        # TODO: figure out why using module.__dict__ directly will get duplicate objects
+        for name in module.__all__:
+            obj = module.__dict__[name]
             if not inspect.isclass(obj):
                 continue
             if issubclass(obj, base_class) and obj != base_class and obj.__module__ == module.__name__:
