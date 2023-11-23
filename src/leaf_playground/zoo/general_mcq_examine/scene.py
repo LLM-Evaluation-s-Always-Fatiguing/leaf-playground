@@ -37,7 +37,7 @@ class GeneralMCQExamineScene(Scene):
     metadata = general_mcq_examine_scene_metadata
     dynamic_agent_base_classes = [AIBaseExaminee]
     scene_info_class = GeneralMCQExamineSceneInfo
-    log_body_class =
+    log_body_class = GeneralMCQExamineSceneLogBody
 
     def __init__(self, config: config_obj):
         super().__init__(config=config)
