@@ -2,7 +2,6 @@ import asyncio
 
 from leaf_playground.ai_backend.openai import OpenAIBackendConfig
 from leaf_playground.core.scene import SceneAgentsObjConfig, SceneAgentObjConfig, SceneInfoObjConfig
-from leaf_playground.data.log_body import LogBody
 from leaf_playground.data.profile import Profile
 from leaf_playground.utils.import_util import dynamically_import_obj
 from leaf_playground.zoo.general_mcq_examine.dataset_utils import DatasetConfig
@@ -10,7 +9,7 @@ from leaf_playground.zoo.general_mcq_examine.scene import (
     GeneralMCQExamineScene,
     GeneralMCQExamineSceneConfig,
 )
-from leaf_playground.zoo.general_mcq_examine.scene_info import GeneralMCQExamineSceneInfoConfig, envs_config_model
+from leaf_playground.zoo.general_mcq_examine.scene_info import envs_config_model
 
 agent_obj = GeneralMCQExamineScene.get_dynamic_agent_classes()[0]
 scene_info_obj = GeneralMCQExamineScene.get_scene_info_class().obj_for_import
@@ -47,7 +46,7 @@ scene_config = GeneralMCQExamineSceneConfig(
 )
 
 
-def display_log(log: LogBody):
+def display_log(log: GeneralMCQExamineScene.log_body_class):
     narrator = log.narrator
     sender = log.response.sender.name
     sender_role = log.response.sender.role.name
@@ -59,7 +58,7 @@ def display_log(log: LogBody):
 async def run_scene():
     scene = GeneralMCQExamineScene.from_config(config=scene_config)
     await asyncio.gather(scene.a_start(), scene.stream_logs(display_log))
-    scene.export_logs("logs.jsonl")
+    scene.export_logs("general_mcq_examine.logs.jsonl")
 
 
 if __name__ == "__main__":

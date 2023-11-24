@@ -38,7 +38,10 @@ class SceneAgent(_Configurable):
             if not callable(getattr(self, action_name)):
                 raise TypeError(f"action [{action_name}] should be callable")
             if action_signature != signature(getattr(self, action_name)):
-                raise TypeError(f"signature of action [{action_name}] should be {action_signature}")
+                raise TypeError(
+                    f"signature of action [{action_name}] should be {action_signature}, "
+                    f"got {signature(getattr(self, action_name))}"
+                )
 
         super().__init__(config=config)
 
