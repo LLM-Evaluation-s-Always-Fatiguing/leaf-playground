@@ -26,10 +26,11 @@ class SceneAgent(_Configurable):
 
     _actions: Dict[str, Signature]
 
-    description: str = "Base class for all scene agents."
-    obj_for_import: DynamicObject = DynamicObject(obj="SceneAgent", module="leaf_playground.core.scene_agent")
+    description: str
+    obj_for_import: DynamicObject
 
     def __init__(self, config: config_obj):
+        self.__valid_class_attributes()
         # check if all actions exist and their signatures are correct
         for action_name, action_signature in self._actions.items():
             if not hasattr(self, action_name):
@@ -45,6 +46,18 @@ class SceneAgent(_Configurable):
         self.scene_info: SceneInfo = None
 
         self._post_initialized = False
+
+    def __valid_class_attributes(self):
+        if not hasattr(self, "_actions"):
+            raise AttributeError(f"class attribute _actions not found, must specify in your agent class")
+        if not hasattr(self, "description"):
+            raise AttributeError(f"class attribute description not found, must specify in your agent class")
+        if not hasattr(self, "obj_for_import"):
+            raise AttributeError(f"class attribute obj_for_import not found, must specify in your agent class")
+        if self.__class__.__name__ != self.obj_for_import.obj:
+            raise ValueError(
+                f"obj_for_import isn't correct, should be {self.__class__.__name__}, got {self.obj_for_import.obj}"
+            )
 
     def post_init(self, role: Optional[Role], scene_info: SceneInfo):
         if role is not None:
@@ -104,9 +117,6 @@ class SceneAIAgent(SceneAgent):
     config_obj = SceneAIAgentConfig
     config: config_obj
 
-    description: str = "Base class for all scene agents who use an AI backend to take actions."
-    obj_for_import: DynamicObject = DynamicObject(obj="SceneAIAgent", module="leaf_playground.core.scene_agent")
-
     def __init__(self, config: config_obj):
         super().__init__(config=config)
 
@@ -120,9 +130,6 @@ class SceneHumanAgentConfig(SceneAgentConfig):
 class SceneHumanAgent(SceneAgent):
     config_obj = SceneHumanAgentConfig
     config: config_obj
-
-    description: str = "Base class for all scene agents who receive and output human inputs."
-    obj_for_import: DynamicObject = DynamicObject(obj="SceneHumanAgent", module="leaf_playground.core.scene_agent")
 
     def __init__(self, config: config_obj):
         super().__init__(config=config)
@@ -144,9 +151,6 @@ class SceneStaticAgentConfig(SceneAgentConfig):
 class SceneStaticAgent(SceneAgent):
     config_obj = SceneStaticAgentConfig
     config: config_obj
-
-    description: str = "Base class for all scene agents who have a static program to take actions."
-    obj_for_import: DynamicObject = DynamicObject(obj="SceneStaticAgent", module="leaf_playground.core.scene_agent")
 
     def __init__(self, config: config_obj):
         if not config.profile.role:

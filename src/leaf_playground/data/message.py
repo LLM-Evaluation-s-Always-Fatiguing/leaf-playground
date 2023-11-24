@@ -79,13 +79,13 @@ class MessagePool(Data):
 
     def get_messages(
         self,
-        agent: "leaf_playground.core.scene_agent.SceneAgent"
+        agent: Profile
     ) -> List[Message]:
         """
         Get messages that sent by the agent or is visible by the agent
 
         :param agent: agent who want to retrieve messages
-        :type agent: Agent
+        :type agent: Profile
         :return: a list of messages that are sent by or visible by the agent
         :rtype: List[Message]
         """

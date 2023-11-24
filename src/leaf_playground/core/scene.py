@@ -89,6 +89,7 @@ class SceneInfoObjConfig(_Config):
 
 
 class SceneConfig(_Config):
+    debug_mode: bool = Field(default=False, exclude=True)
     scene_info: SceneInfoObjConfig = Field(default=...)
     # agents specified here are dynamic agents whose roles remain unknown before assignment (Scene._post_init_agents)
     scene_agents: SceneAgentsObjConfig = Field(default=...)
@@ -101,8 +102,10 @@ class Scene(_Configurable):
     metadata: SceneMetaData
     dynamic_agent_base_classes: List[Type[SceneAgent]]
     scene_info_class: Type[SceneInfo]
+    log_body_class: Type[LogBody]
 
     def __init__(self, config: config_obj):
+        self.__valid_class_attributes()
         super().__init__(config=config)
 
         self.scene_info: SceneInfo = self.config.scene_info.create_instance()
@@ -114,6 +117,22 @@ class Scene(_Configurable):
         self.socket_cache: List[SocketData] = []
         self.message_pool: MessagePool = MessagePool()
         self.state = SceneState.PENDING
+
+    def __valid_class_attributes(self):
+        if not hasattr(self, "metadata"):
+            raise ValueError("metadata not found, please specify in your scene class")
+        if not hasattr(self, "dynamic_agent_base_classes"):
+            raise ValueError(
+                "dynamic_agent_base_classes not found, please specify in your scene class"
+            )
+        if not hasattr(self, "scene_info_class"):
+            raise ValueError(
+                "scene_info_class not found, please specify in your scene class"
+            )
+        if not hasattr(self, "log_body_class"):
+            raise ValueError(
+                "log_body_class not found, please specify in your scene class"
+            )
 
     def _init_static_agents(self) -> List[SceneAgent]:
         agents = []
@@ -198,23 +217,23 @@ class Scene(_Configurable):
                 socket = self.socket_cache[cur]
                 if socket.type == SocketDataType.LOG:
                     if asyncio.iscoroutinefunction(log_handler):
-                        await log_handler(socket.data)
+                        await log_handler(self.log_body_class(**socket.data))
                     else:
-                        log_handler(socket.data)
+                        log_handler(self.log_body_class(**socket.data))
                 await asyncio.sleep(0.001)
                 cur += 1
         for socket in self.socket_cache[cur:]:
             if socket.type == SocketDataType.LOG:
                 if asyncio.iscoroutinefunction(log_handler):
-                    await log_handler(socket.data)
+                    await log_handler(self.log_body_class(**socket.data))
                 else:
-                    log_handler(socket.data)
+                    log_handler(self.log_body_class(**socket.data))
 
     def export_logs(self, file: str):
         with open(file, "w", encoding="utf-8") as f:
             for socket in self.socket_cache:
                 if socket.type == SocketDataType.LOG:
-                    f.write(socket.data.model_dump_json(by_alias=True) + "\n")
+                    f.write(self.log_body_class(**socket.data).model_dump_json(by_alias=True) + "\n")
 
     def start(self):
         async def _run_wrapper():

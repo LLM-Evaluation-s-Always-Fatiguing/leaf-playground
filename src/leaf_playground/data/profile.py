@@ -19,9 +19,9 @@ class Role(Data):
 
 
 class Profile(Data):
-    id: UUID = Field(default_factory=lambda: uuid4(), exclude=True)
+    id: UUID = Field(default_factory=lambda: uuid4())
     name: str = Field(default=...)
-    role: Optional[Role] = Field(default=None, exclude=True)
+    role: Optional[Role] = Field(default=None)
 
 
 __all__ = [
