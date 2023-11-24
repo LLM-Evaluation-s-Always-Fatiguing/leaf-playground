@@ -65,7 +65,7 @@ class GeneralMCQExamineScene(Scene):
             self.socket_cache.append(
                 SocketData(
                     type=SocketDataType.LOG,
-                    data=LogBody(
+                    data=self.log_body_class(
                         index=len(self.socket_cache),  # not thread safe
                         references=[q],
                         response=answer,
@@ -73,7 +73,7 @@ class GeneralMCQExamineScene(Scene):
                         ground_truth=None,
                         eval_result=None,
                         narrator=f"examinee [{examinee.name}] answered question [{q.question_id}]"
-                    ).model_dump()
+                    ).model_dump(mode="json")
                 )
             )
 
@@ -86,7 +86,7 @@ class GeneralMCQExamineScene(Scene):
             self.socket_cache.append(
                 SocketData(
                     type=SocketDataType.LOG,
-                    data=LogBody(
+                    data=self.log_body_class(
                         index=len(self.socket_cache),  # not thread safe
                         references=None,
                         response=question,
@@ -94,7 +94,7 @@ class GeneralMCQExamineScene(Scene):
                         ground_truth=None,
                         eval_result=None,
                         narrator=f"examiner sent question [{question.question_id}] to all examinees"
-                    ).model_dump()
+                    ).model_dump(mode="json")
                 )
             )
 
