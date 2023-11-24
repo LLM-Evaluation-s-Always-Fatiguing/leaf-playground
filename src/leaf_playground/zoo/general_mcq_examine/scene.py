@@ -5,7 +5,7 @@ from pydantic import Field
 
 from leaf_playground.core.scene import Scene, SceneConfig
 from leaf_playground.data.log_body import LogBody
-from leaf_playground.data.media import MediaType
+from leaf_playground.data.media import MediaType, Text
 from leaf_playground.data.socket_data import SocketData, SocketDataType
 from leaf_playground.zoo.general_mcq_examine.dataset_utils import prepare_dataset, DatasetConfig
 from leaf_playground.zoo.general_mcq_examine.scene_agent import (
@@ -50,7 +50,17 @@ class GeneralMCQExamineScene(Scene):
 
     async def _run(self):
         async def examinee_answer(examinee: AIBaseExaminee, q: ExaminerQuestion) -> None:
-            answer: ExamineeAnswer = await examinee.answer_question(question=q, examiner=self.examiner.profile)
+            try:
+                answer: ExamineeAnswer = await examinee.answer_question(question=q, examiner=self.examiner.profile)
+            except:
+                if self.config.debug_mode:
+                    raise
+                answer: ExamineeAnswer = ExamineeAnswer(
+                    sender=examinee.profile,
+                    receivers=[self.examiner.profile],
+                    content=Text(text=""),
+                    question_id=q.question_id
+                )
             self.message_pool.put_message(answer)
             self.socket_cache.append(
                 SocketData(
