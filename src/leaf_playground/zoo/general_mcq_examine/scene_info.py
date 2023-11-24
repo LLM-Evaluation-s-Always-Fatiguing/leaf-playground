@@ -9,7 +9,8 @@ from leaf_playground.utils.import_util import DynamicObject
 
 general_mcq_examine_scene_metadata = SceneMetaData(
     name="GeneralMCQExamine",
-    description="A general examine scene that uses dataset from huggingface hub to test agents.",
+    description="A general multiple choices questioning examine scene that uses dataset "
+                "from huggingface hub to test agents.",
     role_definitions=[
         RoleDefinition(
             name="examiner",
