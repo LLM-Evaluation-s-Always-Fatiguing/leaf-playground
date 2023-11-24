@@ -1,4 +1,4 @@
-# leaf-playground-next
+# leaf-playground
 
 
 ## Installation
