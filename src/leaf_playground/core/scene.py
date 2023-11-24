@@ -89,6 +89,7 @@ class SceneInfoObjConfig(_Config):
 
 
 class SceneConfig(_Config):
+    debug_mode: bool = Field(default=False, exclude=True)
     scene_info: SceneInfoObjConfig = Field(default=...)
     # agents specified here are dynamic agents whose roles remain unknown before assignment (Scene._post_init_agents)
     scene_agents: SceneAgentsObjConfig = Field(default=...)
