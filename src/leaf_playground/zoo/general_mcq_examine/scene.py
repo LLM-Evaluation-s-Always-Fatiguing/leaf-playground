@@ -1,11 +1,11 @@
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import Field
 
 from leaf_playground.core.scene import Scene, SceneConfig
 from leaf_playground.data.log_body import LogBody
-from leaf_playground.data.media import MediaType
+from leaf_playground.data.media import MediaType, Text
 from leaf_playground.data.socket_data import SocketData, SocketDataType
 from leaf_playground.zoo.general_mcq_examine.dataset_utils import prepare_dataset, DatasetConfig
 from leaf_playground.zoo.general_mcq_examine.scene_agent import (
@@ -21,6 +21,11 @@ from leaf_playground.zoo.general_mcq_examine.scene_info import (
 )
 
 
+class GeneralMCQExamineSceneLogBody(LogBody):
+    references: Optional[List[Union[ExaminerQuestion, ExamineeAnswer]]] = Field(default=None)
+    response: Union[ExaminerQuestion, ExamineeAnswer] = Field(default=...)
+
+
 class GeneralMCQExamineSceneConfig(SceneConfig):
     dataset_config: DatasetConfig = Field(default=...)
 
@@ -32,6 +37,7 @@ class GeneralMCQExamineScene(Scene):
     metadata = general_mcq_examine_scene_metadata
     dynamic_agent_base_classes = [AIBaseExaminee]
     scene_info_class = GeneralMCQExamineSceneInfo
+    log_body_class = GeneralMCQExamineSceneLogBody
 
     def __init__(self, config: config_obj):
         super().__init__(config=config)
@@ -44,7 +50,17 @@ class GeneralMCQExamineScene(Scene):
 
     async def _run(self):
         async def examinee_answer(examinee: AIBaseExaminee, q: ExaminerQuestion) -> None:
-            answer: ExamineeAnswer = await examinee.answer_question(question=q, examiner=self.examiner.profile)
+            try:
+                answer: ExamineeAnswer = await examinee.answer_question(question=q, examiner=self.examiner.profile)
+            except:
+                if self.config.debug_mode:
+                    raise
+                answer: ExamineeAnswer = ExamineeAnswer(
+                    sender=examinee.profile,
+                    receivers=[self.examiner.profile],
+                    content=Text(text=""),
+                    question_id=q.question_id
+                )
             self.message_pool.put_message(answer)
             self.socket_cache.append(
                 SocketData(
