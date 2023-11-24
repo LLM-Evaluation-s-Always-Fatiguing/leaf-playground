@@ -88,3 +88,9 @@ class OpenAIBasicExaminee(AIBaseExaminee):
                 sender=self.profile,
                 receivers=[examiner]
             )
+
+
+__all__ = [
+    "OpenAIBasicExamineeConfig",
+    "OpenAIBasicExaminee"
+]
