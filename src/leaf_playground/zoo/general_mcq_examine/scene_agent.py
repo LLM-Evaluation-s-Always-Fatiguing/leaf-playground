@@ -110,7 +110,7 @@ class Examiner(SceneStaticAgent):
         total_questions = len(self._questions)
         golden_answers = [data[golden_answer_column] for data in self._questions]
 
-        messages = [msg for msg in message_pool.get_messages(self) if isinstance(msg, ExamineeAnswer)]
+        messages = [msg for msg in message_pool.get_messages(self.profile) if isinstance(msg, ExamineeAnswer)]
 
         id2profile = {}
         id2answers: Dict[UUID, List[ExamineeAnswer]] = defaultdict(list)
