@@ -10,7 +10,8 @@ requirements = [
     "transformers[agent]",
     "sentencepiece",
     "accelerate",
-    "fastapi[all]"
+    "fastapi[all]",
+    "tiktoken"
 ]
 
 setup(
