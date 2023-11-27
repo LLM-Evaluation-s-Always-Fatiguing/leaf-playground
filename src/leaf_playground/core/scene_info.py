@@ -134,6 +134,24 @@ class SceneMetaData(Data):
             role.name: role.num_agents for role in self.role_definitions
         }
 
+    def get_max_dynamic_agents_num(self) -> int:
+        num = 0
+        for role_def in self.role_definitions:
+            if role_def.is_static:
+                continue
+            if role_def.num_agents == -1:
+                return -1
+            num += role_def.num_agents
+        return num
+
+    def get_min_dynamic_agents_num(self) -> int:
+        num = 0
+        for role_def in self.role_definitions:
+            if role_def.is_static:
+                continue
+            num += role_def.num_agents if role_def.num_agents != -1 else 1
+        return num
+
 
 class SceneInfoConfigBase(_Config):
     name: str = Field(default=..., exclude=True)

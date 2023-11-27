@@ -14,9 +14,6 @@ scene_config = WhoIsTheSpySceneConfig(
                     "key_modality": {"current": "text"},
                     "num_rounds": {"current": 1},
                     "has_blank_slate": {"current": False},
-                    "max_agents_num": {},
-                    "min_agents_num_with_blank": {},
-                    "min_agents_num_without_blank": {}
                 }
             },
             "scene_info_obj": scene_info_obj.model_dump(by_alias=True)
