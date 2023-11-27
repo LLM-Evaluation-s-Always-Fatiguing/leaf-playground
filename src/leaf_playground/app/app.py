@@ -18,6 +18,8 @@ class SceneFull(TypedDict):
     id: str
     scene_metadata: SceneMetaData
     role_agents_num: Dict[str, int]
+    max_agents_num: int
+    min_agents_num: int
     scene_class: Type[Scene]
     scene_config_class: Type[SceneConfig]
     scene_info_class: Type[SceneInfo]
@@ -33,6 +35,8 @@ class SceneDetail(BaseModel):
     scene_metadata: SceneMetaData = Field(default=...)
     agents_metadata: Dict[str, SceneAgentMetadata] = Field(default=...)
     role_agents_num: Dict[str, int] = Field(default=...)
+    max_agents_num: int = Field(default=...)
+    min_agents_num: int = Field(default=...)
     scene_info_config_schema: dict = Field(default=...)
     agents_config_schemas: Dict[str, dict] = Field(default=...)
     additional_config_schema: dict = Field(default=...)
@@ -95,6 +99,8 @@ def get_scenes() -> Dict[str, SceneFull]:
             id=scene_id,
             scene_metadata=scene_metadata,
             role_agents_num=scene_metadata.get_roles_agent_num(),
+            max_agents_num=scene_metadata.get_max_dynamic_agents_num(),
+            min_agents_num=scene_metadata.get_min_dynamic_agents_num(),
             scene_class=scene_class,
             scene_config_class=scene_config_class,
             scene_info_class=scene_info_class,
@@ -138,6 +144,8 @@ async def get_scene(scene_id: str) -> SceneDetail:
         scene_metadata=scene_full["scene_metadata"],
         agents_metadata=scene_full["agents_metadata"],
         role_agents_num=scene_full["role_agents_num"],
+        max_agents_num=scene_full["max_agents_num"],
+        min_agents_num=scene_full["min_agents_num"],
         scene_info_config_schema=scene_full["scene_info_config_class"].get_json_schema(by_alias=True),
         agents_config_schemas={
             agent_id: agent_config_class.get_json_schema(by_alias=True) for agent_id, agent_config_class in
