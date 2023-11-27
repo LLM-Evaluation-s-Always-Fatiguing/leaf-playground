@@ -4,12 +4,13 @@ import random
 from abc import abstractmethod
 from itertools import chain
 from os.path import dirname, join
-from typing import Any, Callable, List, Type
+from typing import Any, Callable, List, Optional, Type
 
 from fastapi import WebSocket
 from pydantic import Field, ValidationError
 
 from .scene_agent import SceneAgent, SceneAgentConfig
+from .scene_evaluator import SceneEvaluatorConfig, SceneEvaluator
 from .scene_info import SceneInfo, SceneInfoConfigBase, SceneMetaData, SceneState
 from .._config import _Config, _Configurable
 from ..data.log_body import LogBody
@@ -57,6 +58,45 @@ class SceneAgentsObjConfig(_Config):
         return [agent.create_instance() for agent in self.agents]
 
 
+class SceneEvaluatorObjConfig(_Config):
+    evaluator_config_data: dict = Field(default=...)
+    evaluator_obj: DynamicObject = Field(default=...)
+
+    def model_post_init(self, __context: Any) -> None:
+        self.valid(self.evaluator_config, self.evaluator_obj)
+
+    def create_instance(self) -> "SceneEvaluator":
+        obj = dynamically_import_obj(self.evaluator_obj)
+        return obj.from_config(config=self.evaluator_config)
+
+    @staticmethod
+    def valid(evaluator_config: SceneEvaluatorConfig, evaluator_obj: DynamicObject):
+        evaluator_cls = dynamically_import_obj(evaluator_obj)
+        if not issubclass(evaluator_cls, SceneEvaluator):
+            raise TypeError(
+                f"evaluator_obj {evaluator_obj.obj} should be a subclass of SceneEvaluator, "
+                f"but get {evaluator_cls.__name__}"
+            )
+        if not isinstance(evaluator_config, evaluator_cls.config_obj):
+            raise TypeError(
+                f"evaluator_config should be an instance of {evaluator_cls.config_obj.__name__}, "
+                f"but get {evaluator_config.__class__.__name__}"
+            )
+
+    @property
+    def evaluator_config(self) -> SceneEvaluatorConfig:
+        evaluator_cls = dynamically_import_obj(self.evaluator_obj)
+        evaluator_config = evaluator_cls.config_obj(**self.evaluator_config_data)
+        return evaluator_config
+
+
+class SceneEvaluatorsObjConfig(_Config):
+    evaluators: List[SceneEvaluatorObjConfig] = Field(default=[])
+
+    def create_instances(self) -> List["SceneEvaluator"]:
+        return [evaluator.create_instance() for evaluator in self.evaluators]
+
+
 class SceneInfoObjConfig(_Config):
     scene_info_config_data: dict = Field(default=...)
     scene_info_obj: DynamicObject = Field(default=...)
@@ -90,9 +130,11 @@ class SceneInfoObjConfig(_Config):
 
 class SceneConfig(_Config):
     debug_mode: bool = Field(default=False, exclude=True)
+    enable_evaluator: bool = Field(default=False, exclude=True)
     scene_info: SceneInfoObjConfig = Field(default=...)
     # agents specified here are dynamic agents whose roles remain unknown before assignment (Scene._post_init_agents)
     scene_agents: SceneAgentsObjConfig = Field(default=...)
+    scene_evaluators: SceneEvaluatorsObjConfig = Field(default=...)
 
 
 class Scene(_Configurable):
@@ -101,10 +143,13 @@ class Scene(_Configurable):
 
     metadata: SceneMetaData
     dynamic_agent_base_classes: List[Type[SceneAgent]]
+    evaluator_classes: Optional[List[Type[SceneEvaluator]]] = None
     scene_info_class: Type[SceneInfo]
     log_body_class: Type[LogBody]
 
     def __init__(self, config: config_obj):
+        if hasattr(self, f"_{self.__class__.__name__}__valid_class_attributes"):
+            getattr(self, f"_{self.__class__.__name__}__valid_class_attributes")()
         self.__valid_class_attributes()
         super().__init__(config=config)
 
@@ -278,6 +323,10 @@ class Scene(_Configurable):
             classes.extend(find_subclasses(search_dir, base_cls))
 
         return classes
+
+    @classmethod
+    def get_evaluator_classes(cls) -> Optional[List[SceneEvaluator]]:
+        return cls.evaluator_classes
 
     @classmethod
     def get_scene_info_class(cls) -> Type[SceneInfo]:
