@@ -4,6 +4,7 @@ import inspect
 import glob
 import os
 from functools import partial
+from hashlib import md5
 from pathlib import Path
 from typing import Any, List, Optional, Type
 
@@ -25,8 +26,11 @@ class DynamicObject(BaseModel):
         if self.module and self.source_file:
             raise ValueError("can't specify 'module' and 'source_file' at the same time.")
 
-    def __hash__(self):
-        return hash((self.obj, self.module, self.source_file))
+    def __hash__(self) -> str:
+        obj = self.obj
+        module = "" if not self.module else self.module
+        source_file = "" if not self.source_file else self.source_file.as_posix()
+        return md5((obj + module + source_file).encode(encoding="utf-8")).hexdigest()
 
 
 def dynamically_import_obj(o: DynamicObject):
@@ -47,8 +51,8 @@ class DynamicFn(BaseModel):
     fn: DynamicObject = Field(default=...)
     default_kwargs: Optional[dict] = Field(default=None)
 
-    def __hash__(self):
-        return hash((self.fn, self.default_kwargs))
+    def __hash__(self) -> str:
+        return str(hash(self.fn)) + md5(str(self.default_kwargs).encode(encoding="utf-8")).hexdigest()
 
 
 def dynamically_import_fn(f: DynamicFn):

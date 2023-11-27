@@ -8,6 +8,7 @@ from .base import Data
 class SocketDataType(Enum):
     LOG = "log"
     METRIC = "metric"
+    SUMMARY = "summary"
 
 
 class SocketData(Data):
