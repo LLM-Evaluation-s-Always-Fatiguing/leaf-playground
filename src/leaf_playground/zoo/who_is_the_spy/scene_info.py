@@ -41,21 +41,15 @@ class HasBlankSlateEnvVar(ConstantEnvironmentVariable):
     current_value: bool = Field(default=False)
 
 
-# TODO: how to let the frontend know the default value of the env vars below?
+class WhoIsTheSpySceneMetaData(SceneMetaData):
+    def get_max_dynamic_agents_num(self) -> int:
+        return 9
 
-class MaxAgentsNumEnvVar(ConstantEnvironmentVariable):
-    current_value: int = Field(default=9, exclude=True)
-
-
-class MinAgentsNumWithBlankEnvVar(ConstantEnvironmentVariable):
-    current_value: int = Field(default=5, exclude=True)
+    def get_min_dynamic_agents_num(self) -> int:
+        return 4  # when only has 4 players, there is no blank slate
 
 
-class MinAgensNumWithoutBlankEnvVar(ConstantEnvironmentVariable):
-    current_value: int = Field(default=4, exclude=True)
-
-
-who_is_the_spy_scene_metadata = SceneMetaData(
+who_is_the_spy_scene_metadata = WhoIsTheSpySceneMetaData(
     name="WhoIsTheSpy",
     description="A scene that simulates the Who is the Spy game.",
     role_definitions=[
@@ -89,25 +83,6 @@ who_is_the_spy_scene_metadata = SceneMetaData(
             description="whether the game has blank slates",
             type=DynamicObject(obj="HasBlankSlateEnvVar", module="leaf_playground.zoo.who_is_the_spy.scene_info")
         ),
-        EnvVarDefinition(
-            name="max_agents_num",
-            description="the maximum number of agents in the game",
-            type=DynamicObject(obj="MaxAgentsNumEnvVar", module="leaf_playground.zoo.who_is_the_spy.scene_info")
-        ),
-        EnvVarDefinition(
-            name="min_agents_num_with_blank",
-            description="the minimum number of agents in the game when there are blank slats",
-            type=DynamicObject(
-                obj="MinAgentsNumWithBlankEnvVar", module="leaf_playground.zoo.who_is_the_spy.scene_info"
-            )
-        ),
-        EnvVarDefinition(
-            name="min_agents_num_without_blank",
-            description="the minimum number of agents in the game when there are no blank slats",
-            type=DynamicObject(
-                obj="MinAgensNumWithoutBlankEnvVar", module="leaf_playground.zoo.who_is_the_spy.scene_info"
-            )
-        )
     ]
 )
 
