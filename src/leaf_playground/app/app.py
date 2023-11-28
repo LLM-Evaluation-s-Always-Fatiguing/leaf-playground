@@ -1,5 +1,6 @@
-import asyncio
+from threading import Thread
 from typing import Any, Dict, List, Optional, Tuple, Type, TypedDict
+from uuid import uuid4, UUID
 
 from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketException, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -19,7 +20,7 @@ from ..core.scene import (
 )
 from ..core.scene_agent import SceneAgentConfig, SceneAgent, SceneAgentMetadata
 from ..core.scene_evaluator import SceneEvaluatorConfig, SceneEvaluator, SceneEvaluatorMetadata
-from ..core.scene_info import SceneMetaData, SceneInfo, SceneInfoConfigBase
+from ..core.scene_info import SceneMetaData, SceneInfo, SceneInfoConfigBase, SceneState
 from ..utils.import_util import dynamically_import_obj, find_subclasses
 
 
@@ -151,6 +152,7 @@ def get_scenes() -> Dict[str, SceneFull]:
 
 
 SCENES: Dict[str, SceneFull] = get_scenes()
+TASK_CACHE: Dict[UUID, Scene] = {}  # TODO: impl task manager(a thread pool)
 
 
 # Don't provide this endpoint for now, because current obj cache mechanism can't handle the update of existing obj.
@@ -234,13 +236,47 @@ def _create_scene(payload: SceneCreatePayload) -> Scene:
     return scene
 
 
-@app.websocket("/run_scene")
-async def run_scene(websocket: WebSocket) -> None:
+class TaskCreationResponse(BaseModel):
+    task_id: UUID = Field(default=...)
+
+
+@app.post("/task/create", response_model=TaskCreationResponse)
+async def create_scene(scene_creation_payload: SceneCreatePayload) -> TaskCreationResponse:
+    scene = _create_scene(payload=scene_creation_payload)
+    task_id = uuid4()
+
+    TASK_CACHE[task_id] = scene
+
+    scene.start()
+
+    return TaskCreationResponse(task_id=task_id)
+
+
+@app.get("/task/status/{task_id}", response_class=JSONResponse)
+async def get_task_status(task_id: UUID) -> JSONResponse:
+    if task_id not in TASK_CACHE:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
+
+    scene = TASK_CACHE[task_id]
+
+    Thread(target=scene.start, daemon=True).start()  # TODO: optimize, this is ugly
+
+    return JSONResponse(content={"status": scene.state.value})
+
+
+@app.websocket("/task/ws/{task_id}")
+async def stream_task_info(websocket: WebSocket, task_id: UUID) -> None:
+    if task_id not in TASK_CACHE:
+        raise WebSocketException(code=status.WS_1011_INTERNAL_ERROR, reason="task not found")
+
     await websocket.accept()
 
-    scene_creation_payload = SceneCreatePayload(**await websocket.receive_json())
-    scene = _create_scene(payload=scene_creation_payload)
-    await asyncio.gather(scene.a_start(), scene.stream_sockets(websocket))
+    scene = TASK_CACHE[task_id]
+
+    await scene.stream_sockets(websocket)
+
+
+# TODO: more apis to pause, resume, interrupt, update log, etc.
 
 
 @app.post("/test/create_scene/", response_class=JSONResponse)
