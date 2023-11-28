@@ -3,12 +3,14 @@ import inspect
 import json
 import random
 from abc import abstractmethod
+from datetime import datetime
 from itertools import chain
 from os import makedirs
 from os.path import dirname, join
 from typing import Any, Callable, List, Optional, Type
+from uuid import uuid4
 
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import Field, ValidationError
 
 from .scene_agent import SceneAgent, SceneAgentConfig
@@ -245,15 +247,18 @@ class Scene(_Configurable):
 
     async def stream_sockets(self, websocket: WebSocket):
         cur = 0
-        while self.state != SceneState.FINISHED:
-            if cur >= len(self.socket_cache):
-                await asyncio.sleep(0.001)
-            else:
-                await websocket.send_json(self.socket_cache[cur].model_dump_json())
-                await asyncio.sleep(0.001)
-                cur += 1
-        for socket in self.socket_cache[cur:]:
-            await websocket.send_json(socket.model_dump_json())
+        try:
+            while self.state in [SceneState.PENDING, SceneState.RUNNING, SceneState.PAUSED]:
+                if cur >= len(self.socket_cache):
+                    await asyncio.sleep(0.001)
+                else:
+                    await websocket.send_json(self.socket_cache[cur].model_dump_json())
+                    await asyncio.sleep(0.001)
+                    cur += 1
+            for socket in self.socket_cache[cur:]:
+                await websocket.send_json(socket.model_dump_json())
+        except WebSocketDisconnect:
+            pass
 
     async def stream_logs(self, log_handler: Callable[[LogBody], Any] = print):
         cur = 0
@@ -280,6 +285,7 @@ class Scene(_Configurable):
         async def _run_wrapper():
             self.state = SceneState.RUNNING
             await self._run()
+            self.save()
             self.state = SceneState.FINISHED
 
         asyncio.new_event_loop().run_until_complete(_run_wrapper())
@@ -288,9 +294,14 @@ class Scene(_Configurable):
         async def _run_wrapper():
             self.state = SceneState.RUNNING
             await self._run()
+            self.save()
             self.state = SceneState.FINISHED
 
         await asyncio.gather(_run_wrapper())
+
+    @classmethod
+    def obj_for_import(cls) -> DynamicObject:
+        return DynamicObject(obj=cls.__name__, source_file=inspect.getfile(cls))
 
     @classmethod
     def from_config(cls, config: config_obj) -> "Scene":
@@ -335,12 +346,26 @@ class Scene(_Configurable):
                 "scene_info_class not found, please specify scene_info_class in your scene class"
             )
 
+    def _save_scene(self, save_dir: str):
+        with open(join(save_dir, "scene.json"), "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "config": self.config.model_dump(mode="json"),
+                    "metadata": self.metadata.model_dump(mode="json"),
+                    "type": self.obj_for_import().model_dump(mode="json")
+                },
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
     def _save_agents(self, save_dir: str):
         agents_info = {}
         for agent in self.agents:
             config = agent.config.model_dump(mode="json")
             agents_info[config["profile"]["id"]] = {
                 "config": config,
+                "metadata": agent.get_metadata().model_dump(mode="json"),
                 "type": agent.obj_for_import.model_dump(mode="json")
             }
         with open(join(save_dir, "agents.json"), "w", encoding="utf-8") as f:
@@ -358,11 +383,23 @@ class Scene(_Configurable):
                 if socket.type == SocketDataType.METRIC:
                     f.write(json.dumps(socket.data, ensure_ascii=False) + "\n")
 
-    def save(self, save_dir: str):
+    def save(self, save_dir: Optional[str] = None):
+        if not save_dir:
+            save_dir = f"tmp/{datetime.utcnow().timestamp().hex() + uuid4().hex}"
+
         makedirs(save_dir, exist_ok=True)
+
+        self._save_scene(save_dir)
         self._save_agents(save_dir)
         self._save_logs(save_dir)
         self._save_metrics(save_dir)
+
+        self.socket_cache.append(
+            SocketData(
+                type=SocketDataType.ENDING,
+                data={"save_dir": save_dir}
+            )
+        )
 
 
 __all__ = [
