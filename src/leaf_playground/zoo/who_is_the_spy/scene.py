@@ -76,10 +76,10 @@ class WhoIsTheSpyScene(Scene):
             if isinstance(message, ModeratorSummary):
                 self.socket_cache.append(
                     SocketData(
-                        type=SocketDataType.METRIC,
+                        type=SocketDataType.SUMMARY,
                         data={
                             "type": message.summary_category.value,
-                            "metric": message.summary
+                            "summary": message.summary
                         }
                     )
                 )
