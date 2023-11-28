@@ -34,7 +34,7 @@ scene_config = GeneralMCQExamineSceneConfig(
                 **{
                     "agent_config_data": dynamically_import_obj(agent_obj).config_obj(
                         profile=Profile(name="James"),
-                        ai_backend_config=OpenAIBackendConfig(model="gpt-4-0613"),
+                        ai_backend_config=OpenAIBackendConfig(model="gpt-4-1106-preview"),
                     ).model_dump(by_alias=True),
                     "agent_obj": agent_obj.model_dump(by_alias=True)
                 }
@@ -85,7 +85,7 @@ def display_log(log: GeneralMCQExamineScene.log_body_class):
 async def run_scene():
     scene = GeneralMCQExamineScene.from_config(config=scene_config)
     await asyncio.gather(scene.a_start(), scene.stream_logs(display_log))
-    scene.save("general_mcq_examine_result")
+    scene.save("output/general_mcq_examine_result")
 
 
 if __name__ == "__main__":
