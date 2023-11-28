@@ -71,7 +71,7 @@ class Comparison(Data):
 
 
 class ComparisonMetric(Metric):
-    value: Dict[str, float] = Field(default=...)
+    value: Dict[UUID, float] = Field(default=...)
     records: List[Comparison] = Field(default=...)
 
     @classmethod
