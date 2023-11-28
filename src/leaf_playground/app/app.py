@@ -247,7 +247,7 @@ async def create_scene(scene_creation_payload: SceneCreatePayload) -> TaskCreati
 
     TASK_CACHE[task_id] = scene
 
-    scene.start()
+    Thread(target=scene.start, daemon=True).start()  # TODO: optimize, this is ugly
 
     return TaskCreationResponse(task_id=task_id)
 
@@ -258,8 +258,6 @@ async def get_task_status(task_id: UUID) -> JSONResponse:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
 
     scene = TASK_CACHE[task_id]
-
-    Thread(target=scene.start, daemon=True).start()  # TODO: optimize, this is ugly
 
     return JSONResponse(content={"status": scene.state.value})
 
