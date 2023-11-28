@@ -30,7 +30,8 @@ class SceneEvaluatorCompare(Data):
 
 class SceneEvaluatorReport(Data):
     evaluator: str = Field(default=...)
-    report: Dict[UUID, Dict[Union[ComparisonName, MetricName], Union[Metric, ComparisonMetric]]] = Field(default=...)
+    metric_report: Optional[Dict[UUID, Dict[MetricName, Metric]]] = Field(default=None)
+    comparison_report: Optional[Dict[ComparisonName, ComparisonMetric]] = Field(default=None)
 
 
 class SceneEvaluatorMetadata(BaseModel):
@@ -113,7 +114,7 @@ class SceneEvaluator(_Configurable):
 
             async def calculate(comparison_config: ComparisonConfig):
                 comparison = await run_asynchronously(
-                    comparison_config.comparison_type.compare, candidates, comparison_config.guidance, self
+                    comparison_config.comparison_type.compare, candidates, comparison_config.compare_guidance, self
                 )
                 comparisons[comparison_config.comparison_name] = comparison
                 self._name2comparisons[comparison_config.comparison_name].append(comparison)
@@ -128,13 +129,15 @@ class SceneEvaluator(_Configurable):
 
     async def report(self) -> Optional[_report_type]:
 
-        async def _report():
+        async def _metric_report():
+            if not self._metric_configs:
+                return None
+
             agent2metrics = defaultdict(dict)
 
             async def calculate(metric_name: str):
                 all_records = self._name2records.get(metric_name, self._name2comparisons.get(metric_name, []))
-                if not all_records:
-                    return
+
                 agent2records = defaultdict(list)
                 for record in all_records:
                     agent2records[record.target_agent].append(record)
@@ -149,22 +152,48 @@ class SceneEvaluator(_Configurable):
                 )
 
             name2metric_type = {}
-            if self._metric_configs:
-                for config in self._metric_configs:
-                    name2metric_type[config.metric_name] = config.metric_type
-            if self._comparison_configs:
-                for config in self._comparison_configs:
-                    name2metric_type[config.comparison_name] = config.metric_type
+            for config in self._metric_configs:
+                name2metric_type[config.metric_name] = config.metric_type
 
             await asyncio.gather(
                 *[calculate(metric_name) for metric_name in name2metric_type]
             )
 
-            return self._report_type(evaluator=self.__class__.__name__, report=agent2metrics)
+            return agent2metrics
+
+        async def _comparison_report():
+            name2metrics = {}
+
+            if not self._comparison_configs:
+                return None
+
+            async def calculate(metric_name: str):
+                all_comparisons = self._name2comparisons.get(metric_name, [])
+
+                name2metrics[metric_name] = await run_asynchronously(
+                    name2metric_type[metric_name].calculate, all_comparisons, self
+                )
+
+            name2metric_type = {}
+            for config in self._comparison_configs:
+                name2metric_type[config.comparison_name] = config.metric_type
+
+            await asyncio.gather(
+                *[calculate(metric_name) for metric_name in name2metric_type]
+            )
+
+            return name2metrics
 
         if not self._name2records and not self._name2comparisons:
             return None
-        return await _report()
+
+        metric_report, comparison_report = await asyncio.gather(_metric_report(), _comparison_report())
+
+        return SceneEvaluatorReport(
+            evaluator=self.__class__.__name__,
+            metric_report=metric_report,
+            comparison_report=comparison_report
+        )
 
     @classmethod
     def from_config(cls, config: config_obj) -> "SceneEvaluator":
