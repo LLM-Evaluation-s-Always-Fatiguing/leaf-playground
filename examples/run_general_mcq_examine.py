@@ -1,7 +1,13 @@
 import asyncio
 
 from leaf_playground.ai_backend.openai import OpenAIBackendConfig
-from leaf_playground.core.scene import SceneAgentsObjConfig, SceneAgentObjConfig, SceneInfoObjConfig
+from leaf_playground.core.scene import (
+    SceneAgentsObjConfig,
+    SceneAgentObjConfig,
+    SceneEvaluatorObjConfig,
+    SceneEvaluatorsObjConfig,
+    SceneInfoObjConfig
+)
 from leaf_playground.data.profile import Profile
 from leaf_playground.utils.import_util import dynamically_import_obj
 from leaf_playground.zoo.general_mcq_examine.dataset_utils import DatasetConfig
@@ -12,6 +18,7 @@ from leaf_playground.zoo.general_mcq_examine.scene import (
 from leaf_playground.zoo.general_mcq_examine.scene_info import envs_config_model
 
 agent_obj = GeneralMCQExamineScene.get_dynamic_agent_classes()[0]
+evaluator_obj = GeneralMCQExamineScene.get_evaluator_classes()[0]
 scene_info_obj = GeneralMCQExamineScene.get_scene_info_class().obj_for_import
 
 scene_config = GeneralMCQExamineSceneConfig(
@@ -31,6 +38,25 @@ scene_config = GeneralMCQExamineSceneConfig(
                     ).model_dump(by_alias=True),
                     "agent_obj": agent_obj.model_dump(by_alias=True)
                 }
+            ),
+            SceneAgentObjConfig(
+                **{
+                    "agent_config_data": dynamically_import_obj(agent_obj).config_obj(
+                        profile=Profile(name="William"),
+                        ai_backend_config=OpenAIBackendConfig(model="gpt-3.5-turbo-instruct"),
+                    ).model_dump(by_alias=True),
+                    "agent_obj": agent_obj.model_dump(by_alias=True)
+                }
+            )
+        ]
+    ),
+    scene_evaluators=SceneEvaluatorsObjConfig(
+        evaluators=[
+            SceneEvaluatorObjConfig(
+                **{
+                    "evaluator_config_data": {},
+                    "evaluator_obj": evaluator_obj.model_dump(by_alias=True)
+                }
             )
         ]
     ),
@@ -40,7 +66,8 @@ scene_config = GeneralMCQExamineSceneConfig(
             "name": "2010-2022_History_MCQs",
             "split": "dev",
             "question_column": "question",
-            "golden_answer_column": "answer"
+            "golden_answer_column": "answer",
+            "num_questions": 10
         }
     )
 )
@@ -58,7 +85,7 @@ def display_log(log: GeneralMCQExamineScene.log_body_class):
 async def run_scene():
     scene = GeneralMCQExamineScene.from_config(config=scene_config)
     await asyncio.gather(scene.a_start(), scene.stream_logs(display_log))
-    scene.export_logs("general_mcq_examine.logs.jsonl")
+    scene.save("general_mcq_examine_result")
 
 
 if __name__ == "__main__":
