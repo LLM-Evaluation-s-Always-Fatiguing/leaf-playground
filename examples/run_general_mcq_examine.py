@@ -85,7 +85,6 @@ def display_log(log: GeneralMCQExamineScene.log_body_class):
 async def run_scene():
     scene = GeneralMCQExamineScene.from_config(config=scene_config)
     await asyncio.gather(scene.a_start(), scene.stream_logs(display_log))
-    scene.save("output/general_mcq_examine_result")
 
 
 if __name__ == "__main__":
