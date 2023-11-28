@@ -30,6 +30,8 @@ class SceneAgent(_Configurable):
     obj_for_import: DynamicObject
 
     def __init__(self, config: config_obj):
+        if hasattr(self, f"_{self.__class__.__name__}__valid_class_attributes"):
+            getattr(self, f"_{self.__class__.__name__}__valid_class_attributes")()
         self.__valid_class_attributes()
         # check if all actions exist and their signatures are correct
         for action_name, action_signature in self._actions.items():
