@@ -1,14 +1,11 @@
 from abc import abstractmethod
-from collections import defaultdict
 from inspect import Signature, Parameter
-from typing import Dict, List, Optional
-from uuid import UUID
+from typing import Dict, List
 
 from pydantic import Field
 
 from leaf_playground.core.scene_agent import SceneAIAgent, SceneAIAgentConfig, SceneStaticAgent, SceneStaticAgentConfig
-from leaf_playground.data.base import Data
-from leaf_playground.data.message import TextMessage, MessagePool
+from leaf_playground.data.message import TextMessage
 from leaf_playground.data.media import Text
 from leaf_playground.data.profile import Profile
 from leaf_playground.utils.import_util import DynamicObject
@@ -17,15 +14,6 @@ from leaf_playground.zoo.general_mcq_examine.dataset_utils import prepare_datase
 
 class ExaminerQuestion(TextMessage):
     question_id: int = Field(default=...)
-
-
-class ExaminerJudgeResult(Data):
-    examinee: Profile = Field(default=...)
-    accuracy: float = Field(default=...)
-
-
-class ExaminerJudgeResults(Data):
-    judge_results: List[ExaminerJudgeResult] = Field(default=...)
 
 
 class ExamineeAnswer(TextMessage):
@@ -53,16 +41,6 @@ class Examiner(SceneStaticAgent):
             ],
             return_annotation=ExaminerQuestion
         ),
-        "judge_answers": Signature(
-            parameters=[
-                Parameter(
-                    name="message_pool",
-                    kind=Parameter.POSITIONAL_OR_KEYWORD,
-                    annotation=MessagePool
-                )
-            ],
-            return_annotation=Optional[ExaminerJudgeResults]
-        ),
         "check_examine_finish": Signature(
             parameters=None,
             return_annotation=bool
@@ -86,6 +64,7 @@ class Examiner(SceneStaticAgent):
         self,
         dataset_config: DatasetConfig,
     ) -> None:
+        self._cur = 0
         self._questions = prepare_dataset(dataset_config)
         self._dataset_config = dataset_config
 
@@ -98,45 +77,6 @@ class Examiner(SceneStaticAgent):
         )
         self._cur += 1
         return question
-
-    def judge_answers(
-        self,
-        message_pool: MessagePool
-    ) -> Optional[ExaminerJudgeResults]:
-        golden_answer_column = self._dataset_config.golden_answer_column
-        if golden_answer_column is None:
-            return
-
-        total_questions = len(self._questions)
-        golden_answers = [data[golden_answer_column] for data in self._questions]
-
-        messages = [msg for msg in message_pool.get_messages(self.profile) if isinstance(msg, ExamineeAnswer)]
-
-        id2profile = {}
-        id2answers: Dict[UUID, List[ExamineeAnswer]] = defaultdict(list)
-        for msg in messages:
-            sender = msg.sender
-            id2profile[sender.id] = sender
-            id2answers[sender.id].append(msg)
-
-        judge_results = ExaminerJudgeResults(judge_results=[])
-        for examinee_id, answers in id2answers.items():
-            acc_num = 0
-            for answer in answers:
-                question_id = answer.question_id
-                pred = answer.content.text
-                golden = golden_answers[question_id]
-                if pred.startswith(golden):
-                    acc_num += 1
-            acc = acc_num / total_questions
-            judge_results.judge_results.append(
-                ExaminerJudgeResult(
-                    examinee=id2profile[examinee_id],
-                    accuracy=acc
-                )
-            )
-
-        return judge_results
 
     def check_examine_finish(self) -> bool:
         return self._cur >= len(self._questions)
@@ -176,8 +116,6 @@ class AIBaseExaminee(SceneAIAgent):
 
 __all__ = [
     "ExaminerQuestion",
-    "ExaminerJudgeResult",
-    "ExaminerJudgeResults",
     "ExamineeAnswer",
     "ExaminerConfig",
     "Examiner",

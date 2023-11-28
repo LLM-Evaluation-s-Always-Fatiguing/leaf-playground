@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Dict, List, Tuple, Type, TypedDict
+from typing import Any, Dict, List, Optional, Tuple, Type, TypedDict
 
 from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketException, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -8,10 +8,19 @@ from pydantic.fields import FieldInfo
 
 from .const import ZOO_ROOT
 from .._config import _Config
-from ..core.scene import Scene, SceneConfig, SceneInfoObjConfig, SceneAgentObjConfig, SceneAgentsObjConfig
-from ..core.scene_info import SceneMetaData, SceneInfo, SceneInfoConfigBase
+from ..core.scene import (
+    Scene,
+    SceneConfig,
+    SceneInfoObjConfig,
+    SceneAgentObjConfig,
+    SceneAgentsObjConfig,
+    SceneEvaluatorObjConfig,
+    SceneEvaluatorsObjConfig
+)
 from ..core.scene_agent import SceneAgentConfig, SceneAgent, SceneAgentMetadata
-from ..utils.import_util import dynamically_import_obj, find_subclasses, DynamicObject
+from ..core.scene_evaluator import SceneEvaluatorConfig, SceneEvaluator, SceneEvaluatorMetadata
+from ..core.scene_info import SceneMetaData, SceneInfo, SceneInfoConfigBase
+from ..utils.import_util import dynamically_import_obj, find_subclasses
 
 
 class SceneFull(TypedDict):
@@ -27,6 +36,9 @@ class SceneFull(TypedDict):
     agent_classes: Dict[str, Type[SceneAgent]]
     agent_config_classes: Dict[str, Type[SceneAgentConfig]]
     agents_metadata: Dict[str, SceneAgentMetadata]
+    evaluator_classes: Optional[Dict[str, Type[SceneEvaluator]]]
+    evaluator_config_classes: Optional[Dict[str, Type[SceneEvaluatorConfig]]]
+    evaluators_metadata: Optional[Dict[str, SceneEvaluatorMetadata]]
     scene_config_additional_fields: Dict[str, Tuple[Type, FieldInfo]]
 
 
@@ -34,11 +46,13 @@ class SceneDetail(BaseModel):
     id: str = Field(default=...)
     scene_metadata: SceneMetaData = Field(default=...)
     agents_metadata: Dict[str, SceneAgentMetadata] = Field(default=...)
+    evaluators_metadata: Optional[Dict[str, SceneEvaluatorMetadata]] = Field(default=...)
     role_agents_num: Dict[str, int] = Field(default=...)
     max_agents_num: int = Field(default=...)
     min_agents_num: int = Field(default=...)
     scene_info_config_schema: dict = Field(default=...)
     agents_config_schemas: Dict[str, dict] = Field(default=...)
+    evaluators_config_schemas: Optional[Dict[str, dict]] = Field(default=...)
     additional_config_schema: dict = Field(default=...)
 
 
@@ -56,10 +70,16 @@ class SceneAgentConfigPayload(BaseModel):
     agent_config_data: dict = Field(default=...)
 
 
+class SceneEvaluatorConfigPayload(BaseModel):
+    evaluator_name: str = Field(default=...)
+    evaluator_config_data: dict = Field(default=...)
+
+
 class SceneCreatePayload(BaseModel):
     id: str = Field(default=...)
     scene_info_config_data: dict = Field(default=...)
     scene_agents_config_data: List[SceneAgentConfigPayload] = Field(default=...)
+    scene_evaluators_config_data: Optional[List[SceneEvaluatorConfigPayload]] = Field(default=...)
     additional_config_data: Dict[str, Any] = Field(default=...)
 
 
@@ -67,21 +87,17 @@ app = FastAPI()
 
 
 def get_scenes() -> Dict[str, SceneFull]:
-    scenes_tmp = [
-        (hash(dynamic_obj), dynamically_import_obj(dynamic_obj)) for dynamic_obj
-        in find_subclasses(package_path=ZOO_ROOT, base_class=Scene)
-    ]
     scenes = {}
-    for scene_id, scene_class in scenes_tmp:
-        scene_id = str(scene_id)
+    for scene_dynamic_obj in find_subclasses(package_path=ZOO_ROOT, base_class=Scene):
         scene_class: Type[Scene]
+        scene_id, scene_class = scene_dynamic_obj.hash, dynamically_import_obj(scene_dynamic_obj)
 
         scene_metadata = scene_class.get_metadata()
         scene_config_class: Type[SceneConfig] = scene_class.config_obj
         scene_info_class: Type[SceneInfo] = scene_class.get_scene_info_class()
         scene_info_config_class: Type[SceneInfoConfigBase] = scene_info_class.config_obj
         agent_classes: Dict[str, Type[SceneAgent]] = {
-            str(hash(dynamic_obj)): dynamically_import_obj(dynamic_obj) for dynamic_obj
+            dynamic_obj.hash: dynamically_import_obj(dynamic_obj) for dynamic_obj
             in scene_class.get_dynamic_agent_classes()
         }
         agent_config_classes: Dict[str, Type[SceneAgentConfig]] = {
@@ -94,6 +110,21 @@ def get_scenes() -> Dict[str, SceneFull]:
             field_name: (field_info.annotation, field_info) for field_name, field_info
             in scene_config_class.model_fields.items() if field_name not in SceneConfig.model_fields.keys()
         }
+
+        evaluator_classes = None
+        evaluator_config_classes = None
+        evaluators_metadata = None
+        if scene_class.get_evaluator_classes():
+            evaluator_classes = {
+                evaluator.hash: dynamically_import_obj(evaluator)
+                for (evaluator) in scene_class.get_evaluator_classes()
+            }
+            evaluator_config_classes = {
+                evaluator_id: evaluator_cls.config_obj for evaluator_id, evaluator_cls in evaluator_classes.items()
+            }
+            evaluators_metadata = {
+                evaluator_id: evaluator_cls.get_metadata() for evaluator_id, evaluator_cls in evaluator_classes.items()
+            }
 
         scene_full = SceneFull(
             id=scene_id,
@@ -108,6 +139,9 @@ def get_scenes() -> Dict[str, SceneFull]:
             agent_classes=agent_classes,
             agent_config_classes=agent_config_classes,
             agents_metadata=agents_metadata,
+            evaluator_classes=evaluator_classes,
+            evaluator_config_classes=evaluator_config_classes,
+            evaluators_metadata=evaluators_metadata,
             scene_config_additional_fields=scene_config_additional_fields
         )
 
@@ -143,6 +177,7 @@ async def get_scene(scene_id: str) -> SceneDetail:
         id=scene_full["id"],
         scene_metadata=scene_full["scene_metadata"],
         agents_metadata=scene_full["agents_metadata"],
+        evaluators_metadata=scene_full["evaluators_metadata"],
         role_agents_num=scene_full["role_agents_num"],
         max_agents_num=scene_full["max_agents_num"],
         min_agents_num=scene_full["min_agents_num"],
@@ -150,6 +185,10 @@ async def get_scene(scene_id: str) -> SceneDetail:
         agents_config_schemas={
             agent_id: agent_config_class.get_json_schema(by_alias=True) for agent_id, agent_config_class in
             scene_full["agent_config_classes"].items()
+        },
+        evaluators_config_schemas=None if not scene_full["evaluator_config_classes"] else {
+            evaluator_name: evaluator_config_class.get_json_schema(by_alias=True) for
+            evaluator_name, evaluator_config_class in scene_full["evaluator_config_classes"].items()
         },
         additional_config_schema=create_model(
             __model_name="AdditionalConfigTemp",
@@ -177,9 +216,18 @@ def _create_scene(payload: SceneCreatePayload) -> Scene:
             ) for agent_config_payload in payload.scene_agents_config_data
         ]
     )
+    scene_evaluators_obj_config = SceneEvaluatorsObjConfig(
+        evaluators=[
+            SceneEvaluatorObjConfig(
+                evaluator_config_data=evaluator_config_payload.evaluator_config_data,
+                evaluator_obj=scene_full["evaluator_classes"][evaluator_config_payload.evaluator_name].obj_for_import
+            ) for evaluator_config_payload in (payload.scene_evaluators_config_data or [])
+        ]
+    )
     scene_config = scene_config_class(
         scene_info=scene_info_obj_config,
         scene_agents=scene_agents_obj_config,
+        scene_evaluators=scene_evaluators_obj_config,
         **payload.additional_config_data
     )
     scene = scene_full["scene_class"].from_config(config=scene_config)

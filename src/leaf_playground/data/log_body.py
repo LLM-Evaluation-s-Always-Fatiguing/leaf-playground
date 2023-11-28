@@ -15,7 +15,7 @@ class LogBody(Data):
     response: MessageType = Field(default=...)
     media_type: MediaType = Field(default=...)
     ground_truth: Optional[Media] = Field(default=None)
-    eval_result: Optional[Dict[str, Union[bool, float, str]]] = Field(default=None)
+    eval_record: Optional[dict] = Field(default=None)
     narrator: Optional[str] = Field(default=None)
 
     def model_post_init(self, __context: Any) -> None:
