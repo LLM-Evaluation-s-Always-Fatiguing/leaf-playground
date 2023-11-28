@@ -68,7 +68,7 @@ def display_log(log: WhoIsTheSpyScene.log_body_class):
 async def run_scene():
     scene = WhoIsTheSpyScene.from_config(config=scene_config)
     await asyncio.gather(scene.a_start(), scene.stream_logs(display_log))
-    scene.save("who_is_the_spy_result")
+    scene.save("output/who_is_the_spy_result")
 
 
 if __name__ == "__main__":
