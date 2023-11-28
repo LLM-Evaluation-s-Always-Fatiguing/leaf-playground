@@ -350,7 +350,7 @@ class Scene(_Configurable):
         with open(join(save_dir, "logs.jsonl"), "w", encoding="utf-8") as f:
             for socket in self.socket_cache:
                 if socket.type == SocketDataType.LOG:
-                    f.write(json.dumps(socket.data) + "\n")
+                    f.write(json.dumps(socket.data, ensure_ascii=False) + "\n")
 
     def _save_metrics(self, save_dir: str):
         with open(join(save_dir, "metrics.jsonl"), "w", encoding="utf-8") as f:
