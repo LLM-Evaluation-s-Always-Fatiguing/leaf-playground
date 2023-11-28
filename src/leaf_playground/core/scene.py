@@ -1,8 +1,10 @@
 import asyncio
 import inspect
+import json
 import random
 from abc import abstractmethod
 from itertools import chain
+from os import makedirs
 from os.path import dirname, join
 from typing import Any, Callable, List, Optional, Type
 
@@ -130,7 +132,6 @@ class SceneInfoObjConfig(_Config):
 
 class SceneConfig(_Config):
     debug_mode: bool = Field(default=False, exclude=True)
-    enable_evaluator: bool = Field(default=False, exclude=True)
     scene_info: SceneInfoObjConfig = Field(default=...)
     # agents specified here are dynamic agents whose roles remain unknown before assignment (Scene._post_init_agents)
     scene_agents: SceneAgentsObjConfig = Field(default=...)
@@ -156,6 +157,7 @@ class Scene(_Configurable):
         self.scene_info: SceneInfo = self.config.scene_info.create_instance()
         self.agents: List[SceneAgent] = self.config.scene_agents.create_instances()
         self.static_agents: List[SceneAgent] = self._init_static_agents()
+        self.evaluators: List[SceneEvaluator] = self.config.scene_evaluators.create_instances()
         self._valid_agent_num()
         self._post_init_agents()
 
@@ -274,12 +276,6 @@ class Scene(_Configurable):
                 else:
                     log_handler(self.log_body_class(**socket.data))
 
-    def export_logs(self, file: str):
-        with open(file, "w", encoding="utf-8") as f:
-            for socket in self.socket_cache:
-                if socket.type == SocketDataType.LOG:
-                    f.write(self.log_body_class(**socket.data).model_dump_json(by_alias=True) + "\n")
-
     def start(self):
         async def _run_wrapper():
             self.state = SceneState.RUNNING
@@ -325,8 +321,10 @@ class Scene(_Configurable):
         return classes
 
     @classmethod
-    def get_evaluator_classes(cls) -> Optional[List[SceneEvaluator]]:
-        return cls.evaluator_classes
+    def get_evaluator_classes(cls) -> Optional[List[DynamicObject]]:
+        return cls.evaluator_classes if not cls.evaluator_classes else [
+            evaluator_cls.obj_for_import for evaluator_cls in cls.evaluator_classes
+        ]
 
     @classmethod
     def get_scene_info_class(cls) -> Type[SceneInfo]:
@@ -336,6 +334,35 @@ class Scene(_Configurable):
             raise ValueError(
                 "scene_info_class not found, please specify scene_info_class in your scene class"
             )
+
+    def _save_agents(self, save_dir: str):
+        agents_info = {}
+        for agent in self.agents:
+            config = agent.config.model_dump(mode="json")
+            agents_info[config["profile"]["id"]] = {
+                "config": config,
+                "type": agent.obj_for_import.model_dump(mode="json")
+            }
+        with open(join(save_dir, "agents.json"), "w", encoding="utf-8") as f:
+            json.dump(agents_info, f, ensure_ascii=False, indent=2)
+
+    def _save_logs(self, save_dir: str):
+        with open(join(save_dir, "logs.jsonl"), "w", encoding="utf-8") as f:
+            for socket in self.socket_cache:
+                if socket.type == SocketDataType.LOG:
+                    f.write(json.dumps(socket.data) + "\n")
+
+    def _save_metrics(self, save_dir: str):
+        with open(join(save_dir, "metrics.jsonl"), "w", encoding="utf-8") as f:
+            for socket in self.socket_cache:
+                if socket.type == SocketDataType.METRIC:
+                    f.write(json.dumps(socket.data, ensure_ascii=False) + "\n")
+
+    def save(self, save_dir: str):
+        makedirs(save_dir, exist_ok=True)
+        self._save_agents(save_dir)
+        self._save_logs(save_dir)
+        self._save_metrics(save_dir)
 
 
 __all__ = [

@@ -20,7 +20,7 @@ from ..core.scene import (
 from ..core.scene_agent import SceneAgentConfig, SceneAgent, SceneAgentMetadata
 from ..core.scene_evaluator import SceneEvaluatorConfig, SceneEvaluator, SceneEvaluatorMetadata
 from ..core.scene_info import SceneMetaData, SceneInfo, SceneInfoConfigBase
-from ..utils.import_util import dynamically_import_obj, find_subclasses, DynamicObject
+from ..utils.import_util import dynamically_import_obj, find_subclasses
 
 
 class SceneFull(TypedDict):
@@ -46,6 +46,7 @@ class SceneDetail(BaseModel):
     id: str = Field(default=...)
     scene_metadata: SceneMetaData = Field(default=...)
     agents_metadata: Dict[str, SceneAgentMetadata] = Field(default=...)
+    evaluators_metadata: Optional[Dict[str, SceneEvaluatorMetadata]] = Field(default=...)
     role_agents_num: Dict[str, int] = Field(default=...)
     max_agents_num: int = Field(default=...)
     min_agents_num: int = Field(default=...)
@@ -86,21 +87,17 @@ app = FastAPI()
 
 
 def get_scenes() -> Dict[str, SceneFull]:
-    scenes_tmp = [
-        (hash(dynamic_obj), dynamically_import_obj(dynamic_obj)) for dynamic_obj
-        in find_subclasses(package_path=ZOO_ROOT, base_class=Scene)
-    ]
     scenes = {}
-    for scene_id, scene_class in scenes_tmp:
-        scene_id = str(scene_id)
+    for scene_dynamic_obj in find_subclasses(package_path=ZOO_ROOT, base_class=Scene):
         scene_class: Type[Scene]
+        scene_id, scene_class = scene_dynamic_obj.hash, dynamically_import_obj(scene_dynamic_obj)
 
         scene_metadata = scene_class.get_metadata()
         scene_config_class: Type[SceneConfig] = scene_class.config_obj
         scene_info_class: Type[SceneInfo] = scene_class.get_scene_info_class()
         scene_info_config_class: Type[SceneInfoConfigBase] = scene_info_class.config_obj
         agent_classes: Dict[str, Type[SceneAgent]] = {
-            str(hash(dynamic_obj)): dynamically_import_obj(dynamic_obj) for dynamic_obj
+            dynamic_obj.hash: dynamically_import_obj(dynamic_obj) for dynamic_obj
             in scene_class.get_dynamic_agent_classes()
         }
         agent_config_classes: Dict[str, Type[SceneAgentConfig]] = {
@@ -118,9 +115,16 @@ def get_scenes() -> Dict[str, SceneFull]:
         evaluator_config_classes = None
         evaluators_metadata = None
         if scene_class.get_evaluator_classes():
-            evaluator_classes = {evaluator.__name__: evaluator for evaluator in scene_class.get_evaluator_classes()}
-            evaluator_config_classes = {evaluator.__name__: evaluator.config_obj for evaluator in evaluator_classes.values()}
-            evaluators_metadata = {evaluator.__name__: evaluator.get_metadata() for evaluator in evaluator_classes.values()}
+            evaluator_classes = {
+                evaluator.hash: dynamically_import_obj(evaluator)
+                for (evaluator) in scene_class.get_evaluator_classes()
+            }
+            evaluator_config_classes = {
+                evaluator_id: evaluator_cls.config_obj for evaluator_id, evaluator_cls in evaluator_classes.items()
+            }
+            evaluators_metadata = {
+                evaluator_id: evaluator_cls.get_metadata() for evaluator_id, evaluator_cls in evaluator_classes.items()
+            }
 
         scene_full = SceneFull(
             id=scene_id,
@@ -173,6 +177,7 @@ async def get_scene(scene_id: str) -> SceneDetail:
         id=scene_full["id"],
         scene_metadata=scene_full["scene_metadata"],
         agents_metadata=scene_full["agents_metadata"],
+        evaluators_metadata=scene_full["evaluators_metadata"],
         role_agents_num=scene_full["role_agents_num"],
         max_agents_num=scene_full["max_agents_num"],
         min_agents_num=scene_full["min_agents_num"],
@@ -216,7 +221,7 @@ def _create_scene(payload: SceneCreatePayload) -> Scene:
             SceneEvaluatorObjConfig(
                 evaluator_config_data=evaluator_config_payload.evaluator_config_data,
                 evaluator_obj=scene_full["evaluator_classes"][evaluator_config_payload.evaluator_name].obj_for_import
-            ) for evaluator_config_payload in payload.scene_evaluators_config_data or []
+            ) for evaluator_config_payload in (payload.scene_evaluators_config_data or [])
         ]
     )
     scene_config = scene_config_class(

@@ -1,24 +1,25 @@
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional, Type
+from uuid import UUID
 
 from pydantic import field_serializer, Field
 
 from .base import Data
-from .log_body import LogBody
-from .profile import Profile
+from .message import MessageType
 from .._config import _Config
 
 
 class MetricRecord(Data):
     value: Any = Field(default=...)
     comment: Optional[str] = Field(default=None)
-    target: int = Field(default=...)
+    misc: Optional[dict] = Field(default=None)
+    target_agent: UUID = Field(default=...)
 
     @classmethod
     @abstractmethod
     async def calculate(
         cls,
-        target: LogBody,
+        target: MessageType,
         evaluator: "leaf_playground.core.scene_evaluator.SceneEvaluator"
     ) -> "MetricRecord":
         pass
@@ -27,7 +28,7 @@ class MetricRecord(Data):
 class Metric(Data):
     value: Any = Field(default=...)
     records: List[MetricRecord] = Field(default=...)
-    metadata: Optional[dict] = Field(default=None)
+    misc: Optional[dict] = Field(default=None)
 
     @classmethod
     @abstractmethod
@@ -49,20 +50,20 @@ class MetricConfig(_Config):
     def serialize_metric_type(self, metric_type: Type[Metric], _info) -> str:
         return metric_type.__name__
 
-    @field_serializer("metric_record__type")
-    def serialize_metric_type(self, metric_record__type: Type[Metric], _info) -> str:
-        return metric_record__type.__name__
+    @field_serializer("metric_record_type")
+    def serialize_metric_record_type(self, metric_record_type: Type[MetricRecord], _info) -> str:
+        return metric_record_type.__name__
 
 
 class Comparison(Data):
-    ranking: List[Profile] = Field(default=...)
-    targets: List[int] = Field(default=...)
+    ranking: List[UUID] = Field(default=...)
+    misc: Optional[dict] = Field(default=None)
 
     @classmethod
     @abstractmethod
     async def compare(
         cls,
-        candidates: List[LogBody],
+        candidates: List[MessageType],
         compare_guidance: str,
         evaluator: "leaf_playground.core.scene_evaluator.SceneEvaluator"
     ) -> "Comparison":
@@ -95,7 +96,7 @@ class ComparisonConfig(_Config):
         return comparison_type.__name__
 
     @field_serializer("metric_type")
-    def serialize_comparison_type(self, metric_type: Type[Comparison], _info) -> str:
+    def serialize_metric_type(self, metric_type: Type[ComparisonMetric], _info) -> str:
         return metric_type.__name__
 
 
@@ -104,5 +105,6 @@ __all__ = [
     "Metric",
     "MetricConfig",
     "Comparison",
+    "ComparisonMetric",
     "ComparisonConfig"
 ]

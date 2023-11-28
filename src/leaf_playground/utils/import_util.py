@@ -26,7 +26,8 @@ class DynamicObject(BaseModel):
         if self.module and self.source_file:
             raise ValueError("can't specify 'module' and 'source_file' at the same time.")
 
-    def __hash__(self) -> str:
+    @property
+    def hash(self) -> str:
         obj = self.obj
         module = "" if not self.module else self.module
         source_file = "" if not self.source_file else self.source_file.as_posix()
@@ -34,8 +35,8 @@ class DynamicObject(BaseModel):
 
 
 def dynamically_import_obj(o: DynamicObject):
-    if o in _IMPORTED_OBJECTS:
-        return _IMPORTED_OBJECTS[o]
+    if o.hash in _IMPORTED_OBJECTS:
+        return _IMPORTED_OBJECTS[o.hash]
     if o.module is not None:
         module = importlib.import_module(o.module)
     else:
@@ -43,7 +44,7 @@ def dynamically_import_obj(o: DynamicObject):
             o.source_file.name, o.source_file.as_posix()
         ).load_module()
     obj = module.__dict__[o.obj]
-    _IMPORTED_OBJECTS[o] = obj
+    _IMPORTED_OBJECTS[o.hash] = obj
     return obj
 
 
@@ -51,17 +52,18 @@ class DynamicFn(BaseModel):
     fn: DynamicObject = Field(default=...)
     default_kwargs: Optional[dict] = Field(default=None)
 
-    def __hash__(self) -> str:
-        return str(hash(self.fn)) + md5(str(self.default_kwargs).encode(encoding="utf-8")).hexdigest()
+    @property
+    def hash(self) -> str:
+        return self.fn.hash + md5(str(self.default_kwargs).encode(encoding="utf-8")).hexdigest()
 
 
 def dynamically_import_fn(f: DynamicFn):
-    if f in _IMPORTED_FUNCTIONS:
-        return _IMPORTED_FUNCTIONS[f]
+    if f.hash in _IMPORTED_FUNCTIONS:
+        return _IMPORTED_FUNCTIONS[f.hash]
     fn = dynamically_import_obj(f.fn)
     if f.default_kwargs is not None:
         fn = partial(fn, **f.default_kwargs)
-    _IMPORTED_FUNCTIONS[f] = fn
+    _IMPORTED_FUNCTIONS[f.hash] = fn
     return fn
 
 
@@ -82,9 +84,7 @@ def find_subclasses(package_path: str, base_class: Type) -> List[DynamicObject]:
             if not inspect.isclass(obj):
                 continue
             if issubclass(obj, base_class) and obj != base_class and obj.__module__ == module.__name__:
-                classes.append(
-                    DynamicObject(obj=name, source_file=module_path.absolute())
-                )
+                classes.append(DynamicObject(obj=obj.__name__, source_file=module_path))
 
     return classes
 
