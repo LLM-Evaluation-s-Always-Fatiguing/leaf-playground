@@ -20,7 +20,7 @@ class IsCorrect(MetricRecord):
     ) -> "IsCorrect":
         data = evaluator.dataset[target.question_id]
         question = data[evaluator.dataset_config.question_column]
-        agent_answer = target.content.text
+        agent_answer = target.content.text.strip()
         golden_answer = data[evaluator.dataset_config.golden_answer_column]
         return cls(
             value=agent_answer.lower().startswith(golden_answer.lower()),
