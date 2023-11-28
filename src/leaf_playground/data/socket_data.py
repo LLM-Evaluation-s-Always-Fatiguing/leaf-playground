@@ -9,6 +9,7 @@ class SocketDataType(Enum):
     LOG = "log"
     METRIC = "metric"
     SUMMARY = "summary"
+    ENDING = "ending"
 
 
 class SocketData(Data):
