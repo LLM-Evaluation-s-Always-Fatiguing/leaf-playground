@@ -217,7 +217,7 @@ class SceneEvaluator(_Configurable):
                     chart_type(
                         name=f"{self.__class__.__name__}_{metric_name}",
                         reports=self.metric_reports if metric_type == MetricTypes.METRIC else self.comparison_reports,
-                        metric_name=metric_config.metric_name,
+                        metric_name=metric_name,
                         metric_type=metric_type,
                         aggregate_method=metric_config.reports_agg_method or simple_agg_mean
                     )
