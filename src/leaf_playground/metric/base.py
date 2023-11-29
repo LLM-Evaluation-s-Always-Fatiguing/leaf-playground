@@ -27,7 +27,7 @@ class MetricRecord(Data):
 
 
 class Metric(Data):
-    value: Any = Field(default=...)
+    value: float = Field(default=...)
     records: List[MetricRecord] = Field(default=...)
     misc: Optional[dict] = Field(default=None)
 
@@ -71,9 +71,10 @@ class Comparison(Data):
         pass
 
 
-class ComparisonMetric(Metric):
+class ComparisonMetric(Data):
     value: Dict[UUID, float] = Field(default=...)
     records: List[Comparison] = Field(default=...)
+    misc: Optional[dict] = Field(default=None)
 
     @classmethod
     @abstractmethod
