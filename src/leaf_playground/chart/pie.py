@@ -28,7 +28,7 @@ class NightingaleRoseChart(PieChart):
             .add(
                 self.metric_name,
                 sorted(self.data, key=lambda x: x[1]),
-                radius=["30%", "135%"],
+                radius=["5%", "100%"],
                 center=["50%", "65%"],
                 rosetype="area",
             )
