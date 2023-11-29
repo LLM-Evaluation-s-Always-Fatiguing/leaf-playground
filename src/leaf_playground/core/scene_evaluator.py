@@ -30,7 +30,7 @@ class SceneEvaluatorCompare(Data):
 
 class SceneEvaluatorReport(Data):
     evaluator: str = Field(default=...)
-    metric_report: Optional[Dict[UUID, Dict[MetricName, Metric]]] = Field(default=None)
+    metric_report: Optional[Dict[MetricName, Dict[UUID, Metric]]] = Field(default=None)
     comparison_report: Optional[Dict[ComparisonName, ComparisonMetric]] = Field(default=None)
 
 
@@ -133,7 +133,7 @@ class SceneEvaluator(_Configurable):
             if not self._metric_configs:
                 return None
 
-            agent2metrics = defaultdict(dict)
+            name2metrics = defaultdict(dict)
 
             async def calculate(metric_name: str):
                 all_records = self._name2records.get(metric_name, self._name2comparisons.get(metric_name, []))
@@ -143,7 +143,7 @@ class SceneEvaluator(_Configurable):
                     agent2records[record.target_agent].append(record)
 
                 async def _calculate(agent: UUID):
-                    agent2metrics[agent][metric_name] = await run_asynchronously(
+                    name2metrics[metric_name][agent] = await run_asynchronously(
                         name2metric_type[metric_name].calculate, agent2records[agent], self
                     )
 
@@ -159,7 +159,7 @@ class SceneEvaluator(_Configurable):
                 *[calculate(metric_name) for metric_name in name2metric_type]
             )
 
-            return agent2metrics
+            return name2metrics
 
         async def _comparison_report():
             name2metrics = {}
