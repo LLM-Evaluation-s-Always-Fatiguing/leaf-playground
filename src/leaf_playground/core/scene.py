@@ -383,6 +383,16 @@ class Scene(_Configurable):
                 if socket.type == SocketDataType.METRIC:
                     f.write(json.dumps(socket.data, ensure_ascii=False) + "\n")
 
+    def _save_charts(self, save_dir: str):
+        charts_dir = join(save_dir, "charts")
+        makedirs(charts_dir, exist_ok=True)
+        if not self.evaluators:
+            return
+        for evaluator in self.evaluators:
+            for chart in evaluator.paint_charts():
+                chart.render_chart(join(charts_dir, f"{chart.name}.html"))
+                chart.dump_chart_options(join(charts_dir, f"{chart.name}.json"))
+
     def save(self, save_dir: Optional[str] = None):
         if not save_dir:
             save_dir = join(getcwd(), f"tmp/{datetime.utcnow().timestamp().hex() + uuid4().hex}")
@@ -393,6 +403,7 @@ class Scene(_Configurable):
         self._save_agents(save_dir)
         self._save_logs(save_dir)
         self._save_metrics(save_dir)
+        self._save_charts(save_dir)
 
         self.socket_cache.append(
             SocketData(

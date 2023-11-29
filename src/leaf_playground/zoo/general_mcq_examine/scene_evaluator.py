@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import Field
 
 from leaf_playground.metric.base import ComparisonConfig, MetricRecord, Metric, MetricConfig
+from leaf_playground.chart.bar import HorizontalBarChart
 from leaf_playground.core.scene_evaluator import *
 from leaf_playground.utils.import_util import DynamicObject
 from leaf_playground.zoo.general_mcq_examine.dataset_utils import DatasetConfig
@@ -63,7 +64,8 @@ class GeneralMCQSceneEvaluator(SceneEvaluator):
             metric_name="accuracy",
             metric_description="Accuracy of an examinee's answer.",
             metric_type=Accuracy,
-            metric_record_type=IsCorrect
+            metric_record_type=IsCorrect,
+            chart_type=HorizontalBarChart,
         )
     ]
     _comparison_configs: Optional[List[ComparisonConfig]] = None
