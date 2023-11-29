@@ -5,7 +5,7 @@ import random
 from abc import abstractmethod
 from datetime import datetime
 from itertools import chain
-from os import makedirs
+from os import getcwd, makedirs
 from os.path import dirname, join
 from typing import Any, Callable, List, Optional, Type
 from uuid import uuid4
@@ -385,7 +385,7 @@ class Scene(_Configurable):
 
     def save(self, save_dir: Optional[str] = None):
         if not save_dir:
-            save_dir = f"tmp/{datetime.utcnow().timestamp().hex() + uuid4().hex}"
+            save_dir = join(getcwd(), f"tmp/{datetime.utcnow().timestamp().hex() + uuid4().hex}")
 
         makedirs(save_dir, exist_ok=True)
 
