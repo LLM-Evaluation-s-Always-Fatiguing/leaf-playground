@@ -2,14 +2,14 @@ import asyncio
 import json
 from uuid import UUID
 from collections import defaultdict
-from typing import Dict, List, Optional, Type, Union
+from typing import Dict, List, Optional, Type
 
 from pydantic import BaseModel, Field
 
 from .._config import _Config, _Configurable
 from ..data.base import Data
 from ..data.message import MessageType
-from ..data.metric import Comparison, ComparisonMetric, ComparisonConfig, MetricRecord, Metric, MetricConfig
+from ..metric.base import Comparison, ComparisonMetric, ComparisonConfig, MetricRecord, Metric, MetricConfig
 from ..utils.import_util import DynamicObject
 from ..utils.thread_util import run_asynchronously
 

@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from leaf_playground.data.metric import ComparisonConfig, MetricRecord, Metric, MetricConfig
+from leaf_playground.metric.base import ComparisonConfig, MetricRecord, Metric, MetricConfig
 from leaf_playground.core.scene_evaluator import *
 from leaf_playground.utils.import_util import DynamicObject
 from leaf_playground.zoo.general_mcq_examine.dataset_utils import DatasetConfig
