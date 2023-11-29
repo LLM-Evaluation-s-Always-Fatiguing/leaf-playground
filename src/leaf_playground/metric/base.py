@@ -1,11 +1,12 @@
 from abc import abstractmethod
+from enum import Enum
 from typing import Any, Dict, List, Optional, Type
 from uuid import UUID
 
 from pydantic import field_serializer, Field
 
-from .base import Data
-from .message import MessageType
+from ..data.base import Data
+from ..data.message import MessageType
 from .._config import _Config
 
 
@@ -100,11 +101,17 @@ class ComparisonConfig(_Config):
         return metric_type.__name__
 
 
+class MetricTypes(Enum):
+    METRIC = "metric"
+    COMPARISON = "comparison"
+
+
 __all__ = [
     "MetricRecord",
     "Metric",
     "MetricConfig",
     "Comparison",
     "ComparisonMetric",
-    "ComparisonConfig"
+    "ComparisonConfig",
+    "MetricTypes"
 ]
