@@ -22,3 +22,6 @@ build/
 # example outputs
 output/
 tmp/
+
+# dev workdirs
+dev/
