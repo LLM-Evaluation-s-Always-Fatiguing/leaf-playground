@@ -219,9 +219,12 @@ class SceneEvaluator(_Configurable):
         def _paint_chart(metric_config, metric_type):
             if metric_config.chart_type:
                 chart_type: Type[Chart] = metric_config.chart_type
+                metric_name = (
+                    metric_config.metric_name if metric_type == MetricTypes.METRIC else metric_config.comparison_name
+                )
                 charts.append(
                     chart_type(
-                        name=f"{self.__class__.__name__}_{metric_config.metric_name}",
+                        name=f"{self.__class__.__name__}_{metric_name}",
                         reports=self.metric_reports if metric_type == MetricTypes.METRIC else self.comparison_reports,
                         metric_name=metric_config.metric_name,
                         metric_type=metric_type,
