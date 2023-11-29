@@ -11,7 +11,8 @@ requirements = [
     "sentencepiece",
     "accelerate",
     "fastapi[all]",
-    "tiktoken"
+    "tiktoken",
+    "pyecharts"
 ]
 
 setup(
