@@ -2,14 +2,24 @@ import asyncio
 import json
 from uuid import UUID
 from collections import defaultdict
-from typing import Dict, List, Optional, Type, Union
+from typing import Dict, List, Optional, Type
 
 from pydantic import BaseModel, Field
 
 from .._config import _Config, _Configurable
+from ..chart.base import Chart
 from ..data.base import Data
 from ..data.message import MessageType
-from ..data.metric import Comparison, ComparisonMetric, ComparisonConfig, MetricRecord, Metric, MetricConfig
+from ..metric import simple_agg_mean
+from ..metric.base import (
+    Comparison,
+    ComparisonMetric,
+    ComparisonConfig,
+    MetricRecord,
+    Metric,
+    MetricConfig,
+    MetricTypes
+)
 from ..utils.import_util import DynamicObject
 from ..utils.thread_util import run_asynchronously
 
@@ -30,7 +40,7 @@ class SceneEvaluatorCompare(Data):
 
 class SceneEvaluatorReport(Data):
     evaluator: str = Field(default=...)
-    metric_report: Optional[Dict[UUID, Dict[MetricName, Metric]]] = Field(default=None)
+    metric_report: Optional[Dict[MetricName, Dict[UUID, Metric]]] = Field(default=None)
     comparison_report: Optional[Dict[ComparisonName, ComparisonMetric]] = Field(default=None)
 
 
@@ -66,6 +76,9 @@ class SceneEvaluator(_Configurable):
         super().__init__(config=config)
         self._name2records: Dict[str, List[MetricRecord]] = defaultdict(list)
         self._name2comparisons: Dict[str, List[Comparison]] = defaultdict(list)
+
+        self.metric_reports = []
+        self.comparison_reports = []
 
     def post_init(self, *args, **kwargs):
         pass
@@ -133,7 +146,7 @@ class SceneEvaluator(_Configurable):
             if not self._metric_configs:
                 return None
 
-            agent2metrics = defaultdict(dict)
+            name2metrics = defaultdict(dict)
 
             async def calculate(metric_name: str):
                 all_records = self._name2records.get(metric_name, self._name2comparisons.get(metric_name, []))
@@ -143,7 +156,7 @@ class SceneEvaluator(_Configurable):
                     agent2records[record.target_agent].append(record)
 
                 async def _calculate(agent: UUID):
-                    agent2metrics[agent][metric_name] = await run_asynchronously(
+                    name2metrics[metric_name][agent] = await run_asynchronously(
                         name2metric_type[metric_name].calculate, agent2records[agent], self
                     )
 
@@ -159,7 +172,7 @@ class SceneEvaluator(_Configurable):
                 *[calculate(metric_name) for metric_name in name2metric_type]
             )
 
-            return agent2metrics
+            return name2metrics
 
         async def _comparison_report():
             name2metrics = {}
@@ -189,11 +202,41 @@ class SceneEvaluator(_Configurable):
 
         metric_report, comparison_report = await asyncio.gather(_metric_report(), _comparison_report())
 
+        if metric_report:
+            self.metric_reports.append(metric_report)
+        if comparison_report:
+            self.comparison_reports.append(comparison_report)
+
         return SceneEvaluatorReport(
             evaluator=self.__class__.__name__,
             metric_report=metric_report,
             comparison_report=comparison_report
         )
+
+    def paint_charts(self) -> List[Chart]:
+        charts = []
+
+        def _paint_chart(metric_config, metric_type):
+            if metric_config.chart_type:
+                chart_type: Type[Chart] = metric_config.chart_type
+                charts.append(
+                    chart_type(
+                        name=f"{self.__class__.__name__}_{metric_config.metric_name}",
+                        reports=self.metric_reports if metric_type == MetricTypes.METRIC else self.comparison_reports,
+                        metric_name=metric_config.metric_name,
+                        metric_type=metric_type,
+                        aggregate_method=metric_config.reports_agg_method or simple_agg_mean
+                    )
+                )
+        if self._metric_configs and self.metric_reports:
+            for config in self._metric_configs:
+                _paint_chart(config, MetricTypes.METRIC)
+
+        if self._comparison_configs and self.comparison_reports:
+            for config in self._comparison_configs:
+                _paint_chart(config, MetricTypes.COMPARISON)
+
+        return charts
 
     @classmethod
     def from_config(cls, config: config_obj) -> "SceneEvaluator":
