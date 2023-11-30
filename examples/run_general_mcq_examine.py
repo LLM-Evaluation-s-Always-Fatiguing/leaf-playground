@@ -69,7 +69,7 @@ scene_config = GeneralMCQExamineSceneConfig(
             "split": "dev",
             "question_column": "question",
             "golden_answer_column": "answer",
-            "num_questions": 10
+            "num_questions": 3
         }
     )
 )
