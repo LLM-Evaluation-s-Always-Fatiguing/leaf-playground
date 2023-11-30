@@ -320,7 +320,9 @@ class SceneEvaluator(_Configurable):
                         reports=self.metric_reports if metric_type == MetricTypes.METRIC else self.comparison_reports,
                         metric_name=metric_name,
                         metric_type=metric_type,
-                        aggregate_method=metric_config.reports_agg_method or simple_nested_mean
+                        aggregate_method=metric_config.reports_agg_method or simple_nested_mean,
+                        agents_name={agent.id: agent.name for agent in self.agents},
+                        agents_color={agent.id: agent.config.chart_major_color for agent in self.agents}
                     )
                 )
         if self._metric_configs and self.metric_reports:
