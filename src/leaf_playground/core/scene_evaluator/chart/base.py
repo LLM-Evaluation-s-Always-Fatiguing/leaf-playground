@@ -22,10 +22,10 @@ class Chart:
     ):
         agents = set()
         for report in reports:
-            if metric_type == MetricTypes.METRIC:
-                agents.update(report[metric_name].keys())
-            else:
+            if metric_type == MetricTypes.COMPARISON:
                 agents.update(report[metric_name].value.keys())
+            else:
+                agents.update(report[metric_name].keys())
 
         agent2values: Dict[UUID, List[Union[float, Dict[str, float]]]] = defaultdict(list)
         if metric_type == MetricTypes.METRIC:

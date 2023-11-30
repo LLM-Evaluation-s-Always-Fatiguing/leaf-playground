@@ -14,9 +14,6 @@ class PieChart(Chart):
     nested: bool = False
 
     def _build_chart(self) -> Pie:
-        n_series = 1 if self.metric_type != MetricTypes.NESTED_METRIC else len(self.data[0][1])
-        colors = self._gen_random_colors(n_series)
-
         if self.metric_type != MetricTypes.NESTED_METRIC:
             pie = (
                 Pie()
@@ -32,12 +29,13 @@ class PieChart(Chart):
             pie = Pie()
             metric_names = list(self.data[0][1].keys())
             num_metrics = len(metric_names)
+            colors = self._gen_random_colors(num_metrics)
             for i, metric_name in enumerate(metric_names):
                 pie.add(
                     metric_name,
-                    [item[1][metric_name] for item in self.data],
+                    [(item[0], item[1][metric_name]) for item in self.data],
                     radius=self.radius if not self.nested
-                    else [f"{(1 / num_metrics) * i * 100}%", f"{(1 / num_metrics) * (i + 1) * 100}%"],
+                    else [f"{(0.85 / num_metrics) * i * 100}%", f"{(0.85 / num_metrics) * (i + 1) * 100}%"],
                     center=self.center if not self.nested else None,
                     rosetype=self.rosetype,
                 )
@@ -49,7 +47,6 @@ class PieChart(Chart):
                 title_opts=opts.TitleOpts(title=self.name, pos_left="center"),
                 legend_opts=opts.LegendOpts(is_show=False, pos_bottom=0),
             )
-            .set_colors(colors)
         )
 
 
@@ -58,7 +55,7 @@ class NestedPieChart(PieChart):
 
 
 class NightingaleRoseChart(PieChart):
-    radius: Optional[List[str]] = ["5%", "100%"]
+    radius: Optional[List[str]] = ["5%", "85%"]
     rosetype: Optional[str] = "area"
 
 
