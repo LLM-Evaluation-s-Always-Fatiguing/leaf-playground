@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional, Type
 
 from pydantic import Field
 
@@ -8,37 +8,35 @@ from leaf_playground.zoo.general_mcq_examine.dataset_utils import DatasetConfig
 from leaf_playground.zoo.general_mcq_examine.scene_agent import ExamineeAnswer
 
 
-class IsCorrect(MetricRecord):
-    value: bool = Field(default=...)
-
+class IsCorrect(NestedMetricRecord):
     @classmethod
     def calculate(
         cls,
         target: ExamineeAnswer,
-        evaluator: "GeneralMCQSceneEvaluator"
+        evaluator: "GeneralMCQSceneEvaluator",
+        metric_record_types: Optional[Dict[str, Type[MetricRecord]]] = None,
     ) -> "IsCorrect":
         data = evaluator.dataset[target.question_id]
         question = data[evaluator.dataset_config.question_column]
         agent_answer = target.content.text.strip()
         golden_answer = data[evaluator.dataset_config.golden_answer_column]
         return cls(
-            value=agent_answer.lower().startswith(golden_answer.lower()),
+            value={"is_correct": agent_answer.lower().startswith(golden_answer.lower())},
             target_agent=target.sender_id,
             misc={"question": question, "agent_answer": agent_answer, "golden_answer": golden_answer}
         )
 
 
-class Accuracy(Metric):
-    value: float = Field(default=..., ge=0.0, le=1.0)
-
+class AccurateInfo(NestedMetric):
     @classmethod
     def calculate(
         cls,
-        records: List[MetricRecord],
+        records: List[NestedMetricRecord],
         evaluator: "GeneralMCQSceneEvaluator"
-    ) -> "Accuracy":
+    ) -> "AccurateInfo":
+        acc_num = sum(record.value["is_correct"] for record in records)
         return cls(
-            value=sum(record.value for record in records) / len(records),
+            value={"accuracy": acc_num / len(records), "acc_num": acc_num},
             records=records
         )
 
@@ -57,16 +55,17 @@ class GeneralMCQSceneEvaluator(SceneEvaluator):
         module="leaf_playground.zoo.general_mcq_examine.scene_evaluator"
     )
 
-    _metric_configs: Optional[List[MetricConfig]] = [
-        MetricConfig(
-            metric_name="accuracy",
-            metric_description="Accuracy of an examinee's answer.",
-            metric_type=Accuracy,
+    _metric_configs: Optional[List[MetricConfig]] = None
+    _nested_metric_configs: Optional[List[NestedMetricConfig]] = [
+        NestedMetricConfig(
+            metric_name="AccurateInfo",
+            metric_description="Accurate information of each examinee.",
+            metric_type=AccurateInfo,
             metric_record_type=IsCorrect,
-            chart_type=HorizontalBarChart,
+            metric_sub_record_types=None,
+            chart_type=NestedNightingaleRoseChart
         )
     ]
-    _nested_metric_configs: Optional[List[NestedMetricConfig]] = None
     _comparison_configs: Optional[List[ComparisonConfig]] = None
     _target_type = ExamineeAnswer
 
