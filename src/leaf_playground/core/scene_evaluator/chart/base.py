@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pyecharts.charts.chart import Chart as EChart
 
-from leaf_playground.core.scene_evaluator.metric.base import ComparisonMetric, Metric, MetricTypes
+from ..metric import ComparisonMetric, Metric, MetricTypes
 
 
 class Chart:
