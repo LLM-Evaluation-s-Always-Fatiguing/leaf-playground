@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from .chart.base import Chart
 from .metric import *
+from ..scene_agent import SceneAgent
 from ..._config import _Config, _Configurable
 from ...data.base import Data
 from ...data.message import MessageType
@@ -93,11 +94,14 @@ class SceneEvaluator(_Configurable):
     _compare_type: Type[SceneEvaluatorCompare] = SceneEvaluatorCompare
     _report_type: Type[SceneEvaluatorReport] = SceneEvaluatorReport
 
-    def __init__(self, config: config_obj):
+    def __init__(self, config: config_obj, agents: List[SceneAgent]):
         if hasattr(self, f"_{self.__class__.__name__}__valid_class_attributes"):
             getattr(self, f"_{self.__class__.__name__}__valid_class_attributes")()
         self.__valid_class_attributes()
         super().__init__(config=config)
+
+        self.agents = {agent.id: agent for agent in agents}
+
         self._name2records: Dict[str, List[MetricRecord]] = defaultdict(list)
         self._name2nested_records: Dict[str, List[NestedMetricRecord]] = defaultdict(list)
         self._name2comparisons: Dict[str, List[Comparison]] = defaultdict(list)
@@ -199,7 +203,7 @@ class SceneEvaluator(_Configurable):
             name2metrics = defaultdict(dict)
 
             async def calculate(metric_name: str):
-                all_records = self._name2records.get(metric_name, self._name2comparisons.get(metric_name, []))
+                all_records = self._name2records.get(metric_name)
 
                 agent2records = defaultdict(list)
                 for record in all_records:
@@ -231,7 +235,7 @@ class SceneEvaluator(_Configurable):
             name2metrics = defaultdict(dict)
 
             async def calculate(metric_name: str):
-                all_records = self._name2nested_records.get(metric_name, self._name2comparisons.get(metric_name, []))
+                all_records = self._name2nested_records.get(metric_name)
 
                 agent2records = defaultdict(list)
                 for record in all_records:
@@ -263,7 +267,7 @@ class SceneEvaluator(_Configurable):
                 return None
 
             async def calculate(metric_name: str):
-                all_comparisons = self._name2comparisons.get(metric_name, [])
+                all_comparisons = self._name2comparisons.get(metric_name)
 
                 name2metrics[metric_name] = await run_asynchronously(
                     name2metric_type[metric_name].calculate, all_comparisons, self
@@ -279,7 +283,7 @@ class SceneEvaluator(_Configurable):
 
             return name2metrics
 
-        if not self._name2records and not self._name2comparisons:
+        if not self._name2records and not self._name2nested_records and not self._name2comparisons:
             return None
 
         metric_report, nested_metric_report, comparison_report = await asyncio.gather(
@@ -303,6 +307,12 @@ class SceneEvaluator(_Configurable):
     def paint_charts(self) -> List[Chart]:
         charts = []
 
+        type2reports = {
+            MetricTypes.METRIC: self.metric_reports,
+            MetricTypes.NESTED_METRIC: self.nested_metric_reports,
+            MetricTypes.COMPARISON: self.comparison_reports
+        }
+
         def _paint_chart(metric_config, metric_type):
             if metric_config.chart_type:
                 chart_type: Type[Chart] = metric_config.chart_type
@@ -313,10 +323,14 @@ class SceneEvaluator(_Configurable):
                 charts.append(
                     chart_type(
                         name=f"{self.__class__.__name__}_{metric_name}",
-                        reports=self.metric_reports if metric_type == MetricTypes.METRIC else self.comparison_reports,
+                        reports=type2reports[metric_type],
                         metric_name=metric_name,
                         metric_type=metric_type,
-                        aggregate_method=metric_config.reports_agg_method or simple_nested_mean
+                        aggregate_method=metric_config.reports_agg_method or simple_nested_mean,
+                        agents_name={agent_id: self.agents[agent_id].name for agent_id in self.agents},
+                        agents_color={
+                            agent_id: self.agents[agent_id].config.chart_major_color for agent_id in self.agents
+                        }
                     )
                 )
         if self._metric_configs and self.metric_reports:
@@ -335,7 +349,7 @@ class SceneEvaluator(_Configurable):
 
     @classmethod
     def from_config(cls, config: config_obj) -> "SceneEvaluator":
-        return cls(config=config)
+        raise NotImplementedError()
 
     @classmethod
     def get_metadata(cls) -> SceneEvaluatorMetadata:
