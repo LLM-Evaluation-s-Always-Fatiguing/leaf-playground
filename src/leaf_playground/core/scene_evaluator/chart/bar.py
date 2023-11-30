@@ -69,7 +69,7 @@ class HorizontalBarChart(BarChart):
         return super()._build_chart().reversal_axis()
 
 
-class HorizontalStackedBarChart(HorizontalBarChart):
+class StackedHorizontalBarChart(HorizontalBarChart):
     stacked: bool = True
 
 
@@ -77,5 +77,5 @@ __all__ = [
     "BarChart",
     "StackedBarChart",
     "HorizontalBarChart",
-    "HorizontalStackedBarChart"
+    "StackedHorizontalBarChart"
 ]
