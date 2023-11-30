@@ -6,12 +6,12 @@ from typing import Dict, List, Optional, Type
 
 from pydantic import BaseModel, Field
 
-from .._config import _Config, _Configurable
-from ..chart.base import Chart
-from ..data.base import Data
-from ..data.message import MessageType
-from ..metric import simple_agg_mean
-from ..metric.base import (
+from leaf_playground._config import _Config, _Configurable
+from leaf_playground.core.scene_evaluator.chart.base import Chart
+from leaf_playground.data.base import Data
+from leaf_playground.data.message import MessageType
+from leaf_playground.core.scene_evaluator.metric import simple_agg_mean
+from leaf_playground.core.scene_evaluator.metric.base import (
     Comparison,
     ComparisonMetric,
     ComparisonConfig,
@@ -20,8 +20,8 @@ from ..metric.base import (
     MetricConfig,
     MetricTypes
 )
-from ..utils.import_util import DynamicObject
-from ..utils.thread_util import run_asynchronously
+from leaf_playground.utils.import_util import DynamicObject
+from leaf_playground.utils.thread_util import run_asynchronously
 
 
 MetricName = str

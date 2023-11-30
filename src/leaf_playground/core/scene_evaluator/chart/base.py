@@ -1,13 +1,12 @@
 import random
 from abc import abstractmethod
 from collections import defaultdict
-from itertools import chain
 from typing import Callable, Dict, List, Union
 from uuid import UUID
 
 from pyecharts.charts.chart import Chart as EChart
 
-from ..metric.base import ComparisonMetric, Metric, MetricTypes
+from leaf_playground.core.scene_evaluator.metric.base import ComparisonMetric, Metric, MetricTypes
 
 
 class Chart:
