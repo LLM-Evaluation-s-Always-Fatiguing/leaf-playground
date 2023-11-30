@@ -18,6 +18,7 @@ class SceneAgentMetadata(BaseModel):
 
 class SceneAgentConfig(_Config):
     profile: Profile = Field(default=...)
+    chart_major_color: Optional[str] = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class SceneAgent(_Configurable):
@@ -149,8 +150,8 @@ class SceneHumanAgent(SceneAgent):
 class SceneStaticAgentConfig(SceneAgentConfig):
     def model_post_init(self, __context: Any) -> None:
         fields = list(self.model_fields.keys())
-        if set(fields) - {"profile"}:
-            raise ValueError(f"static agent config can only have profile field, got {fields}")
+        if set(fields) - {"profile", "chart_major_color"}:
+            raise ValueError(f"{self.__class__.__name__} requires profile and chart_major_color only, got {fields}")
 
 
 class SceneStaticAgent(SceneAgent):

@@ -1,5 +1,6 @@
 from pyecharts import options as opts
 from pyecharts.charts import Bar
+from pyecharts.commons.utils import JsCode
 
 from .base import Chart
 from ..metric import MetricTypes
@@ -9,10 +10,17 @@ class BarChart(Chart):
     stacked: bool = False
 
     def _build_chart(self) -> Bar:
-        n_series = 1 if self.metric_type != MetricTypes.NESTED_METRIC else len(self.data[0][1])
-        colors = self._gen_random_colors(n_series)
-
         if self.metric_type != MetricTypes.NESTED_METRIC:
+            itemstyle_opts = None
+            if self.agents_color:
+                color_function = f"""
+                function (params) {{
+                    var colors = {self.agents_color};
+                    return colors[params.name];
+                }}
+                """
+                itemstyle_opts = opts.ItemStyleOpts(color=JsCode(color_function))
+
             bar = (
                 Bar()
                 .add_xaxis([item[0] for item in self.data])
@@ -20,6 +28,7 @@ class BarChart(Chart):
                     self.metric_name,
                     [item[1] for item in self.data],
                     category_gap="50%",
+                    itemstyle_opts=itemstyle_opts,
                 )
             )
         else:
@@ -43,7 +52,7 @@ class BarChart(Chart):
                         axislabel_opts=opts.LabelOpts(formatter="{value}%")
                     ),
                 )
-                .set_colors(colors)
+                .set_colors(self._gen_random_colors(len(self.data[0][1])))
             )
 
         return (
@@ -56,7 +65,6 @@ class BarChart(Chart):
                     axislabel_opts=opts.LabelOpts(formatter="{value}%")
                 ),
             )
-            .set_colors(colors)
         )
 
 

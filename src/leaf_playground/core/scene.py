@@ -30,7 +30,7 @@ class SceneAgentObjConfig(_Config):
     def model_post_init(self, __context: Any) -> None:
         self.valid(self.agent_config, self.agent_obj)
 
-    def create_instance(self) -> "SceneAgent":
+    def create_instance(self) -> SceneAgent:
         obj = dynamically_import_obj(self.agent_obj)
         return obj.from_config(config=self.agent_config)
 
@@ -58,7 +58,7 @@ class SceneAgentObjConfig(_Config):
 class SceneAgentsObjConfig(_Config):
     agents: List[SceneAgentObjConfig] = Field(default=...)
 
-    def create_instances(self) -> List["SceneAgent"]:
+    def create_instances(self) -> List[SceneAgent]:
         return [agent.create_instance() for agent in self.agents]
 
 
@@ -69,9 +69,9 @@ class SceneEvaluatorObjConfig(_Config):
     def model_post_init(self, __context: Any) -> None:
         self.valid(self.evaluator_config, self.evaluator_obj)
 
-    def create_instance(self) -> "SceneEvaluator":
-        obj = dynamically_import_obj(self.evaluator_obj)
-        return obj.from_config(config=self.evaluator_config)
+    def create_instance(self, agents: List[SceneAgent]) -> SceneEvaluator:
+        obj: Type[SceneEvaluator] = dynamically_import_obj(self.evaluator_obj)
+        return obj(config=self.evaluator_config, agents=agents)
 
     @staticmethod
     def valid(evaluator_config: SceneEvaluatorConfig, evaluator_obj: DynamicObject):
@@ -97,8 +97,8 @@ class SceneEvaluatorObjConfig(_Config):
 class SceneEvaluatorsObjConfig(_Config):
     evaluators: List[SceneEvaluatorObjConfig] = Field(default=[])
 
-    def create_instances(self) -> List["SceneEvaluator"]:
-        return [evaluator.create_instance() for evaluator in self.evaluators]
+    def create_instances(self, agents: List[SceneAgent]) -> List["SceneEvaluator"]:
+        return [evaluator.create_instance(agents) for evaluator in self.evaluators]
 
 
 class SceneInfoObjConfig(_Config):
@@ -108,7 +108,7 @@ class SceneInfoObjConfig(_Config):
     def model_post_init(self, __context: Any) -> None:
         self.valid(self.scene_info_config, self.scene_info_obj)
 
-    def create_instance(self) -> "SceneInfo":
+    def create_instance(self) -> SceneInfo:
         obj = dynamically_import_obj(self.scene_info_obj)
         return obj.from_config(config=self.scene_info_config)
 
@@ -159,7 +159,7 @@ class Scene(_Configurable):
         self.scene_info: SceneInfo = self.config.scene_info.create_instance()
         self.agents: List[SceneAgent] = self.config.scene_agents.create_instances()
         self.static_agents: List[SceneAgent] = self._init_static_agents()
-        self.evaluators: List[SceneEvaluator] = self.config.scene_evaluators.create_instances()
+        self.evaluators: List[SceneEvaluator] = self.config.scene_evaluators.create_instances(self.agents)
         self._valid_agent_num()
         self._post_init_agents()
 

@@ -71,7 +71,7 @@ class GeneralMCQExamineScene(Scene):
                         response=answer,
                         media_type=MediaType.TEXT,
                         ground_truth=None,
-                        eval_record=None if not evaluator else (await evaluator.record(answer)).model_dump(mode="json"),
+                        eval_record=None if not evaluator else (await evaluator.nested_record(answer)).model_dump(mode="json"),
                         narrator=f"examinee [{examinee.name}] answered question [{q.question_id}]"
                     ).model_dump(mode="json")
                 )
