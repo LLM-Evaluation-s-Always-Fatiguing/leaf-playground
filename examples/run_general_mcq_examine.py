@@ -35,6 +35,7 @@ scene_config = GeneralMCQExamineSceneConfig(
                     "agent_config_data": dynamically_import_obj(agent_obj).config_obj(
                         profile=Profile(name="James"),
                         ai_backend_config=OpenAIBackendConfig(model="gpt-4-1106-preview"),
+                        chart_major_color="#4513de",
                     ).model_dump(by_alias=True),
                     "agent_obj": agent_obj.model_dump(by_alias=True)
                 }
@@ -44,6 +45,7 @@ scene_config = GeneralMCQExamineSceneConfig(
                     "agent_config_data": dynamically_import_obj(agent_obj).config_obj(
                         profile=Profile(name="William"),
                         ai_backend_config=OpenAIBackendConfig(model="gpt-3.5-turbo-instruct"),
+                        chart_major_color="#9965ff",
                     ).model_dump(by_alias=True),
                     "agent_obj": agent_obj.model_dump(by_alias=True)
                 }
