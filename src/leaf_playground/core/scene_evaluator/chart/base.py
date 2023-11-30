@@ -59,6 +59,8 @@ class Chart:
         )
         self.data = [(_build_agent_name(agent), aggregate_method(agent2values[agent])) for agent in agents]
 
+        self.chart = self._build_chart()
+
     @staticmethod
     def _gen_random_colors(num_colors: int) -> List[str]:
         """Generate random bright colors"""
@@ -80,13 +82,11 @@ class Chart:
         pass
 
     def render_chart(self, save_path: str) -> None:
-        chart = self._build_chart()
-        chart.render(save_path)
+        self.chart.render(save_path)
 
     def dump_chart_options(self, save_path: str) -> None:
-        chart = self._build_chart()
         with open(save_path, "w") as f:
-            f.write(chart.dump_options())
+            f.write(self.chart.dump_options())
 
 
 __all__ = [
