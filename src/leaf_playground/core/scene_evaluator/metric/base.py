@@ -216,6 +216,7 @@ class ComparisonConfig(_Config):
 
 class MetricTypes(Enum):
     METRIC = "metric"
+    NESTED_METRIC = "nested_metric"
     COMPARISON = "comparison"
 
 

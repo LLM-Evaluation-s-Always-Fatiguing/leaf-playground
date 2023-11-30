@@ -2,7 +2,7 @@ import asyncio
 import json
 from uuid import UUID
 from collections import defaultdict
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Type, Any
 
 from pydantic import BaseModel, Field
 
@@ -23,16 +23,47 @@ class SceneEvaluatorRecord(Data):
     evaluator: str = Field(default=...)
     records: Dict[MetricName, MetricRecord] = Field(default=...)
 
+    def model_post_init(self, __context: Any) -> None:
+        fields = set(self.model_fields.keys())
+        if fields != {"evaluator", "records"}:
+            raise ValueError(f"fields of {self.__class__.__name__} can only have evaluator and records, got {fields}")
+
+
+class SceneEvaluatorNestedRecord(Data):
+    evaluator: str = Field(default=...)
+    records: Dict[MetricName, NestedMetricRecord] = Field(default=...)
+
+    def model_post_init(self, __context: Any) -> None:
+        fields = set(self.model_fields.keys())
+        if fields != {"evaluator", "records"}:
+            raise ValueError(f"fields of {self.__class__.__name__} can only have evaluator and records, got {fields}")
+
 
 class SceneEvaluatorCompare(Data):
     evaluator: str = Field(default=...)
     comparisons: Dict[ComparisonName, Comparison] = Field(default=...)
 
+    def model_post_init(self, __context: Any) -> None:
+        fields = set(self.model_fields.keys())
+        if fields != {"evaluator", "comparisons"}:
+            raise ValueError(
+                f"fields of {self.__class__.__name__} can only have evaluator and comparisons, got {fields}"
+            )
+
 
 class SceneEvaluatorReport(Data):
     evaluator: str = Field(default=...)
     metric_report: Optional[Dict[MetricName, Dict[UUID, Metric]]] = Field(default=None)
+    nested_metric_report: Optional[Dict[MetricName, Dict[UUID, NestedMetric]]] = Field(default=None)
     comparison_report: Optional[Dict[ComparisonName, ComparisonMetric]] = Field(default=None)
+
+    def model_post_init(self, __context: Any) -> None:
+        fields = set(self.model_fields.keys())
+        if fields != {"evaluator", "metric_report", "nested_metric_report", "comparison_report"}:
+            raise ValueError(
+                f"fields of {self.__class__.__name__} can only have evaluator, metric_report, nested_metric_report "
+                f"and comparison_report, got {fields}"
+            )
 
 
 class SceneEvaluatorMetadata(BaseModel):
@@ -54,9 +85,11 @@ class SceneEvaluator(_Configurable):
     obj_for_import: DynamicObject
 
     _metric_configs: Optional[List[MetricConfig]]
+    _nested_metric_configs: Optional[List[NestedMetricConfig]]
     _comparison_configs: Optional[List[ComparisonConfig]]
     _target_type: Type[MessageType]
     _record_type: Type[SceneEvaluatorRecord] = SceneEvaluatorRecord
+    _nested_record_type: Type[SceneEvaluatorNestedRecord] = SceneEvaluatorNestedRecord
     _compare_type: Type[SceneEvaluatorCompare] = SceneEvaluatorCompare
     _report_type: Type[SceneEvaluatorReport] = SceneEvaluatorReport
 
@@ -66,9 +99,11 @@ class SceneEvaluator(_Configurable):
         self.__valid_class_attributes()
         super().__init__(config=config)
         self._name2records: Dict[str, List[MetricRecord]] = defaultdict(list)
+        self._name2nested_records: Dict[str, List[NestedMetricRecord]] = defaultdict(list)
         self._name2comparisons: Dict[str, List[Comparison]] = defaultdict(list)
 
         self.metric_reports = []
+        self.nested_metric_reports = []
         self.comparison_reports = []
 
     def post_init(self, *args, **kwargs):
@@ -79,6 +114,8 @@ class SceneEvaluator(_Configurable):
             raise AttributeError(f"class attribute description not found, must specify in your evaluator class")
         if not hasattr(self, "_metric_configs"):
             raise AttributeError(f"class attribute _metrics not found, must specify in your evaluator class")
+        if not hasattr(self, "_nested_metric_configs"):
+            raise AttributeError(f"class attribute _nested_metrics not found, must specify in your evaluator class")
         if not hasattr(self, "_comparison_configs"):
             raise AttributeError(f"class attribute _comparisons not found, must specify in your evaluator class")
         metric_names = []
@@ -109,6 +146,28 @@ class SceneEvaluator(_Configurable):
             return self._record_type(evaluator=self.__class__.__name__, records=records)
 
         if not self._metric_configs or target.__class__ != self._target_type:  # exact match, not allow subclass
+            return None
+        return await _record()
+
+    async def nested_record(self, target: MessageType) -> Optional[_nested_record_type]:
+        async def _record():
+            records = {}
+
+            async def calculate(metric_config: NestedMetricConfig):
+                payload = {
+                    "target": target,
+                    "evaluator": self,
+                    "metric_record_types": metric_config.metric_sub_record_types
+                }
+                record = await run_asynchronously(metric_config.metric_record_type.calculate, **payload)
+                records[metric_config.metric_name] = record
+                self._name2nested_records[metric_config.metric_name].append(record)
+
+            await asyncio.gather(*[calculate(metric_config) for metric_config in self._nested_metric_configs])
+
+            return self._nested_record_type(evaluator=self.__class__.__name__, records=records)
+
+        if not self._nested_metric_configs or target.__class__ != self._target_type:  # exact match, not allow subclass
             return None
         return await _record()
 
@@ -165,6 +224,38 @@ class SceneEvaluator(_Configurable):
 
             return name2metrics
 
+        async def _nested_metric_report():
+            if not self._nested_metric_configs:
+                return None
+
+            name2metrics = defaultdict(dict)
+
+            async def calculate(metric_name: str):
+                all_records = self._name2nested_records.get(metric_name, self._name2comparisons.get(metric_name, []))
+
+                agent2records = defaultdict(list)
+                for record in all_records:
+                    agent2records[record.target_agent].append(record)
+
+                async def _calculate(agent: UUID):
+                    name2metrics[metric_name][agent] = await run_asynchronously(
+                        name2metric_type[metric_name].calculate, agent2records[agent], self
+                    )
+
+                await asyncio.gather(
+                    *[_calculate(agent) for agent in agent2records]
+                )
+
+            name2metric_type = {}
+            for config in self._nested_metric_configs:
+                name2metric_type[config.metric_name] = config.metric_type
+
+            await asyncio.gather(
+                *[calculate(metric_name) for metric_name in name2metric_type]
+            )
+
+            return name2metrics
+
         async def _comparison_report():
             name2metrics = {}
 
@@ -191,16 +282,21 @@ class SceneEvaluator(_Configurable):
         if not self._name2records and not self._name2comparisons:
             return None
 
-        metric_report, comparison_report = await asyncio.gather(_metric_report(), _comparison_report())
+        metric_report, nested_metric_report, comparison_report = await asyncio.gather(
+            _metric_report(), _nested_metric_report(), _comparison_report()
+        )
 
         if metric_report:
             self.metric_reports.append(metric_report)
+        if nested_metric_report:
+            self.nested_metric_reports.append(nested_metric_report)
         if comparison_report:
             self.comparison_reports.append(comparison_report)
 
         return SceneEvaluatorReport(
             evaluator=self.__class__.__name__,
             metric_report=metric_report,
+            nested_metric_report=nested_metric_report,
             comparison_report=comparison_report
         )
 
