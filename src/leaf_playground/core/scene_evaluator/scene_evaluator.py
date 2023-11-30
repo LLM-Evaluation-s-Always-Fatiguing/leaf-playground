@@ -307,6 +307,12 @@ class SceneEvaluator(_Configurable):
     def paint_charts(self) -> List[Chart]:
         charts = []
 
+        type2reports = {
+            MetricTypes.METRIC: self.metric_reports,
+            MetricTypes.NESTED_METRIC: self.nested_metric_reports,
+            MetricTypes.COMPARISON: self.comparison_reports
+        }
+
         def _paint_chart(metric_config, metric_type):
             if metric_config.chart_type:
                 chart_type: Type[Chart] = metric_config.chart_type
@@ -317,7 +323,7 @@ class SceneEvaluator(_Configurable):
                 charts.append(
                     chart_type(
                         name=f"{self.__class__.__name__}_{metric_name}",
-                        reports=self.metric_reports if metric_type == MetricTypes.METRIC else self.comparison_reports,
+                        reports=type2reports[metric_type],
                         metric_name=metric_name,
                         metric_type=metric_type,
                         aggregate_method=metric_config.reports_agg_method or simple_nested_mean,
