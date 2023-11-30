@@ -70,9 +70,6 @@ class GeneralMCQSceneEvaluator(SceneEvaluator):
     _comparison_configs: Optional[List[ComparisonConfig]] = None
     _target_type = ExamineeAnswer
 
-    def __init__(self, config: config_obj):
-        super().__init__(config=config)
-
     def post_init(self, dataset: List[dict], dataset_config: DatasetConfig) -> None:
         self.dataset = dataset
         self.dataset_config = dataset_config

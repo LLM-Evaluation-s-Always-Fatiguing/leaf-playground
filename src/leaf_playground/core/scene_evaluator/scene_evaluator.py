@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from .chart.base import Chart
 from .metric import *
+from ..scene_agent import SceneAgent
 from ..._config import _Config, _Configurable
 from ...data.base import Data
 from ...data.message import MessageType
@@ -93,11 +94,14 @@ class SceneEvaluator(_Configurable):
     _compare_type: Type[SceneEvaluatorCompare] = SceneEvaluatorCompare
     _report_type: Type[SceneEvaluatorReport] = SceneEvaluatorReport
 
-    def __init__(self, config: config_obj):
+    def __init__(self, config: config_obj, agents: List[SceneAgent]):
         if hasattr(self, f"_{self.__class__.__name__}__valid_class_attributes"):
             getattr(self, f"_{self.__class__.__name__}__valid_class_attributes")()
         self.__valid_class_attributes()
         super().__init__(config=config)
+
+        self.agents = {agent.id: agent for agent in agents}
+
         self._name2records: Dict[str, List[MetricRecord]] = defaultdict(list)
         self._name2nested_records: Dict[str, List[NestedMetricRecord]] = defaultdict(list)
         self._name2comparisons: Dict[str, List[Comparison]] = defaultdict(list)
@@ -335,7 +339,7 @@ class SceneEvaluator(_Configurable):
 
     @classmethod
     def from_config(cls, config: config_obj) -> "SceneEvaluator":
-        return cls(config=config)
+        raise NotImplementedError()
 
     @classmethod
     def get_metadata(cls) -> SceneEvaluatorMetadata:
