@@ -66,6 +66,7 @@ class GeneralMCQSceneEvaluator(SceneEvaluator):
             chart_type=HorizontalBarChart,
         )
     ]
+    _nested_metric_configs: Optional[List[NestedMetricConfig]] = None
     _comparison_configs: Optional[List[ComparisonConfig]] = None
     _target_type = ExamineeAnswer
 
