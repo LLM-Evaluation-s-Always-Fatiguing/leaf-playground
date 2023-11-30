@@ -5,9 +5,9 @@ from uuid import UUID
 
 from pydantic import field_serializer, Field
 
-from ..data.base import Data
-from ..data.message import MessageType
-from .._config import _Config
+from leaf_playground.data.base import Data
+from leaf_playground.data.message import MessageType
+from leaf_playground._config import _Config
 
 
 class MetricRecord(Data):
