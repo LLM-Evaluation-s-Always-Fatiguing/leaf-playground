@@ -12,12 +12,16 @@ class BarChart(Chart):
             .add_xaxis([item[0] for item in self.data])
             .add_yaxis(
                 self.metric_name,
-                [item[1] for item in self.data]
+                [item[1] for item in self.data],
+                category_gap="50%",
             )
             .set_series_opts(label_opts=opts.LabelOpts(formatter="{c}"))
             .set_global_opts(
                 title_opts=opts.TitleOpts(title=self.name, pos_left="center"),
                 legend_opts=opts.LegendOpts(is_show=False, pos_bottom=0),
+                yaxis_opts=opts.AxisOpts(
+                    axislabel_opts=opts.LabelOpts(formatter="{value}%")
+                ),
             )
             .set_colors(colors)
         )
