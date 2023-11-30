@@ -1,23 +1,22 @@
 import random
 from abc import abstractmethod
 from collections import defaultdict
-from itertools import chain
 from typing import Callable, Dict, List, Union
 from uuid import UUID
 
 from pyecharts.charts.chart import Chart as EChart
 
-from ..metric.base import ComparisonMetric, Metric, MetricTypes
+from ..metric import ComparisonMetric, Metric, NestedMetric, MetricTypes
 
 
 class Chart:
     def __init__(
         self,
         name: str,
-        reports: List[Dict[str, Union[Dict[UUID, Metric], ComparisonMetric]]],
+        reports: List[Dict[str, Union[Dict[UUID, Union[Metric, NestedMetric]], ComparisonMetric]]],
         metric_name: str,
         metric_type: MetricTypes,
-        aggregate_method: Callable[[List[float]], float]
+        aggregate_method: Callable[[List[Union[float, Dict[str, float]]]], Union[float, Dict[str, float]]]
     ):
         agents = set()
         for report in reports:
@@ -26,20 +25,26 @@ class Chart:
             else:
                 agents.update(report[metric_name].value.keys())
 
-        agent2values = defaultdict(list)
+        agent2values: Dict[UUID, List[Union[float, Dict[str, float]]]] = defaultdict(list)
         if metric_type == MetricTypes.METRIC:
             for report in reports:
                 for agent in agents:
-                    metric = report[metric_name][agent]
+                    metric: Metric = report[metric_name][agent]
+                    agent2values[agent].append(metric.value)
+        elif metric_type == MetricTypes.NESTED_METRIC:
+            for report in reports:
+                for agent in agents:
+                    metric: NestedMetric = report[metric_name][agent]
                     agent2values[agent].append(metric.value)
         else:
             for report in reports:
                 for agent in agents:
-                    metric = report[metric_name]
+                    metric: ComparisonMetric = report[metric_name]
                     agent2values[agent].append(metric.value[agent])
 
         self.name = name
         self.metric_name = metric_name
+        self.metric_type = metric_type
         self.data = [(str(agent), aggregate_method(agent2values[agent])) for agent in agents]
 
     @staticmethod
