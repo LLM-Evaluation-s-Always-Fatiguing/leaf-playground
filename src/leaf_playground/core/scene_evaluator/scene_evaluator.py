@@ -203,7 +203,7 @@ class SceneEvaluator(_Configurable):
             name2metrics = defaultdict(dict)
 
             async def calculate(metric_name: str):
-                all_records = self._name2records.get(metric_name, self._name2comparisons.get(metric_name, []))
+                all_records = self._name2records.get(metric_name)
 
                 agent2records = defaultdict(list)
                 for record in all_records:
@@ -235,7 +235,7 @@ class SceneEvaluator(_Configurable):
             name2metrics = defaultdict(dict)
 
             async def calculate(metric_name: str):
-                all_records = self._name2nested_records.get(metric_name, self._name2comparisons.get(metric_name, []))
+                all_records = self._name2nested_records.get(metric_name)
 
                 agent2records = defaultdict(list)
                 for record in all_records:
@@ -267,7 +267,7 @@ class SceneEvaluator(_Configurable):
                 return None
 
             async def calculate(metric_name: str):
-                all_comparisons = self._name2comparisons.get(metric_name, [])
+                all_comparisons = self._name2comparisons.get(metric_name)
 
                 name2metrics[metric_name] = await run_asynchronously(
                     name2metric_type[metric_name].calculate, all_comparisons, self
@@ -283,7 +283,7 @@ class SceneEvaluator(_Configurable):
 
             return name2metrics
 
-        if not self._name2records and not self._name2comparisons:
+        if not self._name2records and not self._name2nested_records and not self._name2comparisons:
             return None
 
         metric_report, nested_metric_report, comparison_report = await asyncio.gather(
