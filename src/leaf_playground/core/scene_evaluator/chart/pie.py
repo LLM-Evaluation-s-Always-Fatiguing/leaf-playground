@@ -25,7 +25,7 @@ class PieChart(Chart):
             )
         else:
             pie = Pie()
-            metric_names = list(self.data[0][1].keys()) * 3
+            metric_names = list(self.data[0][1].keys())
             num_metrics = len(metric_names)
 
             num_columns = math.floor(math.sqrt(num_metrics)) + 1
