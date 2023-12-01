@@ -1,3 +1,4 @@
+import os
 from threading import Thread
 from typing import Any, Dict, List, Optional, Tuple, Type, TypedDict
 from uuid import uuid4, UUID
@@ -7,7 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import create_model, BaseModel, Field
 from pydantic.fields import FieldInfo
 
-from .const import ZOO_ROOT
+from .const import *
 from .._config import _Config
 from ..core.scene import (
     Scene,
@@ -82,6 +83,16 @@ class SceneCreatePayload(BaseModel):
     scene_agents_config_data: List[SceneAgentConfigPayload] = Field(default=...)
     scene_evaluators_config_data: Optional[List[SceneEvaluatorConfigPayload]] = Field(default=...)
     additional_config_data: Dict[str, Any] = Field(default=...)
+
+
+class AppPaths(BaseModel):
+    root: str = Field(default=ROOT)
+    zoo_root: str = Field(default=ZOO_ROOT)
+    save_root: str = Field(default=SAVE_ROOT)
+
+
+class AppInfo(BaseModel):
+    paths: AppPaths = Field(default=AppPaths())
 
 
 app = FastAPI()
@@ -172,6 +183,11 @@ async def list_scenes() -> ScenesBrief:
     return ScenesBrief(scenes=briefs)
 
 
+@app.get("/info", response_model=AppInfo)
+async def get_app_info() -> AppInfo:
+    return AppInfo()
+
+
 @app.get("/scene/{scene_id}", response_model=SceneDetail)
 async def get_scene(scene_id: str) -> SceneDetail:
     scene_full = SCENES[scene_id]
@@ -238,18 +254,21 @@ def _create_scene(payload: SceneCreatePayload) -> Scene:
 
 class TaskCreationResponse(BaseModel):
     task_id: UUID = Field(default=...)
+    save_dir: str = Field(default=...)
 
 
 @app.post("/task/create", response_model=TaskCreationResponse)
 async def create_scene(scene_creation_payload: SceneCreatePayload) -> TaskCreationResponse:
     scene = _create_scene(payload=scene_creation_payload)
     task_id = uuid4()
+    save_dir = os.path.join(SAVE_ROOT, task_id.hex)
+    scene.save_dir = save_dir
 
     TASK_CACHE[task_id] = scene
 
     Thread(target=scene.start, daemon=True).start()  # TODO: optimize, this is ugly
 
-    return TaskCreationResponse(task_id=task_id)
+    return TaskCreationResponse(task_id=task_id, save_dir=save_dir)
 
 
 @app.get("/task/status/{task_id}", response_class=JSONResponse)
