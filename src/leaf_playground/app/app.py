@@ -90,6 +90,9 @@ class AppPaths(BaseModel):
     zoo_root: str = Field(default=ZOO_ROOT)
     save_root: str = Field(default=SAVE_ROOT)
 
+    def model_post_init(self, __context: Any) -> None:
+        os.makedirs(self.save_root, exist_ok=True)
+
 
 class AppInfo(BaseModel):
     paths: AppPaths = Field(default=AppPaths())
