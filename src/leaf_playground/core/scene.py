@@ -167,6 +167,16 @@ class Scene(_Configurable):
         self.message_pool: MessagePool = MessagePool()
         self.state = SceneState.PENDING
 
+        self._save_dir = None
+
+    @property
+    def save_dir(self):
+        return self._save_dir
+
+    @save_dir.setter
+    def save_dir(self, save_dir: str):
+        self._save_dir = save_dir
+
     def __valid_class_attributes(self):
         if not hasattr(self, "metadata"):
             raise ValueError("metadata not found, please specify in your scene class")
@@ -346,8 +356,8 @@ class Scene(_Configurable):
                 "scene_info_class not found, please specify scene_info_class in your scene class"
             )
 
-    def _save_scene(self, save_dir: str):
-        with open(join(save_dir, "scene.json"), "w", encoding="utf-8") as f:
+    def _save_scene(self):
+        with open(join(self.save_dir, "scene.json"), "w", encoding="utf-8") as f:
             json.dump(
                 {
                     "config": self.config.model_dump(mode="json"),
@@ -359,7 +369,7 @@ class Scene(_Configurable):
                 indent=2
             )
 
-    def _save_agents(self, save_dir: str):
+    def _save_agents(self):
         agents_info = {}
         for agent in self.agents:
             config = agent.config.model_dump(mode="json")
@@ -368,23 +378,23 @@ class Scene(_Configurable):
                 "metadata": agent.get_metadata().model_dump(mode="json"),
                 "type": agent.obj_for_import.model_dump(mode="json")
             }
-        with open(join(save_dir, "agents.json"), "w", encoding="utf-8") as f:
+        with open(join(self.save_dir, "agents.json"), "w", encoding="utf-8") as f:
             json.dump(agents_info, f, ensure_ascii=False, indent=2)
 
-    def _save_logs(self, save_dir: str):
-        with open(join(save_dir, "logs.jsonl"), "w", encoding="utf-8") as f:
+    def _save_logs(self):
+        with open(join(self.save_dir, "logs.jsonl"), "w", encoding="utf-8") as f:
             for socket in self.socket_cache:
                 if socket.type == SocketDataType.LOG:
                     f.write(json.dumps(socket.data, ensure_ascii=False) + "\n")
 
-    def _save_metrics(self, save_dir: str):
-        with open(join(save_dir, "metrics.jsonl"), "w", encoding="utf-8") as f:
+    def _save_metrics(self):
+        with open(join(self.save_dir, "metrics.jsonl"), "w", encoding="utf-8") as f:
             for socket in self.socket_cache:
                 if socket.type == SocketDataType.METRIC:
                     f.write(json.dumps(socket.data, ensure_ascii=False) + "\n")
 
-    def _save_charts(self, save_dir: str):
-        charts_dir = join(save_dir, "charts")
+    def _save_charts(self):
+        charts_dir = join(self.save_dir, "charts")
         makedirs(charts_dir, exist_ok=True)
         if not self.evaluators:
             return
@@ -393,22 +403,22 @@ class Scene(_Configurable):
                 chart.render_chart(join(charts_dir, f"{chart.name}.html"))
                 chart.dump_chart_options(join(charts_dir, f"{chart.name}.json"))
 
-    def save(self, save_dir: Optional[str] = None):
-        if not save_dir:
-            save_dir = join(getcwd(), f"tmp/{datetime.utcnow().timestamp().hex() + uuid4().hex}")
+    def save(self):
+        if not self.save_dir:
+            self.save_dir = join(getcwd(), f"tmp/{datetime.utcnow().timestamp().hex() + uuid4().hex}")
 
-        makedirs(save_dir, exist_ok=True)
+        makedirs(self.save_dir, exist_ok=True)
 
-        self._save_scene(save_dir)
-        self._save_agents(save_dir)
-        self._save_logs(save_dir)
-        self._save_metrics(save_dir)
-        self._save_charts(save_dir)
+        self._save_scene()
+        self._save_agents()
+        self._save_logs()
+        self._save_metrics()
+        self._save_charts()
 
         self.socket_cache.append(
             SocketData(
                 type=SocketDataType.ENDING,
-                data={"save_dir": save_dir}
+                data={"save_dir": self.save_dir}
             )
         )
 
