@@ -54,8 +54,11 @@ class Chart:
             return f"{agents_name[agent_id]}({agent_id.hex[:8]})"
 
         self.agents_color = (
-            {_build_agent_name(agent): agent_color for agent, agent_color in agents_color.items()}
-            if (agents_color and all(agents_color.values())) else None
+            {
+                _build_agent_name(agent): (agent_color or self._gen_random_colors(1)[0])
+                for agent, agent_color in agents_color.items()
+            }
+            if agents_color else self._gen_random_colors(len(agents))
         )
         self.data = [(_build_agent_name(agent), aggregate_method(agent2values[agent])) for agent in agents]
 
