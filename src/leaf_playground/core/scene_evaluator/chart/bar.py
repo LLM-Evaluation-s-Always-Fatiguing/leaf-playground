@@ -49,7 +49,7 @@ class BarChart(Chart):
                     xaxis_opts=opts.AxisOpts(name="Agent"),
                     yaxis_opts=opts.AxisOpts(
                         name=self.metric_name,
-                        axislabel_opts=opts.LabelOpts(formatter="{value}%")
+                        axislabel_opts=opts.LabelOpts(formatter="{value}")
                     ),
                 )
                 .set_colors(self._gen_random_colors(len(self.data[0][1])))
@@ -62,7 +62,7 @@ class BarChart(Chart):
                 title_opts=opts.TitleOpts(title=self.name, pos_left="center"),
                 legend_opts=opts.LegendOpts(is_show=False, pos_bottom=0),
                 yaxis_opts=opts.AxisOpts(
-                    axislabel_opts=opts.LabelOpts(formatter="{value}%")
+                    axislabel_opts=opts.LabelOpts(formatter="{value}")
                 ),
             )
         )
