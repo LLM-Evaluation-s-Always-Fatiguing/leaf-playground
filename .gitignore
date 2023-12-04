@@ -25,3 +25,6 @@ tmp/
 
 # dev workdirs
 dev/
+
+# client
+client/
