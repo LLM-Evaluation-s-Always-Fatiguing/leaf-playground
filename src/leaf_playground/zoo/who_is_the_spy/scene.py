@@ -69,7 +69,6 @@ class WhoIsTheSpyScene(Scene):
                         index=log_index,
                         references=references,
                         response=message,
-                        media_type=MediaType.TEXT
                     ).model_dump(mode="json", by_alias=True)
                 )
             )

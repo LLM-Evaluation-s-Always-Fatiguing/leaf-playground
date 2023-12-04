@@ -78,8 +78,8 @@ class MessagePool(Data):
         self.messages.append(message)
 
     def get_messages(
-        self,
-        agent: Profile
+            self,
+            agent: Profile
     ) -> List[Message]:
         """
         Get messages that sent by the agent or is visible by the agent
@@ -104,7 +104,6 @@ MessageType = Union[
     AudioMessage,
     VideoMessage
 ]
-
 
 __all__ = [
     "Message",

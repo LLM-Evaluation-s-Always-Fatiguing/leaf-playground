@@ -8,7 +8,7 @@ from openai.types.chat.chat_completion_message_param import (
 from pydantic import Field
 
 from leaf_playground.ai_backend.openai import OpenAIBackendConfig, CHAT_MODELS
-from leaf_playground.data.media import Text
+from leaf_playground.data.media import Text, Json
 from leaf_playground.data.profile import Profile
 from leaf_playground.utils.import_util import DynamicObject
 from leaf_playground.zoo.rag_qa.scene_agent import (
@@ -79,10 +79,14 @@ class OpenAIBasicExaminee(AIBaseExaminee):
                     "contexts": ['nothing found']  # default for ragas data type validation
                 }
 
+            contexts = obj['contexts'] if resp else ['nothing found']
+            answer = obj['answer'] if resp else ""
+
+            json_data = {"answer": answer, "contexts": contexts}
+
             return ExamineeAnswer(
                 question_id=question.question_id,
-                content=Text(text=obj['answer'] if resp else ""),
-                contexts=obj['contexts'] if resp else ['nothing found'],  # default for ragas data type validation
+                content=Json(data=json_data, display_text=answer),
                 sender=self.profile,
                 receivers=[examiner]
             )
@@ -92,18 +96,22 @@ class OpenAIBasicExaminee(AIBaseExaminee):
                 f"{examiner.name}({examiner.role.name}): {examiner_msg}\n"
                 f"{self.name}({self.role_name}): the answer is "
             )
+            contexts = ['nothing found']
+            answer = ""
+
             try:
                 resp = await client.completions.create(
                     prompt=prompt,
                     model=model,
                     max_tokens=2048
                 )
+                answer = resp.choices[0].text if resp else ""
+
             except Exception as e:
-                resp = None
+                pass
             return ExamineeAnswer(
                 question_id=question.question_id,
-                content=Text(text=resp.choices[0].text if resp else ""),
-                contexts=['nothing found'],  # No context for this model
+                content=Json(data={"answer": answer, "contexts": contexts}, display_text=answer),
                 sender=self.profile,
                 receivers=[examiner]
             )
