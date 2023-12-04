@@ -24,7 +24,6 @@ class Media(Data, ABC):
     def set_type(cls, values):
         if values.get('type') is not None:
             values['type'] = cls.__name__.lower()
-            print(f'set type: {values["type"]} for {values["display_text"]}')
         if values.get('display_text') is None:
             values['display_text'] = cls._generate_display_text(values)
         return values
