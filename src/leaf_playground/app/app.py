@@ -258,6 +258,9 @@ def _create_scene(payload: SceneCreatePayload) -> Scene:
 class TaskCreationResponse(BaseModel):
     task_id: UUID = Field(default=...)
     save_dir: str = Field(default=...)
+    scene_config: dict = Field(default=...)
+    agent_configs: List[dict] = Field(default=...)
+    evaluator_configs: List[dict] = Field(default=...)
 
 
 @app.post("/task/create", response_model=TaskCreationResponse)
@@ -271,7 +274,13 @@ async def create_scene(scene_creation_payload: SceneCreatePayload) -> TaskCreati
 
     Thread(target=scene.start, daemon=True).start()  # TODO: optimize, this is ugly
 
-    return TaskCreationResponse(task_id=task_id, save_dir=save_dir)
+    return TaskCreationResponse(
+        task_id=task_id,
+        save_dir=save_dir,
+        scene_config=scene.get_scene_config(mode="dict"),
+        agent_configs=scene.get_agent_configs(mode="dict"),
+        evaluator_configs=scene.get_evaluator_configs(mode="dict")
+    )
 
 
 @app.get("/task/status/{task_id}", response_class=JSONResponse)
