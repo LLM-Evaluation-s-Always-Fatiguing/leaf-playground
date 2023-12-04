@@ -69,9 +69,9 @@ class GeneralMCQExamineScene(Scene):
                         index=len(self.socket_cache),  # not thread safe
                         references=[q],
                         response=answer,
-                        media_type=MediaType.TEXT,
                         ground_truth=None,
-                        eval_record=None if not evaluator else (await evaluator.nested_record(answer)).model_dump(mode="json"),
+                        eval_record=None if not evaluator else (await evaluator.nested_record(answer)).model_dump(
+                            mode="json"),
                         narrator=f"examinee [{examinee.name}] answered question [{q.question_id}]"
                     ).model_dump(mode="json")
                 )
@@ -92,7 +92,6 @@ class GeneralMCQExamineScene(Scene):
                         index=len(self.socket_cache),  # not thread safe
                         references=None,
                         response=question,
-                        media_type=MediaType.TEXT,
                         ground_truth=None,
                         eval_record=None,
                         narrator=f"examiner sent question [{question.question_id}] to all examinees"

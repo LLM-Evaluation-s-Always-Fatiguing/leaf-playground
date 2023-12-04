@@ -1,23 +1,67 @@
+import json
+from abc import ABC, abstractmethod
 from enum import Enum
+from typing import Any, Dict, Union, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .base import Data
 
 
-class Media(Data):
-    pass
+class MediaType(Enum):
+    TEXT = "text"
+    JSON = "json"
+    IMAGE = "image"
+    AUDIO = "audio"
+    VIDEO = "video"
+
+
+class Media(Data, ABC):
+    display_text: str = Field(default=...)
+    type: str = Field(default="unknown")
+
+    @model_validator(mode='before')
+    def set_type(cls, values):
+        if values.get('type') is not None:
+            values['type'] = cls.__name__.lower()
+        if values.get('display_text') is None:
+            values['display_text'] = cls._generate_display_text(values)
+        return values
+
+    @classmethod
+    def _generate_display_text(cls, values) -> str:
+        pass
+
+    def __str__(self):
+        return self.display_text
+
+    class Config:
+        frozen = True
+        extra = "forbid"
 
 
 class Text(Media):
     text: str = Field(default=...)
 
-    def __str__(self):
-        return self.text
+    @classmethod
+    def _generate_display_text(cls, values) -> str:
+        return values['text'][:256]
+
+    def __repr__(self):
+        return f"<Text {self.text}>"
 
 
 class Json(Media):
-    pass
+    data: Union[dict, list] = Field(default={})
+
+    @classmethod
+    def _generate_display_text(cls, values) -> str:
+        if isinstance(values['data'], dict) and values['data'].get('text') is not None:
+            return values['data']['text'][:256]
+        return 'Json Object' if isinstance(values['data'], dict) else 'Json Array'
+
+    def __repr__(self):
+        return f"<Json {json.dumps(self.data, ensure_ascii=False, indent=2)}>"
 
 
 class Image(Media):
@@ -30,31 +74,6 @@ class Audio(Media):
 
 class Video(Media):
     pass
-
-
-class MediaType(Enum):
-    TEXT = "text"
-    JSON = "json"
-    IMAGE = "image"
-    AUDIO = "audio"
-    VIDEO = "video"
-
-    @classmethod
-    def get_media_obj(cls, media_type: "MediaType"):
-        if not isinstance(media_type, cls):
-            raise TypeError(f"media_type should be an instance of {cls.__name__}")
-        if media_type.value == "text":
-            return Text
-        elif media_type.value == "json":
-            return Json
-        elif media_type.value == "image":
-            return Image
-        elif media_type.value == "audio":
-            return Audio
-        elif media_type.value == "video":
-            return Video
-        else:
-            raise ValueError(f"unknown media type: {media_type}")
 
 
 __all__ = [
