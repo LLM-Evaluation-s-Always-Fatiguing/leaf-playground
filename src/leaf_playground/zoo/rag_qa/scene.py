@@ -5,14 +5,15 @@ from pydantic import Field
 
 from leaf_playground.core.scene import Scene, SceneConfig
 from leaf_playground.data.log_body import LogBody
-from leaf_playground.data.media import MediaType, Text
+from leaf_playground.data.media import MediaType, Text, Json
 from leaf_playground.data.socket_data import SocketData, SocketDataType
 from leaf_playground.zoo.rag_qa.dataset_utils import DatasetConfig
 from leaf_playground.zoo.rag_qa.scene_agent import (
     Examiner,
     AIBaseExaminee,
+    ExamineeAnswer,
     ExaminerQuestion,
-    ExamineeAnswer
+    RagQaMessageType
 )
 from leaf_playground.zoo.rag_qa.scene_evaluator import RagasEvaluator, MetricType
 from leaf_playground.zoo.rag_qa.scene_info import (
@@ -22,8 +23,8 @@ from leaf_playground.zoo.rag_qa.scene_info import (
 
 
 class RagQaSceneLogBody(LogBody):
-    references: Optional[List[Union[ExaminerQuestion, ExamineeAnswer]]] = Field(default=None)
-    response: Union[ExaminerQuestion, ExamineeAnswer] = Field(default=...)
+    references: Optional[List[RagQaMessageType]] = Field(default=None)
+    response: RagQaMessageType = Field(default=...)
 
 
 class RagQaSceneConfig(SceneConfig):
@@ -59,9 +60,8 @@ class RagQaScene(Scene):
                 answer: ExamineeAnswer = ExamineeAnswer(
                     sender=examinee.profile,
                     receivers=[self.examiner.profile],
-                    content=Text(text=""),
-                    question_id=q.question_id,
-                    contexts=['nothing found']
+                    content=Json(data={"answer": "", "contexts": ['nothing found']}, display_text="Answering failed"),
+                    question_id=q.question_id
                 )
             self.message_pool.put_message(answer)
             self.socket_cache.append(
@@ -71,7 +71,6 @@ class RagQaScene(Scene):
                         index=len(self.socket_cache),  # not thread safe
                         references=[q],
                         response=answer,
-                        media_type=MediaType.TEXT,
                         ground_truth=None,
                         eval_record=None if not evaluator else (await evaluator.nested_record(answer)).model_dump(
                             mode="json"),
@@ -95,7 +94,6 @@ class RagQaScene(Scene):
                         index=len(self.socket_cache),  # not thread safe
                         references=None,
                         response=question,
-                        media_type=MediaType.TEXT,
                         ground_truth=None,
                         eval_record=None,
                         narrator=f"examiner sent question [{question.question_id}] to all examinees"

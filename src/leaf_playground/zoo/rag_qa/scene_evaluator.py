@@ -54,8 +54,8 @@ class RagasMetricRecord(NestedMetricRecord):
         question = data[evaluator.dataset_config.question_column]
         ground_truth = data[evaluator.dataset_config.ground_truth_column]
         golden_answer = data[evaluator.dataset_config.golden_answer_column]
-        agent_answer = target.content.text.strip()
-        contexts = target.contexts
+        agent_answer = target.content.data['answer']
+        contexts = target.content.data['contexts']
 
         misc = {
             'question': question,
