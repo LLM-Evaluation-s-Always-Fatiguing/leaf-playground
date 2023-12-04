@@ -1,11 +1,12 @@
 from abc import abstractmethod
 from inspect import Signature, Parameter
-from typing import Dict, List
+from typing import Dict, Literal, List, Union
+from typing_extensions import Annotated
 
 from pydantic import Field
 
 from leaf_playground.core.scene_agent import SceneAIAgent, SceneAIAgentConfig, SceneStaticAgent, SceneStaticAgentConfig
-from leaf_playground.data.message import TextMessage
+from leaf_playground.data.message import TextMessage, JsonMessage
 from leaf_playground.data.media import Text
 from leaf_playground.data.profile import Profile
 from leaf_playground.utils.import_util import DynamicObject
@@ -14,17 +15,21 @@ from leaf_playground.zoo.rag_qa.dataset_utils import prepare_dataset, DatasetCon
 
 class ExaminerQuestion(TextMessage):
     question_id: int = Field(default=...)
+    msg_type: Literal["question"] = Field(default="question")
 
     class Config:
         extra = 'forbid'
 
 
-class ExamineeAnswer(TextMessage):
+class ExamineeAnswer(JsonMessage):
     question_id: int = Field(default=...)
-    contexts: List[str] = Field(default=...)
+    msg_type: Literal["answer"] = Field(default="answer")
 
     class Config:
         extra = 'forbid'
+
+
+RagQaMessageType = Annotated[Union[ExaminerQuestion, ExamineeAnswer], Field(discriminator="msg_type")]
 
 
 class ExaminerConfig(SceneStaticAgentConfig):
@@ -76,10 +81,11 @@ class Examiner(SceneStaticAgent):
         self._dataset_config = dataset_config
 
     def send_question(self, receivers: List[Profile]) -> ExaminerQuestion:
+        text = self._questions[self._cur][self._dataset_config.question_column]
         question = ExaminerQuestion(
             sender=self.profile,
             receivers=receivers,
-            content=Text(text=self._questions[self._cur][self._dataset_config.question_column]),
+            content=Text(text=text, display_text=text[:256]),
             question_id=self._cur
         )
         self._cur += 1
@@ -124,6 +130,7 @@ class AIBaseExaminee(SceneAIAgent):
 __all__ = [
     "ExaminerQuestion",
     "ExamineeAnswer",
+    "RagQaMessageType",
     "ExaminerConfig",
     "Examiner",
     "AIBaseExamineeConfig",

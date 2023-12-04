@@ -7,7 +7,7 @@ from datetime import datetime
 from itertools import chain
 from os import getcwd, makedirs
 from os.path import dirname, join
-from typing import Any, Callable, List, Optional, Type
+from typing import Any, Callable, List, Literal, Optional, Type, Union
 from uuid import uuid4
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -421,6 +421,46 @@ class Scene(_Configurable):
                 data={"save_dir": self.save_dir}
             )
         )
+
+    def get_scene_config(
+        self,
+        mode: Literal["pydantic", "dict", "json"] = "pydantic"
+    ) -> Union[SceneConfig, dict, str]:
+        if mode == "pydantic":
+            return self.config
+        elif mode == "dict":
+            return self.config.model_dump(mode="json")
+        elif mode == "json":
+            return self.config.model_dump_json()
+        else:
+            raise ValueError(f"invalid mode {mode}")
+
+    def get_agent_configs(
+        self,
+        mode: Literal["pydantic", "dict", "json"] = "pydantic"
+    ) -> Union[List[SceneAgentConfig], List[dict], str]:
+        agents = self.agents + self.static_agents
+        if mode == "pydantic":
+            return [agent.config for agent in agents]
+        elif mode == "dict":
+            return [agent.config.model_dump(mode="json") for agent in agents]
+        elif mode == "json":
+            return json.dumps([agent.config.model_dump(mode="json") for agent in agents])
+        else:
+            raise ValueError(f"invalid mode {mode}")
+
+    def get_evaluator_configs(
+        self,
+        mode: Literal["pydantic", "dict", "json"] = "pydantic"
+    ) -> Union[List[SceneEvaluatorConfig], List[dict], str]:
+        if mode == "pydantic":
+            return [evaluator.config for evaluator in self.evaluators]
+        elif mode == "dict":
+            return [evaluator.config.model_dump(mode="json") for evaluator in self.evaluators]
+        elif mode == "json":
+            return json.dumps([evaluator.config.model_dump(mode="json") for evaluator in self.evaluators])
+        else:
+            raise ValueError(f"invalid mode {mode}")
 
 
 __all__ = [

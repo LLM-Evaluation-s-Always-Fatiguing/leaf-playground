@@ -16,7 +16,7 @@ from leaf_playground.zoo.rag_qa.scene import (
     RagQaScene,
     RagQaSceneConfig,
 )
-from leaf_playground.zoo.rag_qa.scene_agent import ExamineeAnswer
+from leaf_playground.zoo.rag_qa.scene_agent import ExamineeAnswer, ExaminerQuestion
 from leaf_playground.zoo.rag_qa.scene_info import envs_config_model
 
 agent_obj = RagQaScene.get_dynamic_agent_classes()[0]
@@ -77,8 +77,9 @@ def display_log(log: RagQaScene.log_body_class):
     narrator = log.narrator
     sender = log.response.sender.name
     sender_role = log.response.sender.role.name
-    content = log.response.content.text.strip()
-    contexts = log.response.contexts if isinstance(log.response, ExamineeAnswer) else []
+    content = log.response.content.text.strip() if isinstance(log.response, ExaminerQuestion) else \
+        log.response.content.data['answer']
+    contexts = log.response.content.data['contexts'] if isinstance(log.response, ExamineeAnswer) else []
     print(f"({narrator})\n", flush=True)
     print(f"{sender}({sender_role}): {content}\n", flush=True)
     print(f"ground_truth: {log.ground_truth}\n", flush=True)
