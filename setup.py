@@ -12,7 +12,8 @@ requirements = [
     "accelerate",
     "fastapi[all]",
     "tiktoken",
-    "pyecharts"
+    "pyecharts",
+    "ragas"
 ]
 
 setup(
