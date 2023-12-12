@@ -33,6 +33,16 @@ class DynamicObject(BaseModel):
         source_file = "" if not self.source_file else self.source_file.as_posix()
         return md5((obj + module + source_file).encode(encoding="utf-8")).hexdigest()
 
+    @classmethod
+    def create_dynamic_obj(cls, obj: Type) -> "DynamicObject":
+        dynamic_obj = cls(obj=obj.__name__, source_file=Path(inspect.getfile(obj)))
+        _IMPORTED_OBJECTS[dynamic_obj.hash] = obj
+        return dynamic_obj
+
+    @classmethod
+    def bind_dynamic_obj(cls, obj: "DynamicObject", target: Type) -> None:
+        _IMPORTED_OBJECTS[obj.hash] = target
+
 
 def dynamically_import_obj(o: DynamicObject):
     if o.hash in _IMPORTED_OBJECTS:

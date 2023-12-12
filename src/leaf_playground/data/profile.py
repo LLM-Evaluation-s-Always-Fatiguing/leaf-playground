@@ -11,11 +11,6 @@ class Role(Data):
     name: str = Field(default=...)
     description: str = Field(default=...)
     is_static: bool = Field(default=False)
-    agent_type: Optional[DynamicObject] = Field(default=None)
-
-    def model_post_init(self, __context: Any) -> None:
-        if self.is_static and not self.agent_type:
-            raise ValueError(f"agent_type should be specified when the role is a static role")
 
 
 class Profile(Data):
