@@ -1,93 +1,77 @@
 import asyncio
 
-from leaf_playground.ai_backend.openai import OpenAIBackendConfig
-from leaf_playground.core.scene import (
-    SceneAgentsObjConfig,
-    SceneAgentObjConfig,
-    SceneEvaluatorObjConfig,
-    SceneEvaluatorsObjConfig,
-    SceneInfoObjConfig
+from leaf_playground.core.scene_engine import (
+    SceneEngine, SceneObjConfig, MetricEvaluatorObjConfig, MetricEvaluatorObjsConfig
 )
-from leaf_playground.data.profile import Profile
-from leaf_playground.utils.import_util import dynamically_import_obj
-from leaf_playground.zoo.general_mcq_examine.dataset_utils import DatasetConfig
-from leaf_playground.zoo.general_mcq_examine.scene import (
-    GeneralMCQExamineScene,
-    GeneralMCQExamineSceneConfig,
-)
-from leaf_playground.zoo.general_mcq_examine.scene_info import envs_config_model
+from leaf_playground.zoo_new.general_mcq_examine import *
 
-agent_obj = GeneralMCQExamineScene.get_dynamic_agent_classes()[0]
-evaluator_obj = GeneralMCQExamineScene.get_evaluator_classes()[0]
-scene_info_obj = GeneralMCQExamineScene.get_scene_info_class().obj_for_import
 
-scene_config = GeneralMCQExamineSceneConfig(
-    scene_info=SceneInfoObjConfig(
-        **{
-            "scene_info_config_data": {"environments": envs_config_model()},
-            "scene_info_obj": scene_info_obj.model_dump(by_alias=True)
-        }
-    ),
-    scene_agents=SceneAgentsObjConfig(
-        agents=[
-            SceneAgentObjConfig(
-                **{
-                    "agent_config_data": dynamically_import_obj(agent_obj).config_obj(
-                        profile=Profile(name="James"),
-                        ai_backend_config=OpenAIBackendConfig(model="gpt-4-1106-preview"),
-                        chart_major_color="#4513de",
-                    ).model_dump(by_alias=True),
-                    "agent_obj": agent_obj.model_dump(by_alias=True)
+def init_scene_engine():
+    scene_engine = SceneEngine(
+        scene_config=SceneObjConfig(
+            scene_config_data={
+                "roles_config": {
+                    "examiner": {
+                        "actions_config": {},
+                        "agents_config": [
+                            {"config_data": {}, "obj_for_import": Examiner.obj_for_import.model_dump(mode="json", by_alias=True)}
+                        ]
+                    },
+                    "examinee": {
+                        "actions_config": {
+                            "answer_question": {"metrics_config": {"accurate": {"enable": True}}}
+                        },
+                        "agents_config": [
+                            {
+                                "config_data": {
+                                    "profile": {"name": "William"},
+                                    "ai_backend_config": {"model": "gpt-3.5-turbo"}
+                                },
+                                "obj_for_import": OpenAIBasicExaminee.obj_for_import.model_dump(mode="json", by_alias=True)
+                            }
+                        ]
+                    }
+                },
+                "dataset_config": {
+                    "path": "AsakusaRinne/gaokao_bench",
+                    "name": "2010-2022_History_MCQs",
+                    "split": "dev",
+                    "question_column": "question",
+                    "golden_answer_column": "answer",
+                    "num_questions": 3
                 }
-            ),
-            SceneAgentObjConfig(
-                **{
-                    "agent_config_data": dynamically_import_obj(agent_obj).config_obj(
-                        profile=Profile(name="William"),
-                        ai_backend_config=OpenAIBackendConfig(model="gpt-3.5-turbo-instruct"),
-                        chart_major_color="#9965ff",
-                    ).model_dump(by_alias=True),
-                    "agent_obj": agent_obj.model_dump(by_alias=True)
-                }
-            )
-        ]
-    ),
-    scene_evaluators=SceneEvaluatorsObjConfig(
-        evaluators=[
-            SceneEvaluatorObjConfig(
-                **{
-                    "evaluator_config_data": {},
-                    "evaluator_obj": evaluator_obj.model_dump(by_alias=True)
-                }
-            )
-        ]
-    ),
-    dataset_config=DatasetConfig(
-        **{
-            "path": "AsakusaRinne/gaokao_bench",
-            "name": "2010-2022_History_MCQs",
-            "split": "dev",
-            "question_column": "question",
-            "golden_answer_column": "answer",
-            "num_questions": 3
-        }
+            },
+            scene_obj=GeneralMCQExamineScene.obj_for_import
+        ),
+        evaluators_config=MetricEvaluatorObjsConfig(
+            evaluators=[
+                MetricEvaluatorObjConfig(
+                    evaluator_config_data={},
+                    evaluator_obj=ExamineeAnswerEvaluator.obj_for_import
+                )
+            ]
+        )
     )
-)
+    return scene_engine
 
 
 def display_log(log: GeneralMCQExamineScene.log_body_class):
     narrator = log.narrator
     sender = log.response.sender.name
     sender_role = log.response.sender.role.name
-    content = log.response.content.text.strip()
+    content = log.response.content.text.strip() if isinstance(log.response, ExaminerQuestion) else \
+        log.response.content.data['answer']
     print(f"({narrator})\n", flush=True)
     print(f"{sender}({sender_role}): {content}\n", flush=True)
+    print(f"ground_truth: {log.ground_truth}\n", flush=True)
 
 
-async def run_scene():
-    scene = GeneralMCQExamineScene.from_config(config=scene_config)
-    await asyncio.gather(scene.a_start(), scene.stream_logs(display_log))
+async def run():
+    scene_engine = init_scene_engine()
+    await asyncio.gather(scene_engine.a_run(), scene_engine.stream_logs(display_log))
+    # scene_engine.save_dir = f"output/rag_qa_result-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
+    # scene_engine.save()
 
 
 if __name__ == "__main__":
-    asyncio.run(run_scene())
+    asyncio.run(run())
