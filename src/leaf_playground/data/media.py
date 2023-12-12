@@ -1,7 +1,7 @@
 import json
-from abc import ABC, abstractmethod
+from abc import ABC
 from enum import Enum
-from typing import Any, Dict, Union, Literal
+from typing import Union, Optional
 
 from pydantic import Field, model_validator
 
@@ -17,7 +17,7 @@ class MediaType(Enum):
 
 
 class Media(Data, ABC):
-    display_text: str = Field(default=...)
+    display_text: Optional[str] = Field(default=None)
     type: str = Field(default="unknown")
 
     @model_validator(mode='before')
