@@ -59,8 +59,7 @@ def display_log(log: GeneralMCQExamineScene.log_body_class):
     narrator = log.narrator
     sender = log.response.sender.name
     sender_role = log.response.sender.role.name
-    content = log.response.content.text.strip() if isinstance(log.response, ExaminerQuestion) else \
-        log.response.content.data['answer']
+    content = log.response.content.text.strip()
     print(f"({narrator})\n", flush=True)
     print(f"{sender}({sender_role}): {content}\n", flush=True)
     print(f"ground_truth: {log.ground_truth}\n", flush=True)

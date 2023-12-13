@@ -7,18 +7,18 @@ from pydantic import Field
 from leaf_playground.core.scene import Scene
 from leaf_playground.core.scene_definition import SceneConfig
 from leaf_playground.data.log_body import LogBody
-from leaf_playground.data.media import MediaType, Text
+from leaf_playground.data.media import Text
 from leaf_playground.data.socket_data import SocketData, SocketDataType
 
 from .agents.examiner import Examiner
 from .agents.base_examinee import AIBaseExaminee
 from .dataset_utils import DatasetConfig
-from .scene_definition import ExamineeAnswer, ExaminerQuestion, SCENE_DEFINITION
+from .scene_definition import ExamineeAnswer, ExaminerQuestion, MessageType, SCENE_DEFINITION
 
 
 class GeneralMCQExamineSceneLogBody(LogBody):
-    references: Optional[List[Union[ExaminerQuestion, ExamineeAnswer]]] = Field(default=None)
-    response: Union[ExaminerQuestion, ExamineeAnswer] = Field(default=...)
+    references: Optional[List[MessageType]] = Field(default=None)
+    response: MessageType = Field(default=...)
     ground_truth: Optional[Text] = Field(default=None)
 
 

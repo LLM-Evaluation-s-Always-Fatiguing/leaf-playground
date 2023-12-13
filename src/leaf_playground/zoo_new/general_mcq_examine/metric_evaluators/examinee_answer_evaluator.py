@@ -25,7 +25,8 @@ class ExamineeAnswerEvaluatorProxy(MetricEvaluatorProxy):
         result = {}
         if isinstance(log.response, ExamineeAnswer) and log.ground_truth:
             answer = log.response.content.text
-            result["accurate"] = RecordOutput(record_value=answer.lower().startswith(log.ground_truth.lower()))
+            ground_truth = log.ground_truth.text
+            result["accurate"] = RecordOutput(record_value=answer.lower().startswith(ground_truth.lower()))
         return result
 
     async def _compare(self, logs: List[LogBody], evaluator: Any) -> Dict[_MetricName, CompareOutput]:

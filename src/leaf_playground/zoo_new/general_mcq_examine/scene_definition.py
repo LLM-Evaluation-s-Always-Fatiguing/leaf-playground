@@ -1,4 +1,5 @@
-from typing import List
+from typing import List, Literal, Union
+from typing_extensions import Annotated
 
 from pydantic import Field
 
@@ -17,10 +18,15 @@ def accuracy_fn(records: List[_RecordData]) -> AggregationMethodOutput:
 
 class ExaminerQuestion(TextMessage):
     question_id: int = Field(default=...)
+    msg_type: Literal["question"] = Field(default="question")
 
 
 class ExamineeAnswer(TextMessage):
     question_id: int = Field(default=...)
+    msg_type: Literal["answer"] = Field(default="answer")
+
+
+MessageType = Annotated[Union[ExaminerQuestion, ExamineeAnswer], Field(discriminator="msg_type")]
 
 
 SCENE_DEFINITION = SceneDefinition(
@@ -80,5 +86,6 @@ SCENE_DEFINITION = SceneDefinition(
 __all__ = [
     "ExaminerQuestion",
     "ExamineeAnswer",
+    "MessageType",
     "SCENE_DEFINITION"
 ]
