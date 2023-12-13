@@ -6,7 +6,7 @@ import os
 from functools import partial
 from hashlib import md5
 from pathlib import Path
-from typing import Any, List, Optional, Type
+from typing import Any, Callable, List, Optional, Type
 
 from pydantic import BaseModel, Field, FilePath
 
@@ -65,6 +65,13 @@ class DynamicFn(BaseModel):
     @property
     def hash(self) -> str:
         return self.fn.hash + md5(str(self.default_kwargs).encode(encoding="utf-8")).hexdigest()
+
+    @classmethod
+    def create_dynamic_fn(cls, fn: Type, default_kwargs: Optional[dict] = None) -> "DynamicFn":
+        dynamic_obj = DynamicObject.create_dynamic_obj(fn)
+        dynamic_fn = cls(fn=dynamic_obj, default_kwargs=default_kwargs)
+        _IMPORTED_FUNCTIONS[dynamic_fn.hash] = fn
+        return dynamic_fn
 
 
 def dynamically_import_fn(f: DynamicFn):
