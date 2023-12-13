@@ -19,12 +19,10 @@ class LogBody(Data):
     references: Optional[List[MessageType]] = Field(default=None)
     response: MessageType = Field(default=...)
     ground_truth: Optional[Media] = Field(default=None)
-    eval_records: Dict[_MetricName, _MetricRecords] = Field(
-        default_factory=lambda: defaultdict(list)
-    )
-    human_eval_records: Dict[_MetricName, _MetricRecords] = Field(
-        default_factory=lambda: defaultdict(list)
-    )  # TODO: how to use
+    eval_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
+    compare_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
+    human_eval_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))  # TODO: how to use
+    human_compare_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
     narrator: Optional[str] = Field(default=None)
 
 

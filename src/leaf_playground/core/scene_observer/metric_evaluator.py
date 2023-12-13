@@ -23,6 +23,18 @@ from ...utils.thread_util import run_asynchronously
 from ...utils.type_util import validate_type
 
 
+class RecordOutput(BaseModel):
+    record_value: Any = Field(default=...)
+    reason: Optional[str] = Field(default=None)
+    misc: Optional[dict] = Field(default=None)
+
+
+class CompareOutput(BaseModel):
+    compare_result: Any = Field(default=...)
+    reason: Optional[str] = Field(default=None)
+    misc: Optional[dict] = Field(default=None)
+
+
 _MetricName = str
 _MetricRecordValue = Any
 
@@ -78,9 +90,6 @@ class MetricEvaluatorProxy(Process):
         loop = asyncio.new_event_loop()
         self._state.value = MetricEvaluatorState.RUNNING.value.encode("utf-8")
 
-        async def gather(data, methods):
-            return await asyncio.gather(*[run_asynchronously(method, data, evaluator) for method in methods])
-
         while True:
             try:
                 log_data, is_compare, id_ = self._queue.get_nowait()
@@ -90,17 +99,13 @@ class MetricEvaluatorProxy(Process):
             try:
                 if not is_compare:
                     log = LogBody(**log_data)
-                    results = loop.run_until_complete(
-                        gather(log, [self._cal_record_value, self._comment_record, self._collect_record_misc])
-                    )
+                    output = loop.run_until_complete(self._record(log, evaluator))
                 else:
                     logs = [LogBody(**each) for each in log_data]
-                    results = loop.run_until_complete(
-                        gather(logs, [self._cal_compare_value, self._comment_compare, self._collect_compare_misc])
-                    )
+                    output = loop.run_until_complete(self._compare(logs, evaluator))
             except:
-                results = ({}, None, None)
-            self._result_cache[id_] = pickle.dumps(results)
+                output = {}
+            self._result_cache[id_] = {k: v.model_dump(mode="json", by_alias=True) for k, v in output.items()}
 
             if self._queue.empty() and self._can_stop.value:
                 break
@@ -112,27 +117,11 @@ class MetricEvaluatorProxy(Process):
         self._state.value = MetricEvaluatorState.TERMINATED.value.encode("utf-8")
 
     @abstractmethod
-    async def _cal_record_value(self, log: LogBody, evaluator: Any) -> Dict[_MetricName, _MetricRecordValue]:
+    async def _record(self, log: LogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
         pass
 
     @abstractmethod
-    async def _comment_record(self, log: LogBody, evaluator: Any) -> Optional[Dict[_MetricName, str]]:
-        pass
-
-    @abstractmethod
-    async def _collect_record_misc(self, log: LogBody, evaluator: Any) -> Optional[Dict[_MetricName, dict]]:
-        pass
-
-    @abstractmethod
-    async def _cal_compare_value(self, logs: List[LogBody], evaluator: Any) -> Dict[_MetricName, _MetricRecordValue]:
-        pass
-
-    @abstractmethod
-    async def _comment_compare(self, logs: List[LogBody], evaluator: Any) -> Optional[Dict[_MetricName, str]]:
-        pass
-
-    @abstractmethod
-    async def _collect_compare_misc(self, logs: List[LogBody], evaluator: Any) -> Optional[Dict[_MetricName, dict]]:
+    async def _compare(self, logs: List[LogBody], evaluator: Any) -> Dict[_MetricName, CompareOutput]:
         pass
 
 
@@ -313,7 +302,9 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         self.proxy.queue.put_nowait((log_data, is_compare, id_))
         while id_ not in self.proxy.result_cache:
             time.sleep(0.1)  # sleep longer to let scene's main process have more CPU time slice
-        return pickle.loads(self.proxy.result_cache.pop(id_))
+        return {
+            k: (CompareOutput if is_compare else RecordOutput)(**v) for k, v in self.proxy.result_cache.pop(id_).items()
+        }
 
     def record(self, log: LogBody) -> None:
         resp_type = type(log.response)
@@ -321,13 +312,14 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             return
         target_agent = log.response.sender_id
         # this may very slow
-        metric_name2record_value, metric_name2comments, metric_name2misc = self._wait_result(log)
-        for metric_name, record_value in metric_name2record_value.items():
+        record_results = self._wait_result(log)
+        for metric_name, record_output in record_results.items():
             if metric_name not in self.metrics_for_record:
                 raise TypeError(f"metric [{metric_name}] can't be used in record relevant methods")
 
-            comment = metric_name2comments.get(metric_name, None)
-            misc = metric_name2misc.get(metric_name, None)
+            record_value = record_output.record_value
+            reason = record_output.reason
+            misc = record_output.misc
 
             metric_def = self.metric_name2metric_defs[metric_name]
             expect_dtype = metric_def.metric_dtype
@@ -342,7 +334,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             log.eval_records[metric_name].append(
                 record_data_model(
                     value=record_value,
-                    comment=comment,
+                    reason=reason,
                     misc=misc,
                     target_agent=target_agent,
                     evaluator=self.__class__.__name__
@@ -365,28 +357,29 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                 continue
 
             # this may very, very slow
-            metric_name2compare_value, metric_name2compare_comment, metric_name2compare_misc = self._wait_result(logs)
-            for metric_name, compare_value in metric_name2compare_value.items():
+            compare_results = self._wait_result(logs)
+            for metric_name, compare_output in compare_results.items():
                 if metric_name not in self.metrics_for_compare:
                     raise TypeError(f"metric [{metric_name}] can't be used in compare relevant methods")
 
-                compare_comment = metric_name2compare_comment.get(metric_name, None)
-                compare_misc = metric_name2compare_misc.get(metric_name, None)
+                compare_result = compare_output.compare_result
+                reason = compare_output.reason
+                misc = compare_output.misc
 
                 metric_def = self.metric_name2metric_defs[metric_name]
                 expect_dtype = metric_def.metric_dtype
 
                 # validate value dtype
-                if not validate_type(compare_value, MetricType2Annotation[expect_dtype]):
+                if not validate_type(compare_result, MetricType2Annotation[expect_dtype]):
                     raise TypeError(
-                        f"metric [{metric_name}]'s dtype is [{expect_dtype}], got record_value: {compare_value}"
+                        f"metric [{metric_name}]'s dtype is [{expect_dtype}], got record_value: {compare_result}"
                     )
                 # save record data
                 _, record_data_model = metric_def.create_data_models()
                 record_data = record_data_model(
-                    value=compare_value,
-                    comment=compare_comment,
-                    misc=compare_misc,
+                    value=compare_result,
+                    reason=reason,
+                    misc=misc,
                     evaluator=self.__class__.__name__
                 )
                 for log in logs_:
@@ -421,6 +414,8 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
 
 
 __all__ = [
+    "RecordOutput",
+    "CompareOutput",
     "MetricEvaluatorConfig",
     "MetricEvaluatorProxy",
     "MetricEvaluator",

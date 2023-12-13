@@ -91,11 +91,10 @@ class GeneralMCQExamineScene(Scene, scene_definition=SCENE_DEFINITION, log_body_
                     SocketData(
                         type=SocketDataType.LOG,
                         data=self.log_body_class(
-                            index=cur_log_idx,  # not thread safe
+                            index=cur_log_idx,
                             references=None,
                             response=question,
                             ground_truth=None,
-                            eval_record=None,
                             narrator=f"examiner sent question [{question.question_id}] to all examinees"
                         ).model_dump(mode="json")
                     )

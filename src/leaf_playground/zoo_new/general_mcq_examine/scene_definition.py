@@ -1,8 +1,18 @@
+from typing import List
+
 from pydantic import Field
 
 from leaf_playground.core.scene_definition import *
+from leaf_playground.core.scene_definition.definitions.metric import _RecordData, AggregationMethodOutput
 from leaf_playground.data.message import TextMessage
 from leaf_playground.data.profile import Profile
+
+
+def accuracy_fn(records: List[_RecordData]) -> AggregationMethodOutput:
+    num_records = len(records)
+    num_accurate = len([record for record in records if bool(record.value)])
+    accuracy = round(num_accurate / num_records, 8)
+    return AggregationMethodOutput(value=accuracy, records=records)
 
 
 class ExaminerQuestion(TextMessage):
@@ -52,8 +62,10 @@ SCENE_DEFINITION = SceneDefinition(
                         MetricDefinition(
                             name="accurate",
                             description="accuracy of examinee's answer",
-                            metric_dtype=MetricType.SCALAR,
+                            record_dtype=ValueDType.SCALAR,
+                            metric_dtype=ValueDType.SCALAR,
                             expect_resp_msg_type=ExamineeAnswer,
+                            aggregation_methods={"-": DynamicAggregationFn.create_dynamic_fn(fn=accuracy_fn)},
                             is_comparison=False
                         )
                     ],
