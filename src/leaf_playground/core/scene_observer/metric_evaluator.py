@@ -14,6 +14,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from ..scene_definition import MetricDefinition, MetricType2Annotation, SceneConfig
+from .metric_reporter import MetricReporter
 from ..._config import _Config, _Configurable
 from ..._type import Immutable
 from ...data.log_body import LogBody
@@ -103,7 +104,7 @@ class MetricEvaluatorProxy(Process):
                 else:
                     logs = [LogBody(**each) for each in log_data]
                     output = loop.run_until_complete(self._compare(logs, evaluator))
-            except:
+            except Exception as e:
                 output = {}
             self._result_cache[id_] = {k: v.model_dump(mode="json", by_alias=True) for k, v in output.items()}
 
@@ -241,7 +242,13 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     evaluator_proxy_class: Type[MetricEvaluatorProxy]
     obj_for_import: DynamicObject
 
-    def __init__(self, config: config_cls, scene_config: SceneConfig, socket_cache: List[SocketData]):
+    def __init__(
+        self,
+        config: config_cls,
+        scene_config: SceneConfig,
+        socket_cache: List[SocketData],
+        reporter: MetricReporter
+    ):
         super().__init__(config=config)
 
         self.config_data = self.config.model_dump(mode="json", by_alias=True)
@@ -266,6 +273,8 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         self.metrics_for_compare = [
             metric_def.name for metric_def in self.metric_name2metric_defs.values() if metric_def.is_comparison
         ]
+
+        self.reporter = reporter
 
         self.proxy = self.evaluator_proxy_class(
             config_cls=self.config_cls,
@@ -331,15 +340,15 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                 )
             # save record data
             _, record_data_model = metric_def.create_data_models()
-            log.eval_records[metric_name].append(
-                record_data_model(
-                    value=record_value,
-                    reason=reason,
-                    misc=misc,
-                    target_agent=target_agent,
-                    evaluator=self.__class__.__name__
-                ).model_dump(mode="json")
+            record_data = record_data_model(
+                value=record_value,
+                reason=reason,
+                misc=misc,
+                target_agent=target_agent,
+                evaluator=self.__class__.__name__
             )
+            self.reporter.put_record(record_data, metric_def.belonged_chain)
+            log.eval_records[metric_name].append(record_data.model_dump(mode="json"))
             self.socket_cache.append(
                 SocketData(
                     type=SocketDataType.LOG,
@@ -382,8 +391,9 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                     misc=misc,
                     evaluator=self.__class__.__name__
                 )
+                self.reporter.put_record(record_data, metric_def.belonged_chain)
                 for log in logs_:
-                    log.eval_records[metric_name].append(record_data)
+                    log.eval_records[metric_name].append(record_data.model_dump(mode="json"))
                     self.socket_cache.append(
                         SocketData(
                             type=SocketDataType.LOG,

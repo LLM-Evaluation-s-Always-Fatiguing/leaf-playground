@@ -9,7 +9,7 @@ from pydantic import Field
 
 from .scene import Scene
 from .scene_definition import SceneConfig
-from .scene_observer import MetricEvaluator, MetricEvaluatorConfig
+from .scene_observer import MetricEvaluator, MetricEvaluatorConfig, MetricReporter
 from .._config import _Config
 from ..data.log_body import LogBody
 from ..data.socket_data import SocketData, SocketDataType
@@ -30,22 +30,35 @@ class MetricEvaluatorObjConfig(_Config):
     evaluator_config_data: dict = Field(default=...)
     evaluator_obj: DynamicObject = Field(default=...)
 
-    def initialize_evaluator(self, scene_config: SceneConfig, socket_cache: List[SocketData]) -> MetricEvaluator:
+    def initialize_evaluator(
+        self,
+        scene_config: SceneConfig,
+        socket_cache: List[SocketData],
+        reporter: MetricReporter
+    ) -> MetricEvaluator:
         evaluator_cls: Type[MetricEvaluator] = dynamically_import_obj(self.evaluator_obj)
         evaluator_config_cls: Type[MetricEvaluatorConfig] = evaluator_cls.config_cls
         return evaluator_cls(
             config=evaluator_config_cls(**self.evaluator_config_data),
             scene_config=scene_config,
-            socket_cache=socket_cache
+            socket_cache=socket_cache,
+            reporter=reporter
         )
 
 
 class MetricEvaluatorObjsConfig(_Config):
     evaluators: List[MetricEvaluatorObjConfig] = Field(default=[])
 
-    def initialize_evaluators(self, scene_config: SceneConfig, socket_cache: List[SocketData]) -> List[MetricEvaluator]:
+    def initialize_evaluators(
+        self,
+        scene_config: SceneConfig,
+        socket_cache: List[SocketData],
+        reporter: MetricReporter
+    ) -> List[MetricEvaluator]:
         return [
-            evaluator_obj_config.initialize_evaluator(scene_config=scene_config, socket_cache=socket_cache)
+            evaluator_obj_config.initialize_evaluator(
+                scene_config=scene_config, socket_cache=socket_cache, reporter=reporter
+            )
             for evaluator_obj_config in self.evaluators
         ]
 
@@ -62,9 +75,11 @@ class SceneEngineState(Enum):
 class SceneEngine:
     def __init__(self, scene_config: SceneObjConfig, evaluators_config: MetricEvaluatorObjsConfig):
         self.scene = scene_config.initialize_scene()
+        self.reporter = MetricReporter(scene_definition=self.scene.scene_definition)
         self.evaluators = evaluators_config.initialize_evaluators(
             scene_config=self.scene.config,
-            socket_cache=self.scene.socket_cache
+            socket_cache=self.scene.socket_cache,
+            reporter=self.reporter
         )
 
         for evaluator in self.evaluators:
