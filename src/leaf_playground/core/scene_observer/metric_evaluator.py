@@ -93,16 +93,16 @@ class MetricEvaluatorProxy(Process):
 
         while True:
             try:
-                log_data, is_compare, id_ = self._queue.get_nowait()
+                log_data, log_cls, is_compare, id_ = self._queue.get_nowait()
             except Empty:
                 time.sleep(0.001)
                 continue
             try:
                 if not is_compare:
-                    log = LogBody(**log_data)
+                    log = log_cls(**log_data)
                     output = loop.run_until_complete(self._record(log, evaluator))
                 else:
-                    logs = [LogBody(**each) for each in log_data]
+                    logs = [log_cls(**each) for each in log_data]
                     output = loop.run_until_complete(self._compare(logs, evaluator))
             except Exception as e:
                 output = {}
@@ -304,11 +304,13 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         id_ = uuid4()
         if isinstance(logs, LogBody):
             log_data = logs.model_dump(mode="json", by_alias=True)
+            log_cls = logs.__class__
             is_compare = False
         else:
             log_data = [log.model_dump(mode="json", by_alias=True) for log in logs]
+            log_cls = logs[0].__class__
             is_compare = True
-        self.proxy.queue.put_nowait((log_data, is_compare, id_))
+        self.proxy.queue.put_nowait((log_data, log_cls, is_compare, id_))
         while id_ not in self.proxy.result_cache:
             time.sleep(0.1)  # sleep longer to let scene's main process have more CPU time slice
         return {
