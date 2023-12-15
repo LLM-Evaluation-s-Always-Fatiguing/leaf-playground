@@ -3,6 +3,7 @@ import importlib.machinery
 import inspect
 import glob
 import os
+import pkgutil
 from functools import partial
 from hashlib import md5
 from pathlib import Path
@@ -103,6 +104,24 @@ def find_subclasses(package_path: str, base_class: Type) -> List[DynamicObject]:
             if issubclass(obj, base_class) and obj != base_class and obj.__module__ == module.__name__:
                 classes.append(DynamicObject(obj=obj.__name__, source_file=module_path))
 
+    return classes
+
+
+def relevantly_find_subclasses(root_path: str, prefix: str, base_class: type) -> List[Type]:
+    classes = []
+    for loader, module_name, is_pkg in pkgutil.walk_packages(path=[root_path]):
+        if is_pkg:
+            classes += relevantly_find_subclasses(
+                os.path.join(root_path, module_name), prefix=prefix + "." + module_name, base_class=base_class
+            )
+        else:
+            module = importlib.import_module(prefix + "." + module_name)
+            for name in module.__all__:
+                obj = module.__dict__[name]
+                if not inspect.isclass(obj):
+                    continue
+                if issubclass(obj, base_class) and obj != base_class and obj.__module__ == module.__name__:
+                    classes.append(obj)
     return classes
 
 
