@@ -16,7 +16,8 @@ from ..core.scene_engine import (
 )
 from ..core.scene_definition import SceneConfig, SceneDefinition
 from ..core.scene_observer import MetricEvaluatorMetadata
-from ..utils.import_util import dynamically_import_obj, find_subclasses
+from ..utils.import_util import dynamically_import_obj, relevantly_find_subclasses
+from ..zoo_new import *  # TODO: remove when everything done
 
 
 class SceneFull(BaseModel):
@@ -44,15 +45,25 @@ app = FastAPI()
 
 def scan_scenes() -> List[SceneFull]:
     scenes = []
-    for scene_dynamic_obj in find_subclasses(package_path=ZOO_ROOT, base_class=Scene):
-        scene_class: Type[Scene]
-        scene_class = dynamically_import_obj(scene_dynamic_obj)
-
+    for scene_class in relevantly_find_subclasses(
+        root_path=ZOO_ROOT, prefix="leaf_playground.zoo_new", base_class=Scene
+    ):
+        scene_class: Scene
         scene_metadata = scene_class.get_metadata()
         agents_metadata = {}
         for role_def in scene_class.scene_definition.roles:
             agents_metadata[role_def.name] = role_def.agents_metadata
         # TODO: scan evaluators
+
+        # temporarily mocked logic
+        scenes.append(
+            SceneFull(
+                scene_definition=scene_class.scene_definition,
+                scene_metadata=scene_metadata,
+                agents_metadata=agents_metadata,
+                evaluators_metadata=None
+            )
+        )
 
     return scenes
 
