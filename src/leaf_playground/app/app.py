@@ -1,22 +1,21 @@
 import os
 from threading import Thread
-from typing import Any, Dict, List, Optional, Type, TypedDict
-from uuid import uuid4, UUID
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
-from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketException, WebSocketDisconnect
+from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketException
 from fastapi.responses import JSONResponse
-from pydantic import create_model, BaseModel, Field
+from pydantic import BaseModel, Field
 
 from .const import *
-from .._config import _Config
 from ..core.scene import Scene, SceneMetadata
-from ..core.scene_agent import SceneAgentConfig, SceneAgent, SceneAgentMetadata
+from ..core.scene_agent import SceneAgentMetadata
 from ..core.scene_engine import (
-    SceneEngine, SceneEngineState, SceneObjConfig, MetricEvaluatorObjConfig, MetricEvaluatorObjsConfig
+    SceneEngine, SceneObjConfig, MetricEvaluatorObjsConfig
 )
-from ..core.scene_definition import SceneConfig, SceneDefinition
+from ..core.scene_definition import SceneDefinition
 from ..core.scene_observer import MetricEvaluatorMetadata
-from ..utils.import_util import dynamically_import_obj, relevantly_find_subclasses
+from ..utils.import_util import relevantly_find_subclasses
 from ..zoo_new import *  # TODO: remove when everything done
 
 
@@ -118,7 +117,7 @@ class TaskCreationResponse(BaseModel):
 async def create_scene(task_creation_payload: TaskCreationPayload) -> TaskCreationResponse:
     scene_engine = _create_task(payload=task_creation_payload)
     save_dir = os.path.join(SAVE_ROOT, scene_engine.id.hex)
-    # scene_engine.save_dir = save_dir  # TODO: uncomment when scene_engine's save logics are implemented
+    scene_engine.save_dir = save_dir
 
     Thread(target=scene_engine.run, daemon=True).start()  # TODO: optimize, this is ugly
 
@@ -150,6 +149,16 @@ async def stream_task_info(websocket: WebSocket, task_id: UUID) -> None:
     scene_engine = TASK_CACHE[task_id]
 
     await scene_engine.stream_sockets(websocket)
+
+
+@app.post("/task/save/{task_id}")
+async def save_task(task_id: UUID):
+    if task_id not in TASK_CACHE:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
+
+    scene_engine = TASK_CACHE[task_id]
+
+    scene_engine.save()
 
 
 # TODO: more apis to pause, resume, interrupt, update log, etc.

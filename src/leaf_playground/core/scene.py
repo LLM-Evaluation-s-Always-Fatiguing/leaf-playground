@@ -107,7 +107,7 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         self.env_vars: Dict[str, EnvironmentVariable] = self.config.init_env_vars()
         self.evaluators: List[MetricEvaluator] = []
 
-        self.socket_cache: List[SocketData] = []
+        self.socket_cache: List[SocketData] = []  # TODO: do not explore to scene
         self.message_pool: MessagePool = MessagePool()
 
     def registry_metric_evaluator(self, evaluator: MetricEvaluator):
@@ -154,72 +154,6 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
     @classmethod
     def from_config(cls, config: config_cls) -> "Scene":
         return cls(config=config)
-
-    # def _save_scene(self):
-    #     with open(join(self.save_dir, "scene.json"), "w", encoding="utf-8") as f:
-    #         json.dump(
-    #             {
-    #                 "config": self.config.model_dump(mode="json"),
-    #                 "metadata": self.metadata.model_dump(mode="json"),
-    #                 "type": self.obj_for_import().model_dump(mode="json")
-    #             },
-    #             f,
-    #             ensure_ascii=False,
-    #             indent=2
-    #         )
-    #
-    # def _save_agents(self):
-    #     agents_info = {}
-    #     for agent in self.agents:
-    #         config = agent.config.model_dump(mode="json")
-    #         agents_info[config["profile"]["id"]] = {
-    #             "config": config,
-    #             "metadata": agent.get_metadata().model_dump(mode="json"),
-    #             "type": agent.obj_for_import.model_dump(mode="json")
-    #         }
-    #     with open(join(self.save_dir, "agents.json"), "w", encoding="utf-8") as f:
-    #         json.dump(agents_info, f, ensure_ascii=False, indent=2)
-    #
-    # def _save_logs(self):
-    #     with open(join(self.save_dir, "logs.jsonl"), "w", encoding="utf-8") as f:
-    #         for socket in self.socket_cache:
-    #             if socket.type == SocketDataType.LOG:
-    #                 f.write(json.dumps(socket.data, ensure_ascii=False) + "\n")
-
-    # def _save_metrics(self):
-    #     with open(join(self.save_dir, "metrics.jsonl"), "w", encoding="utf-8") as f:
-    #         for socket in self.socket_cache:
-    #             if socket.type == SocketDataType.METRIC:
-    #                 f.write(json.dumps(socket.data, ensure_ascii=False) + "\n")
-    #
-    # def _save_charts(self):
-    #     charts_dir = join(self.save_dir, "charts")
-    #     makedirs(charts_dir, exist_ok=True)
-    #     if not self.evaluators:
-    #         return
-    #     for evaluator in self.evaluators:
-    #         for chart in evaluator.paint_charts():
-    #             chart.render_chart(join(charts_dir, f"{chart.name}.html"))
-    #             chart.dump_chart_options(join(charts_dir, f"{chart.name}.json"))
-
-    # def save(self):
-    #     if not self.save_dir:
-    #         self.save_dir = join(getcwd(), f"tmp/{datetime.utcnow().timestamp().hex() + uuid4().hex}")
-    #
-    #     makedirs(self.save_dir, exist_ok=True)
-    #
-    #     self._save_scene()
-    #     self._save_agents()
-    #     self._save_logs()
-    #     self._save_metrics()
-    #     self._save_charts()
-    #
-    #     self.socket_cache.append(
-    #         SocketData(
-    #             type=SocketDataType.ENDING,
-    #             data={"save_dir": self.save_dir}
-    #         )
-    #     )
 
 
 __all__ = [
