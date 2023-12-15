@@ -20,7 +20,6 @@ from ..zoo_new import *  # TODO: remove when everything done
 
 
 class SceneFull(BaseModel):
-    scene_definition: SceneDefinition = Field(default=...)
     scene_metadata: SceneMetadata = Field(default=...)
     agents_metadata: Dict[str, List[SceneAgentMetadata]] = Field(default=...)
     evaluators_metadata: Optional[List[MetricEvaluatorMetadata]] = Field(default=...)
@@ -57,7 +56,6 @@ def scan_scenes() -> List[SceneFull]:
         # temporarily mocked logic
         scenes.append(
             SceneFull(
-                scene_definition=scene_class.scene_definition,
                 scene_metadata=scene_metadata,
                 agents_metadata=agents_metadata,
                 evaluators_metadata=None
