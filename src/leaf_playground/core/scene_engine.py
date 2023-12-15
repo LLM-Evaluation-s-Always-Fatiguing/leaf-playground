@@ -1,6 +1,8 @@
 import asyncio
 import json
 from enum import Enum
+from os import makedirs
+from os.path import join
 from typing import Any, Callable, List, Literal, Type, Union
 from uuid import uuid4, UUID
 
@@ -88,6 +90,8 @@ class SceneEngine:
         self.socket_cache = self.scene.socket_cache
         self._state = SceneEngineState.PENDING
         self._id = uuid4()
+
+        self.save_dir = None
 
     @property
     def state(self) -> SceneEngineState:
@@ -185,7 +189,23 @@ class SceneEngine:
         else:
             raise ValueError(f"invalid mode {mode}")
 
-    # TODO: save logics
+    def save(self):
+        makedirs(self.save_dir, exist_ok=True)
+
+        scene_config = self.get_scene_config(mode="dict")
+        evaluator_configs = self.get_evaluator_configs(mode="dict")
+
+        with open(join(self.save_dir, "scene_config.json"), "w", encoding="utf-8") as f:
+            json.dump(scene_config, f, indent=4, ensure_ascii=False)
+
+        with open(join(self.save_dir, "evaluator_configs.json"), "w", encoding="utf-8") as f:
+            json.dump(evaluator_configs, f, indent=4, ensure_ascii=False)
+
+        with open(join(self.save_dir, "sockets.jsonl"), "w", encoding="utf-8") as f:
+            for socket_data in self.socket_cache:
+                f.write(json.dumps(socket_data.model_dump(mode="json"), ensure_ascii=False) + "\n")
+
+        # TODO: save charts
 
 
 __all__ = [
