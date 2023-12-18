@@ -102,8 +102,8 @@ class MetricDefinition(BaseModel):
     description: str = Field(default=...)
     record_value_dtype: ValueDType = Field(default=...)
     expect_resp_msg_type: Type = Field(default=...)
-    aggregation_method: DynamicAggregationMethod = Field(default="mean")
-    is_comparison: bool = Field(default=False)
+    agg_method_when_not_compare: Optional[DynamicAggregationMethod] = Field(default=...)
+    is_comparison: bool = Field(default=...)
 
     _belonged_action: Optional[
         "leaf_playground.core.scene_info.definitions.action.ActionDefinition"
@@ -124,6 +124,10 @@ class MetricDefinition(BaseModel):
             raise TypeError(
                 f"expect_resp_msg_type must be a subclass of Message"
             )
+        if not self.is_comparison and not self.agg_method_when_not_compare:
+            raise ValueError(
+                f"agg_method_when_not_compare can't be None when is_comparison=False"
+            )
         if self.is_comparison and self.record_value_dtype in [ValueDType.SCALAR, ValueDType.NESTED_SCALAR]:
             raise ValueError(
                 f"metric_dtype should be one of [MetricType.VECTOR, MetricType.NESTED_VECTOR], got {self.record_value_dtype}"
@@ -134,7 +138,13 @@ class MetricDefinition(BaseModel):
         return expect_resp_msg_type.__name__
 
     def get_value_annotation(self):
-        return MetricType2Annotation[self.record_value_dtype]
+        if not self.is_comparison:
+            return MetricType2Annotation[self.record_value_dtype]
+        is_nested = self.record_value_dtype == ValueDType.NESTED_VECTOR
+        if is_nested:
+            return Dict[str, List[UUID]]
+        else:
+            return List[UUID]
 
     def create_data_models(self) -> Tuple[Type[_MetricData], Type[_RecordData]]:
         hash_id = md5(self.model_dump_json().encode()).hexdigest()
