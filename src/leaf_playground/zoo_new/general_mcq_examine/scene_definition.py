@@ -13,7 +13,7 @@ def accuracy_fn(records: List[_RecordData]) -> AggregationMethodOutput:
     num_records = len(records)
     num_accurate = len([record for record in records if bool(record.value)])
     accuracy = round(num_accurate / num_records, 8)
-    return AggregationMethodOutput(value=accuracy, records=records)
+    return AggregationMethodOutput(value=accuracy)
 
 
 class ExaminerQuestion(TextMessage):
@@ -68,10 +68,9 @@ SCENE_DEFINITION = SceneDefinition(
                         MetricDefinition(
                             name="accurate",
                             description="accuracy of examinee's answer",
-                            record_dtype=ValueDType.SCALAR,
-                            metric_dtype=ValueDType.SCALAR,
+                            record_value_dtype=ValueDType.SCALAR,
                             expect_resp_msg_type=ExamineeAnswer,
-                            aggregation_methods={"-": DynamicAggregationFn.create_dynamic_fn(fn=accuracy_fn)},
+                            aggregation_method=DynamicAggregationFn.create_dynamic_fn(fn=accuracy_fn),
                             is_comparison=False
                         )
                     ],

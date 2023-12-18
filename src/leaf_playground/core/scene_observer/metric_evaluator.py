@@ -246,7 +246,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         self,
         config: config_cls,
         scene_config: SceneConfig,
-        socket_cache: List[SocketData],
+        socket_cache: List[SocketData],  # TODO: do not explore to evaluator
         reporter: MetricReporter
     ):
         super().__init__(config=config)
@@ -333,7 +333,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             misc = record_output.misc
 
             metric_def = self.metric_name2metric_defs[metric_name]
-            expect_dtype = metric_def.metric_dtype
+            expect_dtype = metric_def.record_value_dtype
 
             # validate value dtype
             if not validate_type(record_value, MetricType2Annotation[expect_dtype]):
@@ -378,7 +378,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                 misc = compare_output.misc
 
                 metric_def = self.metric_name2metric_defs[metric_name]
-                expect_dtype = metric_def.metric_dtype
+                expect_dtype = metric_def.record_value_dtype
 
                 # validate value dtype
                 if not validate_type(compare_result, MetricType2Annotation[expect_dtype]):

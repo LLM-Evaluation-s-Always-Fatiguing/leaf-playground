@@ -65,8 +65,8 @@ def display_log(log: GeneralMCQExamineScene.log_body_class):
 async def run():
     scene_engine = init_scene_engine()
     await asyncio.gather(scene_engine.a_run(), scene_engine.stream_logs(display_log))
-    # scene_engine.save_dir = f"output/rag_qa_result-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
-    # scene_engine.save()
+    scene_engine.save_dir = f"output/rag_qa_result-{scene_engine.id.hex}"
+    scene_engine.save()
 
 
 if __name__ == "__main__":

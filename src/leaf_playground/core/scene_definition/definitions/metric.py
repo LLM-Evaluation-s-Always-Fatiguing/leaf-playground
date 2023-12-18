@@ -56,7 +56,6 @@ class _MetricData(Data):
 
 class AggregationMethodOutput(BaseModel):
     value: Any = Field(default=...)
-    records: List[_RecordData] = Field(default=...)
 
 
 class DynamicAggregationFn(DynamicFn):
@@ -86,17 +85,24 @@ class DynamicAggregationFn(DynamicFn):
         return cls(**dynamic_fn.model_dump(mode="json", by_alias=True))
 
 
-DefaultAggregateMethods = Literal["mean", "min", "max", "median", "sum"]
-DynamicAggregationMethods = Union[DefaultAggregateMethods, DynamicAggregationFn]
+DefaultAggregateMethod = Literal["mean", "min", "max", "median", "sum"]
+DynamicAggregationMethod = Union[DefaultAggregateMethod, DynamicAggregationFn]
+
+DEFAULT_AGG_METHODS = {
+    "mean": lambda x: AggregationMethodOutput(value=sum([each.value for each in x]) / len(x)),
+    "min": lambda x: AggregationMethodOutput(value=min([each.value for each in x])),
+    "max": lambda x: AggregationMethodOutput(value=max([each.value for each in x])),
+    "median": lambda x: AggregationMethodOutput(value=sorted([each.value for each in x])[len(x) // 2]),
+    "sum": lambda x: AggregationMethodOutput(value=sum([each.value for each in x]))
+}
 
 
 class MetricDefinition(BaseModel):
     name: str = Field(default=...)
     description: str = Field(default=...)
-    record_dtype: ValueDType = Field(default=...)
-    metric_dtype: ValueDType = Field(default=...)
+    record_value_dtype: ValueDType = Field(default=...)
     expect_resp_msg_type: Type = Field(default=...)
-    aggregation_methods: Dict[str, DynamicAggregationMethods] = Field(default={"-": "mean"})
+    aggregation_method: DynamicAggregationMethod = Field(default="mean")
     is_comparison: bool = Field(default=False)
 
     _belonged_action: Optional[
@@ -118,20 +124,17 @@ class MetricDefinition(BaseModel):
             raise TypeError(
                 f"expect_resp_msg_type must be a subclass of Message"
             )
-        if self.is_comparison and self.metric_dtype in [ValueDType.SCALAR, ValueDType.NESTED_SCALAR]:
+        if self.is_comparison and self.record_value_dtype in [ValueDType.SCALAR, ValueDType.NESTED_SCALAR]:
             raise ValueError(
-                f"metric_dtype should be one of [MetricType.VECTOR, MetricType.NESTED_VECTOR], got {self.metric_dtype}"
+                f"metric_dtype should be one of [MetricType.VECTOR, MetricType.NESTED_VECTOR], got {self.record_value_dtype}"
             )
 
     @field_serializer("expect_resp_msg_type")
     def serialize_valid_msg_types(self, expect_resp_msg_type: Type, _info):
         return expect_resp_msg_type.__name__
 
-    def get_record_value_annotation(self):
-        return MetricType2Annotation[self.record_dtype]
-
-    def get_metric_value_annotation(self):
-        return MetricType2Annotation[self.metric_dtype]
+    def get_value_annotation(self):
+        return MetricType2Annotation[self.record_value_dtype]
 
     def create_data_models(self) -> Tuple[Type[_MetricData], Type[_RecordData]]:
         hash_id = md5(self.model_dump_json().encode()).hexdigest()
@@ -143,11 +146,10 @@ class MetricDefinition(BaseModel):
         metric_model_name = base_name + ("Comparison" if self.is_comparison else "Metric")
         module = _getframe(1).f_globals["__name__"]
 
-        record_value_annotation = self.get_record_value_annotation()
-        metric_value_annotation = self.get_metric_value_annotation()
+        value_annotation = self.get_value_annotation()
 
         record_model_fields = {
-            "value": (record_value_annotation, Field(default=MetricType2DefaultValue[self.metric_dtype])),
+            "value": (value_annotation, Field(default=MetricType2DefaultValue[self.record_value_dtype])),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
         }
         if not self.is_comparison:
@@ -163,7 +165,6 @@ class MetricDefinition(BaseModel):
         )
 
         metric_model_fields = {
-            "value": (metric_value_annotation, Field(default=MetricType2DefaultValue[self.metric_dtype])),
             "records": (List[record_model], Field(default=...)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
         }
@@ -190,7 +191,9 @@ class MetricConfig(_Config):
 
 __all__ = [
     "AggregationMethodOutput",
+    "DynamicAggregationMethod",
     "DynamicAggregationFn",
+    "DEFAULT_AGG_METHODS",
     "ValueDType",
     "MetricType2Annotation",
     "MetricDefinition",
