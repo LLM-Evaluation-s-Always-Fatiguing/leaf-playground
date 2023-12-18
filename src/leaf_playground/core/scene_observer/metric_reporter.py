@@ -1,7 +1,8 @@
 from collections import defaultdict
 from typing import Any, Dict, List, Union
+from uuid import UUID
 
-from ..scene_definition import SceneDefinition, MetricDefinition, AggregationMethodOutput, ValueDType
+from ..scene_definition import SceneDefinition, MetricDefinition, ValueDType
 from ..scene_definition.definitions.metric import (
     _RecordData, _MetricData, DynamicAggregationMethod, DEFAULT_AGG_METHODS
 )
@@ -19,6 +20,17 @@ def _agg(
     return agg_method_(records).value
 
 
+def _win_ratio(
+    ranks: List[List[UUID]],
+    top_n: int
+):
+    counter = {agent: 0 for agent in ranks[0]}
+    for rank in ranks:
+        for agent in rank[:top_n]:
+            counter[agent] += 1
+    return {k: v / len(ranks) for k, v in counter.items()}
+
+
 class MetricReporter:
     def __init__(self, scene_definition: SceneDefinition):
         metric_definitions = {}
@@ -33,7 +45,7 @@ class MetricReporter:
         self.records[metric_belonged_chain].append(record)
 
     def _cal_record_metric(self, records: List[_RecordData], metric_def: MetricDefinition) -> List[_MetricData]:
-        agg_method = metric_def.aggregation_method
+        agg_method = metric_def.agg_method_when_not_compare
         metric_data_model, _ = metric_def.create_data_models()
 
         agent2records = defaultdict(list)
@@ -53,7 +65,31 @@ class MetricReporter:
         return metrics
 
     def _cal_compare_metric(self, records: List[_RecordData], metric_def: MetricDefinition) -> _MetricData:
-        pass  # TODO: impl calculation logic for compare metrics
+        metric_data_model, _ = metric_def.create_data_models()
+        is_nested = metric_def.record_value_dtype == ValueDType.NESTED_VECTOR
+        record_values = [record.value for record in records]
+        if not is_nested:
+            record_values = [{"-": v} for v in record_values]
+        num_agents = len(record_values[0][list(record_values[0].keys())[0]])
+
+        results = {}
+        for f_name in record_values[0].keys():
+            result = {}
+            f_ranks = [each[f_name] for each in record_values]
+            result["win_ratio"] = _win_ratio(f_ranks, top_n=1)
+            if num_agents >= 10:
+                result["top3_ratio"] = _win_ratio(f_ranks, top_n=3)
+            if num_agents >= 30:
+                result["top10_ratio"] = _win_ratio(f_ranks, top_n=10)
+            results[f_name] = result
+
+        if not is_nested:
+            results = results["-"]
+
+        return metric_data_model(
+            value=results,
+            records=records
+        )
 
     def _cal_metrics(self) -> Dict[str, Union[_MetricData, List[_MetricData]]]:
         metrics = {}

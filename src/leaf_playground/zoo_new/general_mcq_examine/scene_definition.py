@@ -70,7 +70,7 @@ SCENE_DEFINITION = SceneDefinition(
                             description="accuracy of examinee's answer",
                             record_value_dtype=ValueDType.SCALAR,
                             expect_resp_msg_type=ExamineeAnswer,
-                            aggregation_method=DynamicAggregationFn.create_dynamic_fn(fn=accuracy_fn),
+                            agg_method_when_not_compare=DynamicAggregationFn.create_dynamic_fn(fn=accuracy_fn),
                             is_comparison=False
                         )
                     ],
