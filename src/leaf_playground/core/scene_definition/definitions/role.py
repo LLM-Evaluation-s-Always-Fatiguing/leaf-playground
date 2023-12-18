@@ -154,7 +154,8 @@ class RoleConfig(_Config):
             "agents_config": (
                 List[RoleAgentConfig],
                 Field(
-                    default=...,
+                    default=... if not role_definition.is_static else
+                    [RoleAgentConfig(config_data={}, obj_for_import=role_definition.agents_cls[0].obj_for_import)],
                     min_items=role_definition.min_agents_num,
                     max_items=role_definition.max_agents_num if role_definition.max_agents_num != -1 else PydanticUndefined
                 )

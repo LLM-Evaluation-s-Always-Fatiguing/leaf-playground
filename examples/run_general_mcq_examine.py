@@ -13,9 +13,6 @@ def init_scene_engine():
                 "roles_config": {
                     "examiner": {
                         "actions_config": {},
-                        "agents_config": [
-                            {"config_data": {}, "obj_for_import": Examiner.obj_for_import.model_dump(mode="json", by_alias=True)}
-                        ]
                     },
                     "examinee": {
                         "actions_config": {
