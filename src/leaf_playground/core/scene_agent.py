@@ -18,7 +18,7 @@ from ..utils.type_util import validate_type
 class SceneAgentMetadata(BaseModel):
     cls_name: str = Field(default=...)
     description: str = Field(default=...)
-    config_schema: dict = Field(default=...)
+    config_schema: Optional[dict] = Field(default=...)
     obj_for_import: DynamicObject = Field(default=...)
 
 
@@ -167,7 +167,7 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
         return SceneAgentMetadata(
             cls_name=cls.__name__,
             description=cls.cls_description,
-            config_schema=cls.config_cls.get_json_schema(by_alias=True),
+            config_schema=cls.config_cls.get_json_schema(by_alias=True) if not cls.role_definition.is_static else None,
             obj_for_import=cls.obj_for_import
         )
 
