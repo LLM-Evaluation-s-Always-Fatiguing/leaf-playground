@@ -34,7 +34,7 @@ class ExamineeAnswerEvaluatorProxy(MetricEvaluatorProxy):
             )
         return result
 
-    async def _compare(self, logs: List[ActionLogBody], evaluator: Any) -> Dict[_MetricName, CompareOutput]:
+    async def _compare(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
         return {}
 
 
