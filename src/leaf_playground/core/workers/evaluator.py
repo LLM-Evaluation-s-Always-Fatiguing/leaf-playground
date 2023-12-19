@@ -215,6 +215,7 @@ class MetricEvaluatorMetadata(BaseModel):
     description: str = Field(default=...)
     config_schema: dict = Field(default=...)
     obj_for_import: DynamicObject = Field(default=...)
+    metrics: List[str] = Field(default=...)
 
 
 class MetricEvaluatorState(Enum):
@@ -391,7 +392,8 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             cls_name=cls.__name__,
             description=cls.cls_description,
             config_schema=cls.config_cls.get_json_schema(by_alias=True),
-            obj_for_import=cls.obj_for_import
+            obj_for_import=cls.obj_for_import,
+            metrics=[metric_def.belonged_chain for metric_def in cls.metric_definitions]
         )
 
     @classmethod
