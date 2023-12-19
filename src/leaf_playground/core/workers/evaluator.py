@@ -120,7 +120,7 @@ class MetricEvaluatorProxy(Process):
         pass
 
     @abstractmethod
-    async def _compare(self, logs: List[ActionLogBody], evaluator: Any) -> Dict[_MetricName, CompareOutput]:
+    async def _compare(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
         pass
 
 
@@ -299,10 +299,9 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     def join(self):
         self.proxy.join()
 
-    def _wait_result(self, logs: Union[ActionLogBody, List[ActionLogBody]]):
+    def _wait_result(self, log: ActionLogBody, is_compare: bool = False):
         id_ = uuid4()
-        is_compare = True if isinstance(logs, list) else False
-        self.proxy.queue.put_nowait((pickle.dumps(logs), is_compare, id_))
+        self.proxy.queue.put_nowait((pickle.dumps(log), is_compare, id_))
         while id_ not in self.proxy.result_cache:
             time.sleep(0.1)  # sleep longer to let scene's main process have more CPU time slice
         return {
@@ -346,45 +345,41 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             records[metric_name] = record_data.model_dump(mode="json")
         self.logger.add_action_log_record(log_id=log.id, records=records, field_name="eval_records")
 
-    def compare(self, logs: List[ActionLogBody]) -> None:
-        resp_type2logs = defaultdict(list)
-        for log in logs:
-            resp_type2logs[type(log.response)].append(log)
-        for resp_type, logs_ in resp_type2logs.items():
-            if resp_type not in self.resp_msg_type2metric_defs:
-                continue
+    def compare(self, log: ActionLogBody) -> None:
+        resp_type = type(log.response)
+        if resp_type not in self.resp_msg_type2metric_defs:
+            return
 
-            # this may very, very slow
-            compare_results = self._wait_result(logs)
-            records = {}
-            for metric_name, compare_output in compare_results.items():
-                if metric_name not in self.metrics_for_compare:
-                    raise TypeError(f"metric [{metric_name}] can't be used in compare relevant methods")
+        # this may very, very slow
+        compare_results = self._wait_result(log, is_compare=True)
+        records = {}
+        for metric_name, compare_output in compare_results.items():
+            if metric_name not in self.metrics_for_compare:
+                raise TypeError(f"metric [{metric_name}] can't be used in compare relevant methods")
 
-                compare_result = compare_output.compare_result
-                reason = compare_output.reason
-                misc = compare_output.misc
+            compare_result = compare_output.compare_result
+            reason = compare_output.reason
+            misc = compare_output.misc
 
-                metric_def = self.metric_name2metric_defs[metric_name]
-                expect_dtype = metric_def.record_value_dtype
+            metric_def = self.metric_name2metric_defs[metric_name]
+            expect_dtype = metric_def.record_value_dtype
 
-                # validate value dtype
-                if not validate_type(compare_result, VALUE_DETYPE_2_DEFAULT_VALUE[expect_dtype]):
-                    raise TypeError(
-                        f"metric [{metric_name}]'s dtype is [{expect_dtype}], got record_value: {compare_result}"
-                    )
-                # save record data
-                _, record_data_model = metric_def.create_data_models()
-                record_data = record_data_model(
-                    value=compare_result,
-                    reason=reason,
-                    misc=misc,
-                    evaluator=self.__class__.__name__
+            # validate value dtype
+            if not validate_type(compare_result, VALUE_DETYPE_2_DEFAULT_VALUE[expect_dtype]):
+                raise TypeError(
+                    f"metric [{metric_name}]'s dtype is [{expect_dtype}], got record_value: {compare_result}"
                 )
-                self.reporter.put_record(record_data, metric_def.belonged_chain)
-                records[metric_name] = record_data.model_dump(mode="json")
-            for log in logs_:
-                self.logger.add_action_log_record(log_id=log.id, records=records, field_name="compare_records")
+            # save record data
+            _, record_data_model = metric_def.create_data_models()
+            record_data = record_data_model(
+                value=compare_result,
+                reason=reason,
+                misc=misc,
+                evaluator=self.__class__.__name__
+            )
+            self.reporter.put_record(record_data, metric_def.belonged_chain)
+            records[metric_name] = record_data.model_dump(mode="json")
+        self.logger.add_action_log_record(log_id=log.id, records=records, field_name="compare_records")
 
     @classmethod
     def get_metadata(cls) -> MetricEvaluatorMetadata:
