@@ -24,7 +24,7 @@ class ExamineeAnswerEvaluatorProxy(MetricEvaluatorProxy):
         if isinstance(log.response, ExamineeAnswer) and log.ground_truth:
             answer = log.response.content.text
             ground_truth = log.ground_truth.text
-            result["accurate"] = RecordOutput(
+            result["examinee.answer_question.accurate"] = RecordOutput(
                 record_value=answer.lower().startswith(ground_truth.lower()),
                 misc={
                     "question": log.references[0].content.text,
