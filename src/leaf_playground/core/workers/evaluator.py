@@ -295,7 +295,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         )
 
     @abstractmethod
-    def _init_evaluator(self, config) -> Any:
+    def _init_evaluator(self, config: MetricEvaluatorConfig) -> Any:
         pass
 
     @abstractmethod
