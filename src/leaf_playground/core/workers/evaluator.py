@@ -9,7 +9,7 @@ from queue import Empty
 from sys import _getframe
 from threading import Thread
 from typing import Any, Dict, List, Optional, Type, Union
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from pydantic import BaseModel, Field
 
@@ -252,9 +252,9 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
 
         self.config_data = self.config.model_dump(mode="json", by_alias=True)
 
-        metric_name2def = {metric_def.name: metric_def for metric_def in self.metric_definitions}
+        metric_name2def = {metric_def.belonged_chain: metric_def for metric_def in self.metric_definitions}
         metric_name2conf = {
-            metric_def.name: scene_config.get_metric_config(metric_def.belonged_chain)
+            metric_def.belonged_chain: scene_config.get_metric_config(metric_def.belonged_chain)
             for metric_def in self.metric_definitions
         }
         self.metric_name2metric_defs = {
@@ -266,10 +266,12 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             self.resp_msg_type2metric_defs[metric.expect_resp_msg_type].append(metric)
 
         self.metrics_for_record = [
-            metric_def.name for metric_def in self.metric_name2metric_defs.values() if not metric_def.is_comparison
+            metric_def.belonged_chain for metric_def in self.metric_name2metric_defs.values()
+            if not metric_def.is_comparison
         ]
         self.metrics_for_compare = [
-            metric_def.name for metric_def in self.metric_name2metric_defs.values() if metric_def.is_comparison
+            metric_def.belonged_chain for metric_def in self.metric_name2metric_defs.values()
+            if metric_def.is_comparison
         ]
 
         self.logger = logger
@@ -318,7 +320,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         records = {}
         for metric_name, record_output in record_results.items():
             if metric_name not in self.metrics_for_record:
-                raise TypeError(f"metric [{metric_name}] can't be used in record relevant methods")
+                continue
 
             record_value = record_output.record_value
             reason = record_output.reason
@@ -329,9 +331,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
 
             # validate value dtype
             if not validate_type(record_value, VALUE_DETYPE_2_DEFAULT_VALUE[expect_dtype]):
-                raise TypeError(
-                    f"metric [{metric_name}]'s dtype is [{expect_dtype}], got record_value: {record_value}"
-                )
+                continue
             # save record data
             _, record_data_model = metric_def.create_data_models()
             record_data = record_data_model(
@@ -355,20 +355,17 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         records = {}
         for metric_name, compare_output in compare_results.items():
             if metric_name not in self.metrics_for_compare:
-                raise TypeError(f"metric [{metric_name}] can't be used in compare relevant methods")
+                continue
 
             compare_result = compare_output.compare_result
             reason = compare_output.reason
             misc = compare_output.misc
 
             metric_def = self.metric_name2metric_defs[metric_name]
-            expect_dtype = metric_def.record_value_dtype
 
             # validate value dtype
-            if not validate_type(compare_result, VALUE_DETYPE_2_DEFAULT_VALUE[expect_dtype]):
-                raise TypeError(
-                    f"metric [{metric_name}]'s dtype is [{expect_dtype}], got record_value: {compare_result}"
-                )
+            if not validate_type(compare_result, List[List[UUID]]):
+                continue
             # save record data
             _, record_data_model = metric_def.create_data_models()
             record_data = record_data_model(
