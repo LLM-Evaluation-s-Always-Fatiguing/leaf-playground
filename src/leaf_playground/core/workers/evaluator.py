@@ -1,4 +1,5 @@
 import asyncio
+import importlib
 import pickle
 import time
 from abc import abstractmethod, ABC, ABCMeta
@@ -8,6 +9,7 @@ from multiprocessing import Manager, Process
 from queue import Empty
 from sys import _getframe
 from threading import Thread
+from types import new_class
 from typing import Any, Dict, List, Optional, Type, Union
 from uuid import uuid4, UUID
 
@@ -56,6 +58,12 @@ class MetricEvaluatorProxy(Process):
         self._config_cls = config_cls
         self._config_data = config_data
 
+    def __init_subclass__(cls, _init_evaluator, _record, _compare, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls._init_evaluator = _init_evaluator
+        cls._record = _record
+        cls._compare = _compare
+
     @property
     def can_stop(self):
         return self._can_stop.value
@@ -75,10 +83,6 @@ class MetricEvaluatorProxy(Process):
     @property
     def state(self) -> "MetricEvaluatorState":
         return MetricEvaluatorState(self._state.value.decode("utf-8"))
-
-    @abstractmethod
-    def _init_evaluator(self, config) -> Any:
-        pass
 
     def run(self):
         self._state.value = MetricEvaluatorState.INITIALIZING.value.encode("utf-8")
@@ -115,14 +119,6 @@ class MetricEvaluatorProxy(Process):
         super().terminate()
         self._state.value = MetricEvaluatorState.TERMINATED.value.encode("utf-8")
 
-    @abstractmethod
-    async def _record(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
-        pass
-
-    @abstractmethod
-    async def _compare(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
-        pass
-
 
 # TODO: We hope that the MetricEvaluator class can be inherited through composition
 #  (or at least subcls can extend defs), however, using meta class makes this tough
@@ -135,9 +131,25 @@ class MetricEvaluatorMetaClass(ABCMeta):
         attrs,
         *,
         metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
-        cls_description: str = None,
-        evaluator_proxy_class: Type["MetricEvaluatorProxy"] = None
+        cls_description: str = None
     ):
+        # create proxy class on the fly
+        evaluator_proxy_class = new_class(
+            name=f"{name}Proxy",
+            bases=(MetricEvaluatorProxy,),
+            kwds={
+                "_init_evaluator": attrs["_init_evaluator"],
+                "_record": attrs["_record"],
+                "_compare": attrs["_compare"]
+            }
+        )
+        evaluator_proxy_class.__module__ = _getframe(1).f_globals["__name__"]
+        setattr(
+            importlib.import_module(evaluator_proxy_class.__module__),
+            evaluator_proxy_class.__name__,
+            evaluator_proxy_class
+        )
+
         attrs["metric_definitions"] = Immutable(metric_definitions or getattr(bases[0], "metric_definitions", None))
         attrs["cls_description"] = Immutable(cls_description or "")
         attrs["evaluator_proxy_class"] = Immutable(evaluator_proxy_class)
@@ -192,8 +204,7 @@ class MetricEvaluatorMetaClass(ABCMeta):
         attrs,
         *,
         metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
-        cls_description: str = None,
-        evaluator_proxy_class: "MetricEvaluatorProxy" = None
+        cls_description: str = None
     ):
         super().__init__(name, bases, attrs)
 
@@ -282,6 +293,18 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             config_data=self.config_data,
             manager=Manager()
         )
+
+    @abstractmethod
+    def _init_evaluator(self, config) -> Any:
+        pass
+
+    @abstractmethod
+    async def _record(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
+        pass
+
+    @abstractmethod
+    async def _compare(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
+        pass
 
     def notify_to_record(self, log: ActionLogBody):
         Thread(target=self.record, args=(log,), daemon=True).start()
