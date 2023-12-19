@@ -68,10 +68,10 @@ SCENE_DEFINITION = SceneDefinition(
                         MetricDefinition(
                             name="accurate",
                             description="accuracy of examinee's answer",
-                            record_value_dtype=ValueDType.SCALAR,
+                            record_value_dtype=ValueDType.BOOLEAN,
                             record_display_type=DisplayType.BOOLEAN_RADIO,
                             expect_resp_msg_type=ExamineeAnswer,
-                            agg_method_when_not_compare=DynamicAggregationFn.create_dynamic_fn(fn=accuracy_fn),
+                            agg_method=DynamicAggregationFn.create_dynamic_fn(fn=accuracy_fn),
                             is_comparison=False
                         )
                     ],

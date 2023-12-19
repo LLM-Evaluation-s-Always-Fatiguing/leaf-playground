@@ -198,8 +198,14 @@ class SceneEngine:
             for log in self.logger.logs:
                 f.write(json.dumps(log.model_dump(mode="json"), ensure_ascii=False) + "\n")
 
+        metrics_data = self.reporter.metrics_data
+        metrics_data = {
+            name: [each.model_dump(mode="json") for each in data]
+            if isinstance(data, list) else data.model_dump(mode="json")
+            for name, data in metrics_data.items()
+        }
         with open(join(self.save_dir, "metrics.json"), "w", encoding="utf-8") as f:
-            json.dump(self.reporter.metrics_data, f, indent=4, ensure_ascii=False)
+            json.dump(metrics_data, f, indent=4, ensure_ascii=False)
 
         # TODO: save charts
 

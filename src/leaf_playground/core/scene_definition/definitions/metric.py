@@ -18,30 +18,22 @@ _METRIC_MODELS = {}
 
 
 class ValueDType(Enum):
-    SCALAR = "scalar"
-    VECTOR = "vector"
-    NESTED_SCALAR = "nested_scalar"
-    NESTED_VECTOR = "nested_vector"
+    INT = int
+    FLOAT = float
+    BOOLEAN = bool
+
+
+VALUE_DETYPE_2_DEFAULT_VALUE = {
+    ValueDType.INT: 0,
+    ValueDType.FLOAT: 0.0,
+    ValueDType.BOOLEAN: False
+}
 
 
 class DisplayType(Enum):
     FIVE_STARTS_RATE = "FiveStarsRate"
     NUMBER_INPUT = "NumberInput"
     BOOLEAN_RADIO = "BooleanRadio"
-
-
-MetricType2Annotation = {
-    ValueDType.SCALAR: Union[bool, int, float],
-    ValueDType.VECTOR: List[Union[bool, int, float, UUID]],
-    ValueDType.NESTED_SCALAR: Dict[str, Union[bool, int, float]],
-    ValueDType.NESTED_VECTOR: Dict[str, Union[List[bool], List[int], List[float], List[UUID]]]
-}
-MetricType2DefaultValue = {
-    ValueDType.SCALAR: 0,
-    ValueDType.VECTOR: [],
-    ValueDType.NESTED_SCALAR: {},
-    ValueDType.NESTED_VECTOR: {}
-}
 
 
 class _RecordData(Data):
@@ -104,14 +96,86 @@ DEFAULT_AGG_METHODS = {
 }
 
 
+class CompareMetricDefinition(BaseModel):
+    name: str = Field(default=...)
+    description: str = Field(default=...)
+    expect_resp_msg_type: Type = Field(default=...)
+    is_comparison: Literal[True] = Field(default=True)
+
+    _belonged_action: Optional[
+        "leaf_playground.core.scene_info.definitions.action.ActionDefinition"
+    ] = PrivateAttr(default=None)
+
+    @property
+    def belonged_action(self) -> "leaf_playground.core.scene_info.definitions.action.ActionDefinition":
+        return self._belonged_action
+
+    @property
+    def belonged_chain(self):
+        return self.belonged_action.belonged_chain + "." + self.name
+
+    @field_serializer("expect_resp_msg_type")
+    def serialize_valid_msg_types(self, expect_resp_msg_type: Type, _info):
+        return expect_resp_msg_type.__name__
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.expect_resp_msg_type:
+            raise ValueError(f"valid_msg_types should not be empty")
+        if not issubclass(self.expect_resp_msg_type, Message):
+            raise TypeError(
+                f"expect_resp_msg_type must be a subclass of Message"
+            )
+
+    def create_data_models(self) -> Tuple[Type[_MetricData], Type[_RecordData]]:
+        hash_id = md5(self.model_dump_json().encode()).hexdigest()
+        if hash_id in _METRIC_MODELS:
+            return _METRIC_MODELS[hash_id]
+
+        base_name = "".join([s.capitalize() for s in self.name.split("_")])
+        record_model_name = base_name + "ComparisonRecord"
+        metric_model_name = base_name + "Comparison"
+        module = _getframe(1).f_globals["__name__"]
+
+        record_model_fields = {
+            "value": (List[UUID], Field(default=[])),
+            "display_type": (Literal[None], Field(default=None)),
+            "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
+            "target_agent": (Literal[None], Field(default=None))
+        }
+
+        record_model = create_model(
+            __model_name=record_model_name,
+            __module__=module,
+            __base__=_RecordData,
+            **record_model_fields
+        )
+
+        metric_model_fields = {
+            "records": (List[record_model], Field(default=...)),
+            "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
+            "target_agent": (Literal[None], Field(default=None))
+        }
+
+        metric_model = create_model(
+            __model_name=metric_model_name,
+            __module__=module,
+            __base__=_MetricData,
+            **metric_model_fields
+        )
+
+        _METRIC_MODELS[hash_id] = (metric_model, record_model)
+
+        return metric_model, record_model
+
+
 class MetricDefinition(BaseModel):
     name: str = Field(default=...)
     description: str = Field(default=...)
     record_value_dtype: ValueDType = Field(default=...)
     record_display_type: DisplayType = Field(default=...)
     expect_resp_msg_type: Type = Field(default=...)
-    agg_method_when_not_compare: Optional[DynamicAggregationMethod] = Field(default=...)
-    is_comparison: bool = Field(default=...)
+    agg_method: DynamicAggregationMethod = Field(default=...)
+    is_comparison: Literal[False] = Field(default=False)
 
     _belonged_action: Optional[
         "leaf_playground.core.scene_info.definitions.action.ActionDefinition"
@@ -132,27 +196,17 @@ class MetricDefinition(BaseModel):
             raise TypeError(
                 f"expect_resp_msg_type must be a subclass of Message"
             )
-        if not self.is_comparison and not self.agg_method_when_not_compare:
-            raise ValueError(
-                f"agg_method_when_not_compare can't be None when is_comparison=False"
-            )
-        if self.is_comparison and self.record_value_dtype in [ValueDType.SCALAR, ValueDType.NESTED_SCALAR]:
-            raise ValueError(
-                f"metric_dtype should be one of [MetricType.VECTOR, MetricType.NESTED_VECTOR], got {self.record_value_dtype}"
-            )
 
     @field_serializer("expect_resp_msg_type")
     def serialize_valid_msg_types(self, expect_resp_msg_type: Type, _info):
         return expect_resp_msg_type.__name__
 
+    @field_serializer("record_value_dtype")
+    def serialize_record_value_dtype(self, record_value_dtype: ValueDType, _info):
+        return record_value_dtype.name
+
     def get_value_annotation(self):
-        if not self.is_comparison:
-            return MetricType2Annotation[self.record_value_dtype]
-        is_nested = self.record_value_dtype == ValueDType.NESTED_VECTOR
-        if is_nested:
-            return Dict[str, List[UUID]]
-        else:
-            return List[UUID]
+        return self.record_value_dtype.value
 
     def create_data_models(self) -> Tuple[Type[_MetricData], Type[_RecordData]]:
         hash_id = md5(self.model_dump_json().encode()).hexdigest()
@@ -160,21 +214,18 @@ class MetricDefinition(BaseModel):
             return _METRIC_MODELS[hash_id]
 
         base_name = "".join([s.capitalize() for s in self.name.split("_")])
-        record_model_name = base_name + ("ComparisonRecord" if self.is_comparison else "MetricRecord")
-        metric_model_name = base_name + ("Comparison" if self.is_comparison else "Metric")
+        record_model_name = base_name + "MetricRecord"
+        metric_model_name = base_name + "Metric"
         module = _getframe(1).f_globals["__name__"]
 
         value_annotation = self.get_value_annotation()
 
         record_model_fields = {
-            "value": (value_annotation, Field(default=MetricType2DefaultValue[self.record_value_dtype])),
+            "value": (value_annotation, Field(default=VALUE_DETYPE_2_DEFAULT_VALUE[self.record_value_dtype])),
             "display_type": (Literal[self.record_display_type], Field(default=self.record_display_type)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
+            "target_agent": (UUID, Field(default=...))
         }
-        if not self.is_comparison:
-            record_model_fields.update(target_agent=(UUID, Field(default=...)))
-        else:
-            record_model_fields.update(target_agent=(Literal[None], Field(default=None)))
 
         record_model = create_model(
             __model_name=record_model_name,
@@ -186,11 +237,8 @@ class MetricDefinition(BaseModel):
         metric_model_fields = {
             "records": (List[record_model], Field(default=...)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
+            "target_agent": (UUID, Field(default=...))
         }
-        if not self.is_comparison:
-            record_model_fields.update(target_agent=(UUID, Field(default=...)))
-        else:
-            record_model_fields.update(target_agent=(Literal[None], Field(default=None)))
 
         metric_model = create_model(
             __model_name=metric_model_name,
@@ -215,7 +263,8 @@ __all__ = [
     "DEFAULT_AGG_METHODS",
     "ValueDType",
     "DisplayType",
-    "MetricType2Annotation",
+    "VALUE_DETYPE_2_DEFAULT_VALUE",
+    "CompareMetricDefinition",
     "MetricDefinition",
     "MetricConfig"
 ]

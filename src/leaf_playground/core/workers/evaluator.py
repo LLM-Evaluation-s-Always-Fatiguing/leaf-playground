@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from .logger import Logger
 from .reporter import MetricReporter
-from ..scene_definition import MetricDefinition, MetricType2Annotation, SceneConfig
+from ..scene_definition import CompareMetricDefinition, MetricDefinition, VALUE_DETYPE_2_DEFAULT_VALUE, SceneConfig
 from ..._config import _Config, _Configurable
 from ..._type import Immutable
 from ...data.log_body import ActionLogBody
@@ -135,7 +135,7 @@ class MetricEvaluatorMetaClass(ABCMeta):
         bases,
         attrs,
         *,
-        metric_definitions: List[MetricDefinition] = None,
+        metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
         cls_description: str = None,
         evaluator_proxy_class: Type["MetricEvaluatorProxy"] = None
     ):
@@ -192,7 +192,7 @@ class MetricEvaluatorMetaClass(ABCMeta):
         bases,
         attrs,
         *,
-        metric_definitions: List[MetricDefinition] = None,
+        metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
         cls_description: str = None,
         evaluator_proxy_class: "MetricEvaluatorProxy" = None
     ):
@@ -236,7 +236,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     config: config_cls
 
     # class attrs that are immutable
-    metric_definitions: List[MetricDefinition]
+    metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]]
     cls_description: str
     evaluator_proxy_class: Type[MetricEvaluatorProxy]
     obj_for_import: DynamicObject
@@ -336,7 +336,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             expect_dtype = metric_def.record_value_dtype
 
             # validate value dtype
-            if not validate_type(record_value, MetricType2Annotation[expect_dtype]):
+            if not validate_type(record_value, VALUE_DETYPE_2_DEFAULT_VALUE[expect_dtype]):
                 raise TypeError(
                     f"metric [{metric_name}]'s dtype is [{expect_dtype}], got record_value: {record_value}"
                 )
@@ -376,7 +376,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                 expect_dtype = metric_def.record_value_dtype
 
                 # validate value dtype
-                if not validate_type(compare_result, MetricType2Annotation[expect_dtype]):
+                if not validate_type(compare_result, VALUE_DETYPE_2_DEFAULT_VALUE[expect_dtype]):
                     raise TypeError(
                         f"metric [{metric_name}]'s dtype is [{expect_dtype}], got record_value: {compare_result}"
                     )
