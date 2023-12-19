@@ -1,10 +1,8 @@
 from typing import Any, Dict, List
 
-from leaf_playground.core.scene_observer import MetricEvaluatorConfig, MetricEvaluatorProxy, MetricEvaluator
-from leaf_playground.core.scene_observer.metric_evaluator import (
-    _MetricName, CompareOutput, RecordOutput
-)
-from leaf_playground.data.log_body import LogBody
+from leaf_playground.core.workers import MetricEvaluatorConfig, MetricEvaluatorProxy, MetricEvaluator
+from leaf_playground.core.workers.evaluator import _MetricName, CompareOutput, RecordOutput
+from leaf_playground.data.log_body import ActionLogBody
 
 from ..scene_definition import ExamineeAnswer, SCENE_DEFINITION
 
@@ -21,7 +19,7 @@ class ExamineeAnswerEvaluatorProxy(MetricEvaluatorProxy):
     def _init_evaluator(self, config: ExamineeAnswerEvaluatorConfig) -> Any:
         return
 
-    async def _record(self, log: LogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
+    async def _record(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
         result = {}
         if isinstance(log.response, ExamineeAnswer) and log.ground_truth:
             answer = log.response.content.text
@@ -36,7 +34,7 @@ class ExamineeAnswerEvaluatorProxy(MetricEvaluatorProxy):
             )
         return result
 
-    async def _compare(self, logs: List[LogBody], evaluator: Any) -> Dict[_MetricName, CompareOutput]:
+    async def _compare(self, logs: List[ActionLogBody], evaluator: Any) -> Dict[_MetricName, CompareOutput]:
         return {}
 
 

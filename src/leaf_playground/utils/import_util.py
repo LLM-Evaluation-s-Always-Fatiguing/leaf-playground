@@ -131,4 +131,5 @@ __all__ = [
     "dynamically_import_obj",
     "dynamically_import_fn",
     "find_subclasses",
+    "relevantly_find_subclasses"
 ]
