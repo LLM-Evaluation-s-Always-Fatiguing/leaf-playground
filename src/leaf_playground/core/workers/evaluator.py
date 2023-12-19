@@ -301,7 +301,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
 
     def _wait_result(self, logs: Union[ActionLogBody, List[ActionLogBody]]):
         id_ = uuid4()
-        is_compare = True if isinstance(logs, list) else Field()
+        is_compare = True if isinstance(logs, list) else False
         self.proxy.queue.put_nowait((pickle.dumps(logs), is_compare, id_))
         while id_ not in self.proxy.result_cache:
             time.sleep(0.1)  # sleep longer to let scene's main process have more CPU time slice
