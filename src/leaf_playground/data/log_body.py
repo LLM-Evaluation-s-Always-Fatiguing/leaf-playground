@@ -8,7 +8,7 @@ from pydantic import model_validator, Field
 
 from .base import Data
 from .media import Media
-from .message import MessageType
+from .message import BasicMessageType
 
 
 _MetricName = str
@@ -41,8 +41,8 @@ class LogBody(Data):
 
 class ActionLogBody(LogBody):
     log_type: Literal[LogType.ACTION] = Field(default=LogType.ACTION)
-    references: Optional[List[MessageType]] = Field(default=None)
-    response: MessageType = Field(default=...)
+    references: Optional[List[BasicMessageType]] = Field(default=None)
+    response: BasicMessageType = Field(default=...)
     ground_truth: Optional[Media] = Field(default=None)
     eval_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
     compare_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
