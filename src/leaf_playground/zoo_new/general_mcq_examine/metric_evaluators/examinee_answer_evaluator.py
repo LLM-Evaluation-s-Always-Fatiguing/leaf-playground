@@ -1,6 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-from leaf_playground.core.workers import MetricEvaluatorConfig, MetricEvaluatorProxy, MetricEvaluator
+from leaf_playground.core.workers import MetricEvaluatorConfig, MetricEvaluator
 from leaf_playground.core.workers.evaluator import _MetricName, CompareOutput, RecordOutput
 from leaf_playground.data.log_body import ActionLogBody
 
@@ -14,7 +14,14 @@ class ExamineeAnswerEvaluatorConfig(MetricEvaluatorConfig):
     pass
 
 
-class ExamineeAnswerEvaluatorProxy(MetricEvaluatorProxy):
+class ExamineeAnswerEvaluator(
+    MetricEvaluator,
+    metric_definitions=ROLE_DEFINITION.get_action_definition("answer_question").metrics,
+    cls_description="An evaluator that evaluate examinee's answers",
+    # evaluator_proxy_class=ExamineeAnswerEvaluatorProxy
+):
+    config_cls = ExamineeAnswerEvaluatorConfig
+    config: config_cls
 
     def _init_evaluator(self, config: ExamineeAnswerEvaluatorConfig) -> Any:
         return
@@ -36,16 +43,6 @@ class ExamineeAnswerEvaluatorProxy(MetricEvaluatorProxy):
 
     async def _compare(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
         return {}
-
-
-class ExamineeAnswerEvaluator(
-    MetricEvaluator,
-    metric_definitions=ROLE_DEFINITION.get_action_definition("answer_question").metrics,
-    cls_description="An evaluator that evaluate examinee's answers",
-    evaluator_proxy_class=ExamineeAnswerEvaluatorProxy
-):
-    config_cls = ExamineeAnswerEvaluatorConfig
-    config: config_cls
 
 
 __all__ = [
