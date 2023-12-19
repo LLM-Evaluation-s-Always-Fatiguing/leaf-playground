@@ -23,10 +23,12 @@ class ExamineeAnswerEvaluator(
     config_cls = ExamineeAnswerEvaluatorConfig
     config: config_cls
 
-    def _init_evaluator(self, config: ExamineeAnswerEvaluatorConfig) -> Any:
+    @staticmethod
+    def _init_evaluator(config: ExamineeAnswerEvaluatorConfig) -> Any:
         return
 
-    async def _record(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
+    @staticmethod
+    async def _record(log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
         result = {}
         if isinstance(log.response, ExamineeAnswer) and log.ground_truth:
             answer = log.response.content.text
@@ -41,7 +43,8 @@ class ExamineeAnswerEvaluator(
             )
         return result
 
-    async def _compare(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
+    @staticmethod
+    async def _compare(log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
         return {}
 
 
