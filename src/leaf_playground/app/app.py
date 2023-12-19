@@ -1,3 +1,4 @@
+import inspect
 import os
 from threading import Thread
 from typing import Any, Dict, List, Optional
@@ -13,8 +14,7 @@ from ..core.scene_agent import SceneAgentMetadata
 from ..core.scene_engine import (
     SceneEngine, SceneObjConfig, MetricEvaluatorObjsConfig
 )
-from ..core.scene_definition import SceneDefinition
-from ..core.workers import MetricEvaluatorMetadata
+from ..core.workers import MetricEvaluatorMetadata, MetricEvaluator
 from ..utils.import_util import relevantly_find_subclasses
 from ..zoo_new import *  # TODO: remove when everything done
 
@@ -51,14 +51,18 @@ def scan_scenes() -> List[SceneFull]:
         agents_metadata = {}
         for role_def in scene_class.scene_definition.roles:
             agents_metadata[role_def.name] = role_def.agents_metadata
-        # TODO: scan evaluators
+        evaluator_classes = relevantly_find_subclasses(
+            root_path=os.path.join(os.path.dirname(inspect.getfile(scene_class)), "metric_evaluators"),
+            prefix=".".join(inspect.getmodule(scene_class).__name__.split(".")[:-1]) + ".metric_evaluators",
+            base_class=MetricEvaluator
+        )
 
-        # temporarily mocked logic
         scenes.append(
             SceneFull(
                 scene_metadata=scene_metadata,
                 agents_metadata=agents_metadata,
-                evaluators_metadata=None
+                evaluators_metadata=None if not evaluator_classes else
+                [eval_cls.get_metadata() for eval_cls in evaluator_classes]
             )
         )
 
