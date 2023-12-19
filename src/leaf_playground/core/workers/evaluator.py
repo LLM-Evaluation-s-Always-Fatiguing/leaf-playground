@@ -294,16 +294,19 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             manager=Manager()
         )
 
+    @staticmethod
     @abstractmethod
-    def _init_evaluator(self, config: MetricEvaluatorConfig) -> Any:
+    def _init_evaluator(config: MetricEvaluatorConfig) -> Any:
         pass
 
+    @staticmethod
     @abstractmethod
-    async def _record(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
+    async def _record(log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
         pass
 
+    @staticmethod
     @abstractmethod
-    async def _compare(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
+    async def _compare(log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
         pass
 
     def notify_to_record(self, log: ActionLogBody):
