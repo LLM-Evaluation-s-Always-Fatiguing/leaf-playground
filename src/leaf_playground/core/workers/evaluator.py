@@ -13,14 +13,13 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from .logger import Logger
+from .reporter import MetricReporter
 from ..scene_definition import MetricDefinition, MetricType2Annotation, SceneConfig
-from .metric_reporter import MetricReporter
 from ..._config import _Config, _Configurable
 from ..._type import Immutable
-from ...data.log_body import LogBody
-from ...data.socket_data import SocketData, SocketDataType, SocketOperation
+from ...data.log_body import ActionLogBody
 from ...utils.import_util import DynamicObject
-from ...utils.thread_util import run_asynchronously
 from ...utils.type_util import validate_type
 
 
@@ -118,11 +117,11 @@ class MetricEvaluatorProxy(Process):
         self._state.value = MetricEvaluatorState.TERMINATED.value.encode("utf-8")
 
     @abstractmethod
-    async def _record(self, log: LogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
+    async def _record(self, log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
         pass
 
     @abstractmethod
-    async def _compare(self, logs: List[LogBody], evaluator: Any) -> Dict[_MetricName, CompareOutput]:
+    async def _compare(self, logs: List[ActionLogBody], evaluator: Any) -> Dict[_MetricName, CompareOutput]:
         pass
 
 
@@ -246,13 +245,12 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         self,
         config: config_cls,
         scene_config: SceneConfig,
-        socket_cache: List[SocketData],  # TODO: do not explore to evaluator
+        logger: Logger,
         reporter: MetricReporter
     ):
         super().__init__(config=config)
 
         self.config_data = self.config.model_dump(mode="json", by_alias=True)
-        self.socket_cache = socket_cache
 
         metric_name2def = {metric_def.name: metric_def for metric_def in self.metric_definitions}
         metric_name2conf = {
@@ -274,6 +272,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             metric_def.name for metric_def in self.metric_name2metric_defs.values() if metric_def.is_comparison
         ]
 
+        self.logger = logger
         self.reporter = reporter
 
         self.proxy = self.evaluator_proxy_class(
@@ -282,10 +281,10 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             manager=Manager()
         )
 
-    def notify_to_record(self, log: LogBody):
+    def notify_to_record(self, log: ActionLogBody):
         Thread(target=self.record, args=(log,), daemon=True).start()
 
-    def notify_to_compare(self, logs: List[LogBody]):
+    def notify_to_compare(self, logs: List[ActionLogBody]):
         Thread(target=self.compare, args=(logs,), daemon=True).start()
 
     def notify_can_stop(self):
@@ -300,9 +299,9 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     def join(self):
         self.proxy.join()
 
-    def _wait_result(self, logs: Union[LogBody, List[LogBody]]):
+    def _wait_result(self, logs: Union[ActionLogBody, List[ActionLogBody]]):
         id_ = uuid4()
-        if isinstance(logs, LogBody):
+        if isinstance(logs, ActionLogBody):
             log_data = logs.model_dump(mode="json", by_alias=True)
             log_cls = logs.__class__
             is_compare = False
@@ -317,13 +316,14 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             k: (CompareOutput if is_compare else RecordOutput)(**v) for k, v in self.proxy.result_cache.pop(id_).items()
         }
 
-    def record(self, log: LogBody) -> None:
+    def record(self, log: ActionLogBody) -> None:
         resp_type = type(log.response)
         if resp_type not in self.resp_msg_type2metric_defs:
             return
         target_agent = log.response.sender_id
         # this may very slow
         record_results = self._wait_result(log)
+        records = {}
         for metric_name, record_output in record_results.items():
             if metric_name not in self.metrics_for_record:
                 raise TypeError(f"metric [{metric_name}] can't be used in record relevant methods")
@@ -350,16 +350,10 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                 evaluator=self.__class__.__name__
             )
             self.reporter.put_record(record_data, metric_def.belonged_chain)
-            log.eval_records[metric_name].append(record_data.model_dump(mode="json"))
-            self.socket_cache.append(
-                SocketData(
-                    type=SocketDataType.LOG,
-                    data=log.model_dump(mode="json"),
-                    operation=SocketOperation.UPDATE
-                )
-            )
+            records[metric_name] = record_data.model_dump(mode="json")
+        self.logger.add_action_log_record(log_id=log.id, records=records, field_name="eval_records")
 
-    def compare(self, logs: List[LogBody]) -> None:
+    def compare(self, logs: List[ActionLogBody]) -> None:
         resp_type2logs = defaultdict(list)
         for log in logs:
             resp_type2logs[type(log.response)].append(log)
@@ -369,6 +363,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
 
             # this may very, very slow
             compare_results = self._wait_result(logs)
+            records = {}
             for metric_name, compare_output in compare_results.items():
                 if metric_name not in self.metrics_for_compare:
                     raise TypeError(f"metric [{metric_name}] can't be used in compare relevant methods")
@@ -394,15 +389,9 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                     evaluator=self.__class__.__name__
                 )
                 self.reporter.put_record(record_data, metric_def.belonged_chain)
-                for log in logs_:
-                    log.eval_records[metric_name].append(record_data.model_dump(mode="json"))
-                    self.socket_cache.append(
-                        SocketData(
-                            type=SocketDataType.LOG,
-                            data=log.model_dump(mode="json"),
-                            operation=SocketOperation.UPDATE
-                        )
-                    )
+                records[metric_name] = record_data.model_dump(mode="json")
+            for log in logs_:
+                self.logger.add_action_log_record(log_id=log.id, records=records, field_name="compare_records")
 
     @classmethod
     def get_metadata(cls) -> MetricEvaluatorMetadata:

@@ -7,13 +7,12 @@ from pydantic import BaseModel, Field
 
 from .scene_agent import SceneAgent
 from .scene_definition import SceneDefinition, SceneConfig
-from .scene_observer import MetricEvaluator
+from .workers import MetricEvaluator, Logger
 from .._config import _Configurable
 from .._type import Immutable
 from ..data.environment import EnvironmentVariable
-from ..data.log_body import LogBody
+from ..data.log_body import ActionLogBody
 from ..data.message import MessagePool
-from ..data.socket_data import SocketData
 from ..utils.import_util import DynamicObject
 from ..utils.type_util import validate_type
 
@@ -26,7 +25,7 @@ class SceneMetaClass(ABCMeta):
         attrs,
         *,
         scene_definition: SceneDefinition = None,
-        log_body_class: Type[LogBody] = LogBody,
+        log_body_class: Type[ActionLogBody] = ActionLogBody,
     ):
         attrs["scene_definition"] = Immutable(scene_definition or getattr(bases[0], "scene_definition", None))
         attrs["log_body_class"] = Immutable(log_body_class)
@@ -41,9 +40,9 @@ class SceneMetaClass(ABCMeta):
                 f"class [{name}]'s class attribute [scene_definition] should be a [SceneDefinition] instance, "
                 f"got [{type(attrs['scene_definition']).__name__}] type"
             )
-        if not validate_type(attrs["log_body_class"], Immutable[Type[LogBody]]):
+        if not validate_type(attrs["log_body_class"], Immutable[Type[ActionLogBody]]):
             raise TypeError(
-                f"class [{name}]'s class attribute [log_body_class] should be subclass of [LogBody]"
+                f"class [{name}]'s class attribute [log_body_class] should be subclass of [ActionLogBody]"
             )
 
         if ABC not in bases:
@@ -64,7 +63,7 @@ class SceneMetaClass(ABCMeta):
         attrs,
         *,
         scene_definition: SceneDefinition = None,
-        log_body_class: Type[LogBody] = LogBody
+        log_body_class: Type[ActionLogBody] = ActionLogBody
     ):
         super().__init__(name, bases, attrs)
 
@@ -93,10 +92,10 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
 
     # class attributes initialized in metaclass
     scene_definition: SceneDefinition
-    log_body_class: Type[LogBody]
+    log_body_class: Type[ActionLogBody]
     obj_for_import: DynamicObject
 
-    def __init__(self, config: config_cls):
+    def __init__(self, config: config_cls, logger: Logger):
         super().__init__(config=config)
 
         static_roles = [role_def.name for role_def in self.scene_definition.roles if role_def.is_static]
@@ -107,17 +106,17 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         self.env_vars: Dict[str, EnvironmentVariable] = self.config.init_env_vars()
         self.evaluators: List[MetricEvaluator] = []
 
-        self.socket_cache: List[SocketData] = []  # TODO: do not explore to scene
+        self.logger = logger
         self.message_pool: MessagePool = MessagePool()
 
     def registry_metric_evaluator(self, evaluator: MetricEvaluator):
         self.evaluators.append(evaluator)
 
-    def notify_evaluators_record(self, log: LogBody):
+    def notify_evaluators_record(self, log: ActionLogBody):
         for evaluator in self.evaluators:
             evaluator.notify_to_record(log)
 
-    def notify_evaluators_compare(self, logs: List[LogBody]):
+    def notify_evaluators_compare(self, logs: List[ActionLogBody]):
         for evaluator in self.evaluators:
             evaluator.notify_to_compare(logs)
 
@@ -153,7 +152,11 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
 
     @classmethod
     def from_config(cls, config: config_cls) -> "Scene":
-        return cls(config=config)
+        raise NotImplementedError()
+
+    @classmethod
+    def from_config_file(cls, file_path: str) -> "Scene":
+        raise NotImplementedError()
 
 
 __all__ = [

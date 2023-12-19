@@ -14,7 +14,7 @@ from ..core.scene_engine import (
     SceneEngine, SceneObjConfig, MetricEvaluatorObjsConfig
 )
 from ..core.scene_definition import SceneDefinition
-from ..core.scene_observer import MetricEvaluatorMetadata
+from ..core.workers import MetricEvaluatorMetadata
 from ..utils.import_util import relevantly_find_subclasses
 from ..zoo_new import *  # TODO: remove when everything done
 
@@ -146,7 +146,7 @@ async def stream_task_info(websocket: WebSocket, task_id: UUID) -> None:
 
     scene_engine = TASK_CACHE[task_id]
 
-    await scene_engine.stream_sockets(websocket)
+    await scene_engine.socket_handler.stream_sockets(websocket)
 
 
 @app.post("/task/save/{task_id}")

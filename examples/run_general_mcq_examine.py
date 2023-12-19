@@ -53,7 +53,7 @@ def init_scene_engine():
 
 
 def display_log(log: GeneralMCQExamineScene.log_body_class):
-    narrator = log.narrator
+    narrator = log.log_msg
     sender = log.response.sender.name
     sender_role = log.response.sender.role.name
     content = log.response.content.text.strip()
@@ -64,7 +64,7 @@ def display_log(log: GeneralMCQExamineScene.log_body_class):
 
 async def run():
     scene_engine = init_scene_engine()
-    await asyncio.gather(scene_engine.a_run(), scene_engine.stream_logs(display_log))
+    await asyncio.gather(scene_engine.a_run(), scene_engine.logger.stream_logs(display_log))
     scene_engine.save_dir = f"output/{scene_engine.id.hex}"
     scene_engine.save()
 
