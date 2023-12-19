@@ -45,7 +45,7 @@ class MetricReporter:
         self.records[metric_belonged_chain].append(record)
 
     def _cal_record_metric(self, records: List[_RecordData], metric_def: MetricDefinition) -> List[_MetricData]:
-        agg_method = metric_def.agg_method_when_not_compare
+        agg_method = metric_def.agg_method
         metric_data_model, _ = metric_def.create_data_models()
 
         agent2records = defaultdict(list)
@@ -66,28 +66,18 @@ class MetricReporter:
 
     def _cal_compare_metric(self, records: List[_RecordData], metric_def: MetricDefinition) -> _MetricData:
         metric_data_model, _ = metric_def.create_data_models()
-        is_nested = metric_def.record_value_dtype == ValueDType.NESTED_VECTOR
-        record_values = [record.value for record in records]
-        if not is_nested:
-            record_values = [{"-": v} for v in record_values]
-        num_agents = len(record_values[0][list(record_values[0].keys())[0]])
+        record_values: List[List[UUID]] = [record.value for record in records]
 
-        results = {}
-        for f_name in record_values[0].keys():
-            result = {}
-            f_ranks = [each[f_name] for each in record_values]
-            result["win_ratio"] = _win_ratio(f_ranks, top_n=1)
-            if num_agents >= 10:
-                result["top3_ratio"] = _win_ratio(f_ranks, top_n=3)
-            if num_agents >= 30:
-                result["top10_ratio"] = _win_ratio(f_ranks, top_n=10)
-            results[f_name] = result
+        num_agents = len(record_values[0])
 
-        if not is_nested:
-            results = results["-"]
+        result = {"win_ratio": _win_ratio(record_values, top_n=1)}
+        if num_agents >= 10:
+            result["top3_ratio"] = _win_ratio(record_values, top_n=3)
+        if num_agents >= 30:
+            result["top10_ratio"] = _win_ratio(record_values, top_n=10)
 
         return metric_data_model(
-            value=results,
+            value=result,
             records=records
         )
 

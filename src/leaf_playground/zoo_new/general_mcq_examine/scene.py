@@ -12,10 +12,12 @@ from leaf_playground.data.media import Text
 from .agents.examiner import Examiner
 from .agents.base_examinee import AIBaseExaminee
 from .dataset_utils import DatasetConfig
-from .scene_definition import ExamineeAnswer, ExaminerQuestion, SCENE_DEFINITION
+from .scene_definition import ExamineeAnswer, ExaminerQuestion, MessageType, SCENE_DEFINITION
 
 
 class GeneralMCQExamineSceneLogBody(ActionLogBody):
+    references: Optional[List[MessageType]] = Field(default=None)
+    response: MessageType = Field(default=...)
     ground_truth: Optional[Text] = Field(default=None)
 
 

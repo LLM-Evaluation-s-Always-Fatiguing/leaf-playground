@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Dict, List, Literal, Optional, Any
 from uuid import uuid4, UUID
 
-from pydantic import Field
+from pydantic import model_validator, Field
 
 from .base import Data
 from .media import Media
@@ -25,6 +25,18 @@ class LogBody(Data):
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     log_type: LogType = Field(default=...)
     log_msg: str = Field(default=...)
+
+    @model_validator(mode="before")
+    def set_log_type(cls, values):
+        log_type = values.get("log_type", None)
+        if isinstance(log_type, str):
+            log_type = log_type.lower()
+            if log_type == "action":
+                log_type = LogType.ACTION
+            if log_type == "system":
+                log_type = LogType.SYSTEM
+            values["log_type"] = log_type
+        return values
 
 
 class ActionLogBody(LogBody):
