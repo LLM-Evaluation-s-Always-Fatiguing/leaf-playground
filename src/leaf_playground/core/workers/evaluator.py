@@ -284,8 +284,8 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     def notify_to_record(self, log: ActionLogBody):
         Thread(target=self.record, args=(log,), daemon=True).start()
 
-    def notify_to_compare(self, logs: List[ActionLogBody]):
-        Thread(target=self.compare, args=(logs,), daemon=True).start()
+    def notify_to_compare(self, log: ActionLogBody):
+        Thread(target=self.compare, args=(log,), daemon=True).start()
 
     def notify_can_stop(self):
         self.proxy.can_stop = True

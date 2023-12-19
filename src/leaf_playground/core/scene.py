@@ -116,9 +116,9 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         for evaluator in self.evaluators:
             evaluator.notify_to_record(log)
 
-    def notify_evaluators_compare(self, logs: List[ActionLogBody]):
+    def notify_evaluators_compare(self, log: ActionLogBody):
         for evaluator in self.evaluators:
-            evaluator.notify_to_compare(logs)
+            evaluator.notify_to_compare(log)
 
     def notify_evaluators_can_stop(self):
         for evaluator in self.evaluators:
