@@ -18,7 +18,6 @@ class ExamineeAnswerEvaluator(
     MetricEvaluator,
     metric_definitions=ROLE_DEFINITION.get_action_definition("answer_question").metrics,
     cls_description="An evaluator that evaluate examinee's answers",
-    # evaluator_proxy_class=ExamineeAnswerEvaluatorProxy
 ):
     config_cls = ExamineeAnswerEvaluatorConfig
     config: config_cls
