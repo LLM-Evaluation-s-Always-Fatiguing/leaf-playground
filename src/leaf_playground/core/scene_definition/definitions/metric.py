@@ -24,6 +24,12 @@ class ValueDType(Enum):
     NESTED_VECTOR = "nested_vector"
 
 
+class DisplayType(Enum):
+    FIVE_STARTS_RATE = "FiveStarsRate"
+    NUMBER_INPUT = "NumberInput"
+    BOOLEAN_RADIO = "BooleanRadio"
+
+
 MetricType2Annotation = {
     ValueDType.SCALAR: Union[bool, int, float],
     ValueDType.VECTOR: List[Union[bool, int, float, UUID]],
@@ -41,6 +47,7 @@ MetricType2DefaultValue = {
 class _RecordData(Data):
     value: Any = Field(default=...)
     evaluator: str = Field(default=...)
+    display_type: DisplayType = Field(default=...)
     reason: Optional[str] = Field(default=None)
     misc: Optional[dict] = Field(default=None)
     is_comparison: bool = Field(default=False)
@@ -101,6 +108,7 @@ class MetricDefinition(BaseModel):
     name: str = Field(default=...)
     description: str = Field(default=...)
     record_value_dtype: ValueDType = Field(default=...)
+    record_display_type: DisplayType = Field(default=...)
     expect_resp_msg_type: Type = Field(default=...)
     agg_method_when_not_compare: Optional[DynamicAggregationMethod] = Field(default=...)
     is_comparison: bool = Field(default=...)
@@ -160,6 +168,7 @@ class MetricDefinition(BaseModel):
 
         record_model_fields = {
             "value": (value_annotation, Field(default=MetricType2DefaultValue[self.record_value_dtype])),
+            "display_type": (Literal[self.record_display_type], Field(default=self.record_display_type)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
         }
         if not self.is_comparison:
@@ -205,6 +214,7 @@ __all__ = [
     "DynamicAggregationFn",
     "DEFAULT_AGG_METHODS",
     "ValueDType",
+    "DisplayType",
     "MetricType2Annotation",
     "MetricDefinition",
     "MetricConfig"
