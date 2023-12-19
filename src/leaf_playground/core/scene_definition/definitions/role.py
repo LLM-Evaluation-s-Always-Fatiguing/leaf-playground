@@ -66,6 +66,13 @@ class RoleDefinition(BaseModel):
                     f"[{action.name}] action has already been bounded to role [{action.belonged_role.name}]"
                 )
             action._belonged_role = self
+        # compare metrics can only be used in static role
+        for action in self.actions:
+            for metric in action.metrics:
+                if metric.is_comparison and not self.is_static:
+                    raise ValueError(
+                        f"[{metric.belonged_chain}] metric is a comparison metric, can only be used for static role."
+                    )
 
     def get_action_definition(self, action_name: str) -> ActionDefinition:
         for action in self.actions:
