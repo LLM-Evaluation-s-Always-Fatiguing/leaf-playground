@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from leaf_playground.core.workers import MetricEvaluatorConfig, MetricEvaluator
 from leaf_playground.core.workers.evaluator import _MetricName, CompareOutput, RecordOutput
@@ -23,7 +23,13 @@ class ExamineeAnswerEvaluator(
     config: config_cls
 
     @staticmethod
-    def _init_evaluator(config: ExamineeAnswerEvaluatorConfig) -> Any:
+    def _init_evaluator(
+        config: MetricEvaluatorConfig,
+        record_metrics: List[_MetricName],
+        compare_metrics: List[_MetricName]
+    ) -> Any:
+        print(record_metrics)
+        print(compare_metrics)
         return
 
     @staticmethod
