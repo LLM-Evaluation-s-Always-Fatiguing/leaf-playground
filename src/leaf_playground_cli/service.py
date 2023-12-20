@@ -180,4 +180,4 @@ async def test_create_task(task_creation_payload: TaskCreationPayload) -> JSONRe
 def start_service(port: int = 8000):
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=port)
