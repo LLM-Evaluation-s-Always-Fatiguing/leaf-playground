@@ -10,7 +10,7 @@ from typing_extensions import Annotated
 
 import typer
 
-from leaf_playground.app.app import SceneFull
+from .service import start_service, SceneFull
 from leaf_playground.core.scene import Scene
 from leaf_playground.core.scene_agent import SceneAgent
 from leaf_playground.core.workers import MetricEvaluator
@@ -102,6 +102,11 @@ def publish_project(
 
     print(f"publish new version [{version_str}]")
     raise typer.Exit()
+
+
+@app.command(name="start_service")
+def start_server(port: Annotated[int, typer.Option("--port", "-p")] = 8000):
+    start_service(port)
 
 
 if __name__ == "__main__":
