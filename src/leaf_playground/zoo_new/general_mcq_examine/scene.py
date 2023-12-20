@@ -74,9 +74,7 @@ class GeneralMCQExamineScene(Scene, scene_definition=SCENE_DEFINITION, log_body_
                     response=question,
                     ground_truth=None,
                     log_msg=f"examiner sent question [{question.question_id}] to all examinees",
-                    action_belonged_chain=self.examiner.role_definition.get_action_definition(
-                        "send_question"
-                    ).belonged_chain
+                    action_belonged_chain=None
                 )
             )
 
