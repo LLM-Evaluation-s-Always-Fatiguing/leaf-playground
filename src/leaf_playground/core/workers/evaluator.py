@@ -153,7 +153,7 @@ class MetricEvaluatorMetaClass(ABCMeta):
         attrs["metric_definitions"] = Immutable(metric_definitions or getattr(bases[0], "metric_definitions", None))
         attrs["cls_description"] = Immutable(cls_description or "")
         attrs["evaluator_proxy_class"] = Immutable(evaluator_proxy_class)
-        attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, source_file=_getframe(1).f_code.co_filename))
+        attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, module=_getframe(1).f_globals["__name__"]))
 
         new_cls = super().__new__(cls, name, bases, attrs)
 
