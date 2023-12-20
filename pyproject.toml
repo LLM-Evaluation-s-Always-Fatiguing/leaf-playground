@@ -10,7 +10,7 @@ packages = [
 ]
 
 [tool.poetry.scripts]
-leaf-playground-cli = "leaf_playground_cli.main:app"
+leaf-out = "leaf_playground_cli.main:app"
 
 [tool.poetry.dependencies]
 python = "^3.9"
