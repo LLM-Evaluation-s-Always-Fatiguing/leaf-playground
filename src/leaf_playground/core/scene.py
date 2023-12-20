@@ -29,7 +29,7 @@ class SceneMetaClass(ABCMeta):
     ):
         attrs["scene_definition"] = Immutable(scene_definition or getattr(bases[0], "scene_definition", None))
         attrs["log_body_class"] = Immutable(log_body_class)
-        attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, source_file=_getframe(1).f_code.co_filename))
+        attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, module=_getframe(1).f_globals["__name__"]))
 
         new_cls = super().__new__(cls, name, bases, attrs)
 

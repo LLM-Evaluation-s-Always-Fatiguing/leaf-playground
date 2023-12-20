@@ -36,7 +36,7 @@ class DynamicObject(BaseModel):
 
     @classmethod
     def create_dynamic_obj(cls, obj: Type) -> "DynamicObject":
-        dynamic_obj = cls(obj=obj.__name__, source_file=Path(inspect.getfile(obj)))
+        dynamic_obj = cls(obj=obj.__name__, module=inspect.getmodule(obj).__name__)
         _IMPORTED_OBJECTS[dynamic_obj.hash] = obj
         return dynamic_obj
 

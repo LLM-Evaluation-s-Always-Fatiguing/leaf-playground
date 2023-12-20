@@ -34,7 +34,7 @@ class SceneAgentMetaClass(ABCMeta):
     ):
         attrs["role_definition"] = Immutable(role_definition or getattr(bases[0], "role_definition", None))
         attrs["cls_description"] = Immutable(cls_description)
-        attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, source_file=_getframe(1).f_code.co_filename))
+        attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, module=_getframe(1).f_globals["__name__"]))
 
         new_cls = super().__new__(cls, name, bases, attrs)
 
