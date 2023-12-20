@@ -12,7 +12,6 @@ requirements = [
     "accelerate",
     "fastapi[all]",
     "tiktoken",
-    "pyecharts",
     "ragas"
 ]
 
@@ -22,5 +21,5 @@ setup(
     install_requires=requirements,
     package_dir={"": "src"},
     packages=find_packages("src"),
-    python_requires=">=3.8.0"
+    python_requires=">=3.9.0"
 )
