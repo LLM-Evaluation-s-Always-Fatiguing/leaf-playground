@@ -8,15 +8,19 @@ from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketExceptio
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .const import *
-from ..core.scene import Scene, SceneMetadata
-from ..core.scene_agent import SceneAgentMetadata
-from ..core.scene_engine import (
+from leaf_playground.core.scene import Scene, SceneMetadata
+from leaf_playground.core.scene_agent import SceneAgentMetadata
+from leaf_playground.core.scene_engine import (
     SceneEngine, SceneObjConfig, MetricEvaluatorObjsConfig
 )
-from ..core.workers import MetricEvaluatorMetadata, MetricEvaluator
-from ..utils.import_util import relevantly_find_subclasses
-from ..zoo_new import *  # TODO: remove when everything done
+from leaf_playground.core.workers import MetricEvaluatorMetadata, MetricEvaluator
+from leaf_playground.utils.import_util import relevantly_find_subclasses
+from leaf_playground.zoo_new import *  # TODO: remove when everything done
+
+
+ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+ZOO_ROOT = os.path.join(ROOT, "leaf_playground", "zoo_new")  # TODO: change back to zoo when everything done
+SAVE_ROOT = os.path.join(os.getcwd(), "output")
 
 
 class SceneFull(BaseModel):
@@ -171,3 +175,9 @@ async def test_create_task(task_creation_payload: TaskCreationPayload) -> JSONRe
     _create_task(payload=task_creation_payload)
 
     return JSONResponse(content="create task successfully")
+
+
+def start_service(port: int = 8000):
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)
