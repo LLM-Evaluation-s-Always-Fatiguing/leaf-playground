@@ -56,7 +56,8 @@ class GeneralMCQExamineScene(Scene, scene_definition=SCENE_DEFINITION, log_body_
                 references=[q],
                 response=answer,
                 ground_truth=Text(text=ground_truth) if ground_truth else None,
-                log_msg=f"examinee [{examinee.name}] answered question [{q.question_id}]"
+                log_msg=f"examinee [{examinee.name}] answered question [{q.question_id}]",
+                action_belonged_chain=examinee.role_definition.get_action_definition("answer_question").belonged_chain
             )
             self.logger.add_log(log)
             self.notify_evaluators_record(log)
@@ -72,7 +73,10 @@ class GeneralMCQExamineScene(Scene, scene_definition=SCENE_DEFINITION, log_body_
                     references=None,
                     response=question,
                     ground_truth=None,
-                    log_msg=f"examiner sent question [{question.question_id}] to all examinees"
+                    log_msg=f"examiner sent question [{question.question_id}] to all examinees",
+                    action_belonged_chain=self.examiner.role_definition.get_action_definition(
+                        "send_question"
+                    ).belonged_chain
                 )
             )
 

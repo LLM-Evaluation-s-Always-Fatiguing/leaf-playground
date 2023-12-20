@@ -43,6 +43,7 @@ class ActionLogBody(LogBody):
     log_type: Literal[LogType.ACTION] = Field(default=LogType.ACTION)
     references: Optional[List[BasicMessageType]] = Field(default=None)
     response: BasicMessageType = Field(default=...)
+    action_belonged_chain: str = Field(default=...)
     ground_truth: Optional[Media] = Field(default=None)
     eval_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
     compare_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
