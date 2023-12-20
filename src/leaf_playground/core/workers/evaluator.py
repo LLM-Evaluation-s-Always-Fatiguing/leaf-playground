@@ -46,6 +46,8 @@ class MetricEvaluatorProxy(Process):
         self,
         config_cls: Type["MetricEvaluatorConfig"],
         config_data: dict,
+        record_metrics: List[_MetricName],
+        compare_metrics: List[_MetricName],
         manager: Manager
     ):
         super().__init__(daemon=True)
@@ -57,6 +59,8 @@ class MetricEvaluatorProxy(Process):
 
         self._config_cls = config_cls
         self._config_data = config_data
+        self._record_metrics = record_metrics
+        self._compare_metrics = compare_metrics
 
     def __init_subclass__(cls, _init_evaluator, _record, _compare, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -87,7 +91,9 @@ class MetricEvaluatorProxy(Process):
     def run(self):
         self._state.value = MetricEvaluatorState.INITIALIZING.value.encode("utf-8")
         try:
-            evaluator = self._init_evaluator(self._config_cls(**self._config_data))
+            evaluator = self._init_evaluator(
+                self._config_cls(**self._config_data), self._record_metrics, self._compare_metrics
+            )
         except Exception as e:
             self._state.value = MetricEvaluatorState.INIT_FAILED.value.encode("utf-8")
             return
@@ -291,12 +297,18 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         self.proxy = self.evaluator_proxy_class(
             config_cls=self.config_cls,
             config_data=self.config_data,
+            record_metrics=self.metrics_for_record,
+            compare_metrics=self.metrics_for_compare,
             manager=Manager()
         )
 
     @staticmethod
     @abstractmethod
-    def _init_evaluator(config: MetricEvaluatorConfig) -> Any:
+    def _init_evaluator(
+        config: MetricEvaluatorConfig,
+        record_metrics: List[_MetricName],
+        compare_metrics: List[_MetricName]
+    ) -> Any:
         pass
 
     @staticmethod
