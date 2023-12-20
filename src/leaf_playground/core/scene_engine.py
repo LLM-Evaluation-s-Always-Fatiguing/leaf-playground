@@ -61,12 +61,12 @@ class MetricEvaluatorObjsConfig(_Config):
 
 
 class SceneEngineState(Enum):
-    PENDING = 0
-    RUNNING = 1
-    FINISHED = 2
-    INTERRUPTED = 3
-    PAUSED = 4
-    FAILED = 5
+    PENDING = "pending"
+    RUNNING = "running"
+    FINISHED = "finished"
+    INTERRUPTED = "interrupted"
+    PAUSED = "paused"
+    FAILED = "failed"
 
 
 class SceneEngine:
