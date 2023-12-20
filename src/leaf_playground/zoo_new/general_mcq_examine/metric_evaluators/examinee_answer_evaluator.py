@@ -28,8 +28,6 @@ class ExamineeAnswerEvaluator(
         record_metrics: List[_MetricName],
         compare_metrics: List[_MetricName]
     ) -> Any:
-        print(record_metrics)
-        print(compare_metrics)
         return
 
     @staticmethod
