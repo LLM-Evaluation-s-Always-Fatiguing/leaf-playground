@@ -1,8 +1,8 @@
 from datetime import datetime
-from typing import List, Optional, Literal, Union
+from typing import List, Literal, Union
 from typing_extensions import Annotated
 
-from pydantic import model_validator, Field
+from pydantic import Field
 
 from .base import Data
 from .media import Media, Text, Json, Image, Audio, Video

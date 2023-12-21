@@ -1,6 +1,5 @@
 from collections import defaultdict
 from typing import Any, Dict, List, Union
-from uuid import UUID
 
 from ..scene_definition import SceneDefinition, MetricDefinition, ValueDType
 from ..scene_definition.definitions.metric import (
@@ -21,7 +20,7 @@ def _agg(
 
 
 def _win_ratio(
-    ranks: List[List[UUID]],
+    ranks: List[List[str]],
     top_n: int
 ):
     counter = {agent: 0 for agent in ranks[0]}
@@ -66,7 +65,7 @@ class MetricReporter:
 
     def _cal_compare_metric(self, records: List[_RecordData], metric_def: MetricDefinition) -> _MetricData:
         metric_data_model, _ = metric_def.create_data_models()
-        record_values: List[List[UUID]] = [record.value for record in records]
+        record_values: List[List[str]] = [record.value for record in records]
 
         num_agents = len(record_values[0])
 

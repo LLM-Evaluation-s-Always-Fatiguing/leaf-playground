@@ -3,8 +3,7 @@ from inspect import signature, Signature, Parameter
 from functools import partial
 from hashlib import md5
 from sys import _getframe
-from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
-from uuid import UUID
+from typing import Any, List, Literal, Optional, Tuple, Type, Union
 
 from pydantic import create_model, field_serializer, BaseModel, Field, PrivateAttr
 
@@ -43,14 +42,14 @@ class _RecordData(Data):
     reason: Optional[str] = Field(default=None)
     misc: Optional[dict] = Field(default=None)
     is_comparison: bool = Field(default=False)
-    target_agent: Optional[UUID] = Field(default=None)
+    target_agent: Optional[str] = Field(default=None)
 
 
 class _MetricData(Data):
     value: Any = Field(default=...)
     records: List[_RecordData] = Field(default=...)
     is_comparison: bool = Field(default=False)
-    target_agent: Optional[UUID] = Field(default=None)
+    target_agent: Optional[str] = Field(default=None)
 
 
 class AggregationMethodOutput(BaseModel):
@@ -137,7 +136,7 @@ class CompareMetricDefinition(BaseModel):
         module = _getframe(1).f_globals["__name__"]
 
         record_model_fields = {
-            "value": (List[UUID], Field(default=[])),
+            "value": (List[str], Field(default=[])),
             "display_type": (Literal[None], Field(default=None)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
             "target_agent": (Literal[None], Field(default=None))
@@ -224,7 +223,7 @@ class MetricDefinition(BaseModel):
             "value": (value_annotation, Field(default=VALUE_DETYPE_2_DEFAULT_VALUE[self.record_value_dtype])),
             "display_type": (Literal[self.record_display_type], Field(default=self.record_display_type)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
-            "target_agent": (UUID, Field(default=...))
+            "target_agent": (str, Field(default=...))
         }
 
         record_model = create_model(
@@ -237,7 +236,7 @@ class MetricDefinition(BaseModel):
         metric_model_fields = {
             "records": (List[record_model], Field(default=...)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
-            "target_agent": (UUID, Field(default=...))
+            "target_agent": (str, Field(default=...))
         }
 
         metric_model = create_model(

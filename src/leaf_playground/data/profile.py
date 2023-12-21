@@ -14,7 +14,7 @@ class Role(Data):
 
 
 class Profile(Data):
-    id: UUID = Field(default_factory=lambda: uuid4())
+    id: str = Field(default_factory=lambda: "agent_" + uuid4().hex[:8])
     name: str = Field(default=...)
     role: Optional[Role] = Field(default=None)
 
