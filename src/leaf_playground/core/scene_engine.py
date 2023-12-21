@@ -3,7 +3,7 @@ from enum import Enum
 from os import makedirs
 from os.path import join
 from typing import Callable, List, Literal, Type, Union
-from uuid import uuid4, UUID
+from uuid import uuid4
 
 from pydantic import Field
 
@@ -98,7 +98,7 @@ class SceneEngine:
     ):
         self._state_change_callbacks = state_change_callbacks
         self.state = SceneEngineState.PENDING
-        self._id = uuid4()
+        self._id = "engine_" + uuid4().hex[:8]
 
         self.logger = Logger()
         self.socket_handler = SocketHandler()
@@ -119,7 +119,7 @@ class SceneEngine:
         self.save_dir = None
 
     @property
-    def id(self) -> UUID:
+    def id(self) -> str:
         return self._id
 
     def run(self):

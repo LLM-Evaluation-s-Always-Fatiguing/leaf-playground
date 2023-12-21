@@ -11,7 +11,7 @@ from sys import _getframe
 from threading import Thread
 from types import new_class
 from typing import Any, Dict, List, Optional, Type, Union
-from uuid import uuid4, UUID
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -402,7 +402,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             metric_def = self.metric_name2metric_defs[metric_name]
 
             # validate value dtype
-            if not validate_type(compare_result, List[List[UUID]]):
+            if not validate_type(compare_result, List[List[str]]):
                 continue
             # save record data
             _, record_data_model = metric_def.create_data_models()
