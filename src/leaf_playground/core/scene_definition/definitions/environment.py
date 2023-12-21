@@ -56,7 +56,7 @@ class EnvVarConfig(_Config):
         return self.env_var_definition.env_var_cls(
             name=self.env_var_definition.name,
             description=self.env_var_definition.description,
-            **self.model_dump(by_alias=True)
+            **self.model_dump(mode="json", by_alias=True)
         )
 
 
