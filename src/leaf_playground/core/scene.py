@@ -104,10 +104,19 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         self.static_agents = {role_name: agents[role_name] for role_name in static_roles}
         self.agents = {role_name: agents[role_name] for role_name in dynamic_roles}
         self.env_vars: Dict[str, EnvironmentVariable] = self.config.init_env_vars()
+        self._bind_env_vars_to_agents()
         self.evaluators: List[MetricEvaluator] = []
 
         self.logger = logger
         self.message_pool: MessagePool = MessagePool()
+
+    def _bind_env_vars_to_agents(self):
+        for agents in self.static_agents.values():
+            for agent in agents:
+                agent.bind_env_vars(self.env_vars)
+        for agents in self.agents.values():
+            for agent in agents:
+                agent.bind_env_vars(self.env_vars)
 
     def registry_metric_evaluator(self, evaluator: MetricEvaluator):
         self.evaluators.append(evaluator)
