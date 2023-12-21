@@ -68,7 +68,7 @@ class RoleDefinition(BaseModel):
             action._belonged_role = self
         # compare metrics can only be used in static role
         for action in self.actions:
-            for metric in action.metrics:
+            for metric in action.metrics or []:
                 if metric.is_comparison and not self.is_static:
                     raise ValueError(
                         f"[{metric.belonged_chain}] metric is a comparison metric, can only be used for static role."

@@ -49,7 +49,7 @@ class SceneEnvVarsConfig(_Config):
         module = _getframe(1).f_globals["__name__"]
         fields = {}
         for env_var in scene_definition.env_vars:
-            fields[env_var.name] = EnvVarConfig.create_config_model(env_var)
+            fields[env_var.name] = (EnvVarConfig.create_config_model(env_var), Field(default=...))
         if not fields:
             return
         return create_model(__model_name=model_name, __module__=module, __base__=cls, **fields)

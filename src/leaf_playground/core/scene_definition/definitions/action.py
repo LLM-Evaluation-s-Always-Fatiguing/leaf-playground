@@ -1,7 +1,7 @@
 from inspect import Signature, Parameter
 from warnings import warn
 from sys import _getframe
-from typing import Any, List, Literal, Optional, Type
+from typing import Any, Annotated, List, Literal, Optional, Type, Union
 
 from pydantic import create_model, field_serializer, BaseModel, Field, PrivateAttr
 
@@ -12,7 +12,7 @@ from ....data.message import Message
 
 class ActionSignatureParameterDefinition(BaseModel):
     name: str = Field(default=...)
-    annotation: Optional[Type] = Field(default=Parameter.empty)
+    annotation: Optional[Any] = Field(default=Parameter.empty)
 
     @field_serializer("annotation")
     def serialize_annotation(self, annotation: Optional[Type], _info):
@@ -30,7 +30,7 @@ class ActionSignatureDefinition(BaseModel):
 
     @field_serializer("return_annotation")
     def serialize_return_annotation(self, return_annotation: Optional[Type[Message]], _info):
-        return return_annotation.__name__
+        return str(return_annotation)
 
 
 class ActionDefinition(BaseModel):
@@ -73,7 +73,7 @@ class ActionDefinition(BaseModel):
 
         if not self.signature.is_static_method:
             self.signature.parameters = (
-                ActionSignatureParameterDefinition(name="self") if not self.signature.parameters else
+                [ActionSignatureParameterDefinition(name="self")] if not self.signature.parameters else
                 [ActionSignatureParameterDefinition(name="self")] + self.signature.parameters
             )
 
@@ -81,7 +81,7 @@ class ActionDefinition(BaseModel):
         return Signature(
             parameters=[
                 Parameter(name=p.name, kind=Parameter.POSITIONAL_OR_KEYWORD, annotation=p.annotation)
-                for p in self.signature.parameters
+                for p in (self.signature.parameters or [])
             ],
             return_annotation=self.signature.return_annotation
         )
