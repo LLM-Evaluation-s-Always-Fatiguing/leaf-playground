@@ -135,6 +135,10 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
         self._env_vars = env_vars
 
     @property
+    def env_vars(self) -> Dict[str, EnvironmentVariable]:
+        return self._env_vars
+
+    @property
     def profile(self):
         return self._profile
 
