@@ -4,6 +4,7 @@ import random
 import signal
 import sys
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from threading import Lock
 from typing import Dict, List, Optional
@@ -105,7 +106,7 @@ class TaskManager:
             self._task_ports.add(port)
 
     def create_task(self, payload: TaskCreationPayload):
-        task_id = uuid4().hex
+        task_id = "task_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
         payload_tmp_path = os.path.join(self._task_payload_tmp_dir, f"task_payload_{task_id}.json")
         port = self.acquire_port()
 
