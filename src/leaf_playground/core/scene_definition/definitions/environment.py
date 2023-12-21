@@ -41,7 +41,7 @@ class EnvVarConfig(_Config):
             "_env_var_definition": env_var_definition
         }
         fields = {
-            f_name: (f_info.annotation, f_info) for f_name, f_info in env_var_definition.model_fields.items()
+            f_name: (f_info.annotation, f_info) for f_name, f_info in env_var_definition.env_var_cls.model_fields.items()
             if f_name not in ["name", "description"] and not f_info.exclude
         }
         return create_model(
