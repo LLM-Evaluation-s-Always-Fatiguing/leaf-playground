@@ -114,7 +114,7 @@ def publish_project(
     raise typer.Exit()
 
 
-@app.command(name="start_service")
+@app.command(name="start-server")
 def start_server(
     zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
     results_dir: Annotated[str, typer.Option("--results")] = os.path.join(os.getcwd(), "results"),
