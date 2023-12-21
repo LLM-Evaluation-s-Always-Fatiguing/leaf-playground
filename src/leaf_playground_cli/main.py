@@ -10,7 +10,8 @@ from typing_extensions import Annotated
 
 import typer
 
-from .service import start_service, SceneFull
+from .service import start_service, ServiceConfig
+from leaf_playground import __version__ as leaf_version
 from leaf_playground.core.scene import Scene
 from leaf_playground.core.scene_agent import SceneAgent
 from leaf_playground.core.workers import MetricEvaluator
@@ -36,7 +37,12 @@ def create_new_project(
         f.write("")
     os.makedirs(os.path.join(project_dir, ".leaf"))
     with open(os.path.join(project_dir, ".leaf", "project_config.json"), "w", encoding="utf-8") as f:
-        json.dump({"name": name, "version": "0.1.0", "metadata": {}}, f, ensure_ascii=False, indent=4)
+        json.dump(
+            {"name": name, "version": "0.1.0", "metadata": {}, "leaf_version": leaf_version},
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
 
     print(f"project [{name}] created.")
     raise typer.Exit()
@@ -64,6 +70,7 @@ def publish_project(
 
     # set new version
     project_config["version"] = version_str
+    project_config["leaf_version"] = leaf_version
 
     # get and set metadata
     pkg_root = Path(os.path.join(target, project_name))
@@ -88,14 +95,17 @@ def publish_project(
     for agent_cls in agent_classes:
         if ABC in agent_cls.__bases__:
             continue
-        agents_metadata[agent_cls.role_definition.name].append(agent_cls.get_metadata())
+        agents_metadata[agent_cls.role_definition.name].append(
+            agent_cls.get_metadata().model_dump(mode="json", by_alias=True)
+        )
 
-    project_config["metadata"] = SceneFull(
-        scene_metadata=scene_class.get_metadata(),
-        agents_metadata=agents_metadata,
-        evaluators_metadata=[evaluator_cls.get_metadata() for evaluator_cls in evaluator_classes]
-        if evaluator_classes else None
-    ).model_dump(mode="json")
+    project_config["metadata"] = {
+        "scene_metadata": scene_class.get_metadata().model_dump(mode="json", by_alias=True),
+        "agents_metadata": agents_metadata,
+        "evaluators_metadata": [
+            evaluator_cls.get_metadata().model_dump(mode="json", by_alias=True) for evaluator_cls in evaluator_classes
+        ] if evaluator_classes else None
+    }
 
     with open(os.path.join(target, ".leaf", "project_config.json"), "w", encoding="utf-8") as f:
         json.dump(project_config, f, indent=4, ensure_ascii=False)
@@ -105,8 +115,16 @@ def publish_project(
 
 
 @app.command(name="start_service")
-def start_server(port: Annotated[int, typer.Option("--port", "-p")] = 8000):
-    start_service(port)
+def start_server(
+    zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
+    results_dir: Annotated[str, typer.Option("--results")] = os.path.join(os.getcwd(), "results"),
+    port: Annotated[int, typer.Option("--port", "-p")] = 8000
+):
+    if not os.path.exists(zoo_dir):
+        raise typer.BadParameter(f"zoo [{zoo_dir}] not exist.")
+    os.makedirs(results_dir, exist_ok=True)
+
+    start_service(config=ServiceConfig(zoo_dir=zoo_dir, result_dir=results_dir, port=port))
 
 
 if __name__ == "__main__":

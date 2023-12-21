@@ -1,183 +1,194 @@
-import inspect
+import json
 import os
-from threading import Thread
-from typing import Any, Dict, List, Optional
-from uuid import UUID
+import random
+import signal
+import sys
+import subprocess
+from pathlib import Path
+from threading import Lock
+from typing import Dict, List, Optional
+from uuid import uuid4
 
-from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketException
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, DirectoryPath, PrivateAttr
 
-from leaf_playground.core.scene import Scene, SceneMetadata
-from leaf_playground.core.scene_agent import SceneAgentMetadata
-from leaf_playground.core.scene_engine import (
-    SceneEngine, SceneObjConfig, MetricEvaluatorObjsConfig
-)
-from leaf_playground.core.workers import MetricEvaluatorMetadata, MetricEvaluator
-from leaf_playground.utils.import_util import relevantly_find_subclasses
-from leaf_playground.zoo_new import *  # TODO: remove when everything done
+from leaf_playground.core.scene_engine import SceneEngineState, SceneObjConfig, MetricEvaluatorObjsConfig
+
+app = FastAPI()
+service_config: "ServiceConfig" = None
 
 
-ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-ZOO_ROOT = os.path.join(ROOT, "leaf_playground", "zoo_new")  # TODO: change back to zoo when everything done
-SAVE_ROOT = os.path.join(os.getcwd(), "output")
+class ServiceConfig(BaseModel):
+    zoo_dir: DirectoryPath = Field(default=...)
+    result_dir: DirectoryPath = Field(default=...)
+    port: int = Field(default=...)
 
 
 class SceneFull(BaseModel):
-    scene_metadata: SceneMetadata = Field(default=...)
-    agents_metadata: Dict[str, List[SceneAgentMetadata]] = Field(default=...)
-    evaluators_metadata: Optional[List[MetricEvaluatorMetadata]] = Field(default=...)
+    scene_metadata: dict = Field(default=...)
+    agents_metadata: Dict[str, List[dict]] = Field(default=...)
+    evaluators_metadata: Optional[List[dict]] = Field(default=...)
+    work_dir: DirectoryPath = Field(default=...)
 
 
 class AppPaths(BaseModel):
-    root: str = Field(default=ROOT)
-    zoo_root: str = Field(default=ZOO_ROOT)
-    save_root: str = Field(default=SAVE_ROOT)
-
-    def model_post_init(self, __context: Any) -> None:
-        os.makedirs(self.save_root, exist_ok=True)
+    zoo_dir: DirectoryPath = Field(default=...)
+    result_dir: DirectoryPath = Field(default=...)
 
 
 class AppInfo(BaseModel):
-    paths: AppPaths = Field(default=AppPaths())
+    paths: AppPaths = Field(default=...)
 
 
-app = FastAPI()
-
-
-def scan_scenes() -> List[SceneFull]:
+def scan_scenes(zoo_dir: DirectoryPath) -> List[SceneFull]:
     scenes = []
-    for scene_class in relevantly_find_subclasses(
-        root_path=ZOO_ROOT, prefix="leaf_playground.zoo_new", base_class=Scene
-    ):
-        scene_class: Scene
-        scene_metadata = scene_class.get_metadata()
-        agents_metadata = {}
-        for role_def in scene_class.scene_definition.roles:
-            agents_metadata[role_def.name] = role_def.agents_metadata
-        evaluator_classes = relevantly_find_subclasses(
-            root_path=os.path.join(os.path.dirname(inspect.getfile(scene_class)), "metric_evaluators"),
-            prefix=".".join(inspect.getmodule(scene_class).__name__.split(".")[:-1]) + ".metric_evaluators",
-            base_class=MetricEvaluator
-        )
 
-        scenes.append(
-            SceneFull(
-                scene_metadata=scene_metadata,
-                agents_metadata=agents_metadata,
-                evaluators_metadata=None if not evaluator_classes else
-                [eval_cls.get_metadata() for eval_cls in evaluator_classes]
+    if os.path.exists(os.path.join(zoo_dir.as_posix(), ".leaf")):
+        work_dir = zoo_dir
+        with open(os.path.join(work_dir.as_posix(), ".leaf", "project_config.json"), "r", encoding="utf-8") as f:
+            proj_metadata = json.load(f)["metadata"]
+        if proj_metadata:
+            scenes.append(
+                SceneFull(**proj_metadata, work_dir=work_dir)
             )
-        )
+    else:
+        for root, dirs, _ in os.walk(zoo_dir.as_posix()):
+            for work_dir in dirs:
+                scenes += scan_scenes(Path(str(os.path.join(root, work_dir))))
 
     return scenes
 
 
-SCENES: List[SceneFull] = scan_scenes()
-TASK_CACHE: Dict[UUID, SceneEngine] = {}  # TODO: impl task manager(a thread pool)
+class TaskCreationPayload(BaseModel):
+    scene_obj_config: SceneObjConfig = Field(default=...)
+    metric_evaluator_objs_config: MetricEvaluatorObjsConfig = Field(default=...)
+    work_dir: DirectoryPath = Field(default=...)
 
 
-# Don't provide this endpoint for now, because current obj cache mechanism can't handle the update of existing obj.
-# @app.get("/refresh_zoo")
-# async def refresh_zoo():
-#     global SCENES
-#     SCENES = scan_scenes()
+class Task(BaseModel):
+    id: str = Field(default=...)
+    port: int = Field(default=...)
+    host: str = Field(default="http://127.0.0.1")
+    status: str = Field(default=SceneEngineState.PENDING.value)
+    payload_path: str = Field(default=...)
+
+    _pid: int = PrivateAttr(default=None)
+
+    @property
+    def pid(self) -> int:
+        return self._pid
+
+    @pid.setter
+    def pid(self, pid: int):
+        self._pid = pid
+
+
+class TaskManager:
+    def __init__(self):
+        self._task_ports = set(list(range(1000, 9999))) - {service_config.port}
+        self._port_lock = Lock()
+
+        self._task_payload_tmp_dir = os.path.join(os.getcwd(), "tmp")
+        os.makedirs(self._task_payload_tmp_dir, exist_ok=True)
+
+        self._tasks: Dict[str, Task] = {}
+
+    def acquire_port(self) -> int:
+        with self._port_lock:
+            port = random.choice(list(self._task_ports))
+            self._task_ports -= {port}
+        return port
+
+    def release_port(self, port: int) -> None:
+        with self._port_lock:
+            self._task_ports.add(port)
+
+    def create_task(self, payload: TaskCreationPayload):
+        task_id = uuid4().hex
+        payload_tmp_path = os.path.join(self._task_payload_tmp_dir, f"task_payload_{task_id}.json")
+        port = self.acquire_port()
+
+        task = Task(id=task_id, port=port, payload_path=payload_tmp_path)
+        self._tasks[task_id] = task
+
+        with open(payload_tmp_path, "w", encoding="utf-8") as f:
+            json.dump(payload.model_dump(mode="json"), f, indent=4, ensure_ascii=False)
+        process = subprocess.Popen(
+            (
+                f"{sys.executable} {os.path.join(payload.work_dir.as_posix(), '.leaf', 'app.py')} "
+                f"--payload {payload_tmp_path} "
+                f"--port {port} "
+                f"--save_dir {service_config.result_dir.as_posix()} "
+                f"--callback http://127.0.0.1:{service_config.port}/task/status/update "
+                f"--id {task_id}"
+            ).split()
+        )
+        task.pid = process.pid
+
+        return task
+
+    def update_task_status(self, task_id: str, task_status: str):
+        self._tasks[task_id].status = task_status
+
+    def get_task_states(self, task_id: str):
+        return self._tasks[task_id].status
+
+    def destroy_task(self, task_id: str):
+        pid = self._tasks[task_id].pid
+
+        is_windows = os.name == "nt"
+        if is_windows:
+            import ctypes
+            ctypes.windll.kernel32.GenerateConsoleCtrlEvent(0, pid)  # TODO: truly kill
+        else:
+            os.kill(pid, signal.SIGINT)
+
+
+task_manager: TaskManager = None
 
 
 @app.get("/", response_class=JSONResponse)
 async def list_scenes() -> JSONResponse:
     return JSONResponse(
-        content=[scene_full.model_dump(mode="json", by_alias=True) for scene_full in SCENES],
+        content=[scene_full.model_dump(mode="json", by_alias=True) for scene_full in
+                 scan_scenes(service_config.zoo_dir)],
         media_type="application/json"
     )
 
 
 @app.get("/info", response_model=AppInfo)
 async def get_app_info() -> AppInfo:
-    return AppInfo()
+    return AppInfo(paths=AppPaths(zoo_dir=service_config.zoo_dir, result_dir=service_config.result_dir))
 
 
-class TaskCreationPayload(BaseModel):
-    scene_obj_config: SceneObjConfig = Field(default=...)
-    metric_evaluator_objs_config: MetricEvaluatorObjsConfig = Field(default=...)
+@app.get("/task/status/{task_id}")
+async def get_task_status(task_id: str):
+    return JSONResponse(content={"status": task_manager.get_task_states(task_id)})
 
 
-def _create_task(payload: TaskCreationPayload) -> SceneEngine:
-    scene_engine = SceneEngine(
-        scene_config=payload.scene_obj_config,
-        evaluators_config=payload.metric_evaluator_objs_config
-    )
-    task_id = scene_engine.id
-    TASK_CACHE[task_id] = scene_engine
-    return scene_engine
+class TaskStatusUpdatePayload(BaseModel):
+    id: str = Field(default=...)
+    status: str = Field(default=...)
 
 
-class TaskCreationResponse(BaseModel):
-    task_id: UUID = Field(default=...)
-    save_dir: str = Field(default=...)
-    scene_config: dict = Field(default=...)
-    evaluator_configs: List[dict] = Field(default=...)
+@app.post("/task/status/update")
+async def update_task_status(payload: TaskStatusUpdatePayload):
+    task_manager.update_task_status(task_id=payload.id, task_status=payload.status)
 
 
-@app.post("/task/create", response_model=TaskCreationResponse)
-async def create_scene(task_creation_payload: TaskCreationPayload) -> TaskCreationResponse:
-    scene_engine = _create_task(payload=task_creation_payload)
-    save_dir = os.path.join(SAVE_ROOT, scene_engine.id.hex)
-    scene_engine.save_dir = save_dir
-
-    Thread(target=scene_engine.run, daemon=True).start()  # TODO: optimize, this is ugly
-
-    return TaskCreationResponse(
-        task_id=scene_engine.id,
-        save_dir=save_dir,
-        scene_config=scene_engine.get_scene_config(mode="dict"),
-        evaluator_configs=scene_engine.get_evaluator_configs(mode="dict")
-    )
+@app.post("/task/create", response_model=Task)
+async def create_task(task_creation_payload: TaskCreationPayload) -> Task:
+    task = task_manager.create_task(task_creation_payload)
+    return task
 
 
-@app.get("/task/status/{task_id}", response_class=JSONResponse)
-async def get_task_status(task_id: UUID) -> JSONResponse:
-    if task_id not in TASK_CACHE:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
+def start_service(config: ServiceConfig):
+    global service_config, task_manager
 
-    scene_engine = TASK_CACHE[task_id]
+    service_config = config
+    task_manager = TaskManager()
 
-    return JSONResponse(content={"status": scene_engine.state.value})
-
-
-@app.websocket("/task/ws/{task_id}")
-async def stream_task_info(websocket: WebSocket, task_id: UUID) -> None:
-    if task_id not in TASK_CACHE:
-        raise WebSocketException(code=status.WS_1011_INTERNAL_ERROR, reason="task not found")
-
-    await websocket.accept()
-
-    scene_engine = TASK_CACHE[task_id]
-
-    await scene_engine.socket_handler.stream_sockets(websocket)
-
-
-@app.post("/task/save/{task_id}")
-async def save_task(task_id: UUID):
-    if task_id not in TASK_CACHE:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
-
-    scene_engine = TASK_CACHE[task_id]
-
-    scene_engine.save()
-
-
-# TODO: more apis to pause, resume, interrupt, update log, etc.
-
-
-@app.post("/test/create_task/", response_class=JSONResponse)
-async def test_create_task(task_creation_payload: TaskCreationPayload) -> JSONResponse:
-    _create_task(payload=task_creation_payload)
-
-    return JSONResponse(content="create task successfully")
-
-
-def start_service(port: int = 8000):
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    uvicorn.run(app, host="127.0.0.1", port=config.port)

@@ -2,7 +2,7 @@ import json
 from enum import Enum
 from os import makedirs
 from os.path import join
-from typing import List, Literal, Type, Union
+from typing import Callable, List, Literal, Type, Union
 from uuid import uuid4, UUID
 
 from pydantic import Field
@@ -69,9 +69,35 @@ class SceneEngineState(Enum):
     FAILED = "failed"
 
 
+class SceneEngineStateProxy:
+    def __init__(
+        self,
+        bound_name: str = "_state",
+        callbacks_attr_name: str = "_state_change_callbacks"
+    ):
+        self._bound_name = bound_name
+        self._callbacks_attr_name = callbacks_attr_name
+
+    def __get__(self, instance, owner):
+        return getattr(instance, self._bound_name)
+
+    def __set__(self, instance, value):
+        setattr(instance, self._bound_name, value)
+        for cb in getattr(instance, self._callbacks_attr_name):
+            cb()
+
+
 class SceneEngine:
-    def __init__(self, scene_config: SceneObjConfig, evaluators_config: MetricEvaluatorObjsConfig):
-        self._state = SceneEngineState.PENDING
+    state = SceneEngineStateProxy()
+
+    def __init__(
+        self,
+        scene_config: SceneObjConfig,
+        evaluators_config: MetricEvaluatorObjsConfig,
+        state_change_callbacks: List[Callable] = []
+    ):
+        self._state_change_callbacks = state_change_callbacks
+        self.state = SceneEngineState.PENDING
         self._id = uuid4()
 
         self.logger = Logger()
@@ -93,15 +119,11 @@ class SceneEngine:
         self.save_dir = None
 
     @property
-    def state(self) -> SceneEngineState:
-        return self._state
-
-    @property
     def id(self) -> UUID:
         return self._id
 
     def run(self):
-        self._state = SceneEngineState.RUNNING
+        self.state = SceneEngineState.RUNNING
 
         for evaluator in self.evaluators:
             evaluator.start()
@@ -124,12 +146,12 @@ class SceneEngine:
             SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE)
         )
 
-        self._state = SceneEngineState.FINISHED
+        self.state = SceneEngineState.FINISHED
         self.logger.stop()
         self.socket_handler.stop()
 
     async def a_run(self):
-        self._state = SceneEngineState.RUNNING
+        self.state = SceneEngineState.RUNNING
 
         for evaluator in self.evaluators:
             evaluator.start()
@@ -152,7 +174,7 @@ class SceneEngine:
             SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE)
         )
 
-        self._state = SceneEngineState.FINISHED
+        self.state = SceneEngineState.FINISHED
         self.logger.stop()
         self.socket_handler.stop()
 
