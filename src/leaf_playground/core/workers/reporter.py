@@ -35,7 +35,7 @@ class MetricReporter:
         metric_definitions = {}
         for role in scene_definition.roles:
             for action in role.actions:
-                for metric_def in action.metrics:
+                for metric_def in action.metrics or []:
                     metric_definitions[metric_def.belonged_chain] = metric_def
         self.metric_definitions: Dict[str, MetricDefinition] = metric_definitions
         self.records: Dict[str, List[_RecordData]] = defaultdict(list)
