@@ -21,7 +21,7 @@ from leaf_playground.utils.import_util import relevantly_find_subclasses
 app = typer.Typer(name="leaf-playground-cli")
 
 
-@app.command(name="new_project")
+@app.command(name="new-project")
 def create_new_project(
     name: Annotated[str, typer.Argument(metavar="project_name")]
 ):
