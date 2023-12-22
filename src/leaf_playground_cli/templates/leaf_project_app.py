@@ -3,6 +3,7 @@ import os
 import requests
 import sys
 from argparse import ArgumentParser
+from contextlib import asynccontextmanager
 from threading import Thread
 from typing import Any, List, Optional
 from uuid import UUID
@@ -26,10 +27,6 @@ parser.add_argument("--id", type=str)
 args = parser.parse_args()
 
 
-app = FastAPI()
-scene_engine: SceneEngine = None
-
-
 def create_engine(payload: TaskCreationPayload):
     global scene_engine
 
@@ -49,11 +46,17 @@ def update_scene_engine_status():
         pass
 
 
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(application: FastAPI):
     with open(args.payload, "r", encoding="utf-8") as f:
         create_engine(TaskCreationPayload(**json.load(f)))
     os.remove(args.payload)
+
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+scene_engine: SceneEngine = None
 
 
 @app.get("/status", response_class=JSONResponse)
