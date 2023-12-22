@@ -10,6 +10,7 @@ from typing import List, Type
 from typing_extensions import Annotated
 
 import typer
+from cookiecutter.main import cookiecutter
 
 from .service import start_service, ServiceConfig
 from leaf_playground import __version__ as leaf_version
@@ -27,28 +28,16 @@ template_dir = os.path.join(os.path.dirname(__file__), "templates")
 def create_new_project(
     name: Annotated[str, typer.Argument(metavar="project_name")]
 ):
-    project_dir = os.path.join("./",  name)
-
-    if os.path.exists(project_dir):
-        print(f"project [{name}] already existed.")
-        raise typer.Exit()
-
-    dot_leaf_dir = os.path.join(project_dir, ".leaf")
-    pkg_dir = os.path.join(project_dir, name)
-
-    os.makedirs(project_dir)
-    os.makedirs(dot_leaf_dir)
-    os.makedirs(pkg_dir)
-    with open(os.path.join(pkg_dir, "__init__.py"), "w", encoding="utf-8") as f:
-        f.write("")
-    with open(os.path.join(dot_leaf_dir, "project_config.json"), "w", encoding="utf-8") as f:
-        json.dump(
-            {"name": name, "version": "0.1.0", "metadata": {}, "leaf_version": leaf_version},
-            f,
-            ensure_ascii=False,
-            indent=4
-        )
-    shutil.copy(os.path.join(template_dir, "leaf_project_app.py"), os.path.join(dot_leaf_dir, "app.py"))
+    project_name = name.lower().replace(" ", "_").replace("-", "_")
+    cookiecutter(
+        template=template_dir,
+        extra_context={
+            "project_name": project_name,
+            "project_name_camel_case": "".join([each.capitalize() for each in project_name.split("_")]),
+            "leaf_version": leaf_version
+        },
+        no_input=True
+    )
 
     print(f"project [{name}] created.")
     raise typer.Exit()
@@ -118,7 +107,13 @@ def publish_project(
     with open(os.path.join(dot_leaf_dir, "project_config.json"), "w", encoding="utf-8") as f:
         json.dump(project_config, f, indent=4, ensure_ascii=False)
 
-    shutil.copy(os.path.join(template_dir, "leaf_project_app.py"), os.path.join(dot_leaf_dir, "app.py"))
+    app_py_file_path = os.path.join(
+        template_dir,
+        "{{cookiecutter.project_name}}",
+        ".leaf",
+        "app.py"
+    )
+    shutil.copy(app_py_file_path, os.path.join(dot_leaf_dir, "app.py"))
 
     print(f"publish new version [{version_str}]")
     raise typer.Exit()

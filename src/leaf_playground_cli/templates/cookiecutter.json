@@ -1,0 +1,5 @@
+{
+  "project_name": "{{ cookiecutter.project_name }}",
+  "project_name_camel_case": "{{ cookiecutter.project_name_camel_case }}",
+  "leaf_version": "{{ cookiecutter.leaf_version }}"
+}
