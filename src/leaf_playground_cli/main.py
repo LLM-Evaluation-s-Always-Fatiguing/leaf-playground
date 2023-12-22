@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import sys
 from abc import ABC
 from collections import defaultdict
@@ -19,6 +20,7 @@ from leaf_playground.utils.import_util import relevantly_find_subclasses
 
 
 app = typer.Typer(name="leaf-playground-cli")
+template_dir = os.path.join(os.path.dirname(__file__), "templates")
 
 
 @app.command(name="new-project")
@@ -31,18 +33,22 @@ def create_new_project(
         print(f"project [{name}] already existed.")
         raise typer.Exit()
 
+    dot_leaf_dir = os.path.join(project_dir, ".leaf")
+    pkg_dir = os.path.join(project_dir, name)
+
     os.makedirs(project_dir)
-    os.makedirs(os.path.join(project_dir, name))
-    with open(os.path.join(project_dir, name, "__init__.py"), "w", encoding="utf-8") as f:
+    os.makedirs(dot_leaf_dir)
+    os.makedirs(pkg_dir)
+    with open(os.path.join(pkg_dir, "__init__.py"), "w", encoding="utf-8") as f:
         f.write("")
-    os.makedirs(os.path.join(project_dir, ".leaf"))
-    with open(os.path.join(project_dir, ".leaf", "project_config.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(dot_leaf_dir, "project_config.json"), "w", encoding="utf-8") as f:
         json.dump(
             {"name": name, "version": "0.1.0", "metadata": {}, "leaf_version": leaf_version},
             f,
             ensure_ascii=False,
             indent=4
         )
+    shutil.copy(os.path.join(template_dir, "leaf_project_app.py"), os.path.join(dot_leaf_dir, "app.py"))
 
     print(f"project [{name}] created.")
     raise typer.Exit()
@@ -53,7 +59,9 @@ def publish_project(
     target: Annotated[str, typer.Argument(metavar="target_dir")],
     version_str: Annotated[str, typer.Option("--version", "-v")] = "0.1.0",
 ):
-    if not os.path.exists(os.path.join(target, ".leaf")):
+    dot_leaf_dir = os.path.join(target, ".leaf")
+
+    if not os.path.exists(dot_leaf_dir):
         raise typer.BadParameter("not a leaf playground project.")
 
     try:
@@ -61,7 +69,7 @@ def publish_project(
     except version.InvalidVersion:
         raise typer.BadParameter(f"expect a valid version string, got {version_str}")
 
-    with open(os.path.join(target, ".leaf", "project_config.json"), "r", encoding="utf-8") as f:
+    with open(os.path.join(dot_leaf_dir, "project_config.json"), "r", encoding="utf-8") as f:
         project_config = json.load(f)
         old_version_str = project_config["version"]
         project_name = project_config["name"]
@@ -107,8 +115,10 @@ def publish_project(
         ] if evaluator_classes else None
     }
 
-    with open(os.path.join(target, ".leaf", "project_config.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(dot_leaf_dir, "project_config.json"), "w", encoding="utf-8") as f:
         json.dump(project_config, f, indent=4, ensure_ascii=False)
+
+    shutil.copy(os.path.join(template_dir, "leaf_project_app.py"), os.path.join(dot_leaf_dir, "app.py"))
 
     print(f"publish new version [{version_str}]")
     raise typer.Exit()
