@@ -108,19 +108,19 @@ class HFPipelineBackendConfig(HFLocalModelConfig):
 
 
 class HFAgentBackend(AIBackend):
-    config_obj = HFAgentBackendConfig
-    config: config_obj
+    config_cls = HFAgentBackendConfig
+    config: config_cls
 
-    def __init__(self, config: config_obj):
+    def __init__(self, config: config_cls):
         super().__init__(config=config)
         self.hf_agent = self.config.create_hf_agent()
 
 
 class HFPipelineBackend(AIBackend):
-    config_obj = HFPipelineBackendConfig
-    config: config_obj
+    config_cls = HFPipelineBackendConfig
+    config: config_cls
 
-    def __init__(self, config: config_obj):
+    def __init__(self, config: config_cls):
         super().__init__(config=config)
         self.pipeline = self.config.prepare_pipeline()
 

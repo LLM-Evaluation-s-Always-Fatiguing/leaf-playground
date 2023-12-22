@@ -11,11 +11,11 @@ class AIBackendConfig(_Config):
 
 
 class AIBackend(_Configurable):
-    config_obj = AIBackendConfig
-    config: config_obj
+    config_cls = AIBackendConfig
+    config: config_cls
 
     @classmethod
-    def from_config(cls, config: config_obj) -> "AIBackend":
+    def from_config(cls, config: config_cls) -> "AIBackend":
         return cls(config=config)
 
 
