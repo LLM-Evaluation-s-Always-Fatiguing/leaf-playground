@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import List, Union
+from typing import List, Literal, Union
+from typing_extensions import Annotated
 
 from pydantic import Field
 
@@ -12,6 +13,7 @@ class Message(Data):
     sender: Profile = Field(default=...)
     content: Media = Field(default=...)
     receivers: List[Profile] = Field(default=...)
+    msg_type: Literal["basic"] = Field(default="basic")
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
     @property
@@ -41,22 +43,27 @@ class Message(Data):
 
 class TextMessage(Message):
     content: Text = Field(default=...)
+    msg_type: Literal["text"] = Field(default="text")
 
 
 class JsonMessage(Message):
     content: Json = Field(default=...)
+    msg_type: Literal["json"] = Field(default="json")
 
 
 class ImageMessage(Message):
     content: Image = Field(default=...)
+    msg_type: Literal["image"] = Field(default="image")
 
 
 class AudioMessage(Message):
     content: Audio = Field(default=...)
+    msg_type: Literal["audio"] = Field(default="audio")
 
 
 class VideoMessage(Message):
     content: Video = Field(default=...)
+    msg_type: Literal["video"] = Field(default="video")
 
 
 class MessagePool(Data):
@@ -78,8 +85,8 @@ class MessagePool(Data):
         self.messages.append(message)
 
     def get_messages(
-        self,
-        agent: Profile
+            self,
+            agent: Profile
     ) -> List[Message]:
         """
         Get messages that sent by the agent or is visible by the agent
@@ -97,14 +104,16 @@ class MessagePool(Data):
         return messages
 
 
-MessageType = Union[
-    TextMessage,
-    JsonMessage,
-    ImageMessage,
-    AudioMessage,
-    VideoMessage
+BasicMessageType = Annotated[
+    Union[
+        TextMessage,
+        JsonMessage,
+        ImageMessage,
+        AudioMessage,
+        VideoMessage
+    ],
+    Field(discriminator="msg_type")
 ]
-
 
 __all__ = [
     "Message",
@@ -114,5 +123,5 @@ __all__ = [
     "AudioMessage",
     "VideoMessage",
     "MessagePool",
-    "MessageType"
+    "BasicMessageType"
 ]

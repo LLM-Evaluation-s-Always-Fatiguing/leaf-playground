@@ -21,7 +21,14 @@ build/
 
 # example outputs
 output/
+outputs/
+result/
+results/
 tmp/
+temp/
 
 # dev workdirs
 dev/
+
+# client
+client/
