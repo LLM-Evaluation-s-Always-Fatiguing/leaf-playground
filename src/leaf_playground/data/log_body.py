@@ -12,7 +12,8 @@ from .message import BasicMessageType
 
 
 _MetricName = str
-_MetricRecords = List[dict]
+_MetricRecord = dict
+_MetricRecords = List[_MetricRecord]
 
 
 class LogType(Enum):
@@ -47,8 +48,8 @@ class ActionLogBody(LogBody):
     ground_truth: Optional[Media] = Field(default=None)
     eval_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
     compare_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
-    human_eval_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))  # TODO: how to use
-    human_compare_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
+    human_eval_records: Dict[_MetricName, _MetricRecord] = Field(default={})  # TODO: how to use
+    human_compare_records: Dict[_MetricName, _MetricRecord] = Field(default={})
 
 
 class SystemEvent(Enum):

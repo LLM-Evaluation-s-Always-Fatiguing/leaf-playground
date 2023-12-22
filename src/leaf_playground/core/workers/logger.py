@@ -33,10 +33,14 @@ class Logger:
     ):
         log_body = self._id2log[log_id]
         for name, record in records.items():
-            getattr(log_body, field_name)[name].append(record)
+            if "human" not in field_name:
+                getattr(log_body, field_name)[name].append(record)
+            else:
+                getattr(log_body, field_name)[name] = record
 
         for handler in self._handlers:
-            handler.notify_update(log_body)
+            if "human" not in field_name:
+                handler.notify_update(log_body)
 
     @property
     def logs(self):
