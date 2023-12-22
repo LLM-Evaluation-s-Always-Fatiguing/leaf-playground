@@ -127,14 +127,12 @@ def publish_project(
 @app.command(name="start-server")
 def start_server(
     zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
-    results_dir: Annotated[str, typer.Option("--results")] = os.path.join(os.getcwd(), "results"),
     port: Annotated[int, typer.Option("--port", "-p")] = 8000
 ):
     if not os.path.exists(zoo_dir):
         raise typer.BadParameter(f"zoo [{zoo_dir}] not exist.")
-    os.makedirs(results_dir, exist_ok=True)
 
-    start_service(config=ServiceConfig(zoo_dir=zoo_dir, result_dir=results_dir, port=port))
+    start_service(config=ServiceConfig(zoo_dir=zoo_dir, port=port))
 
 
 if __name__ == "__main__":
