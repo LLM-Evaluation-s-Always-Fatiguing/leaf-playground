@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "leaf-playground"
-version = "0.1.0"
+version = "0.2.0.dev0"
 description = ""
 authors = [
     "The LEAF team (past and future) with the help of all our contributors <leaf@shanda.com>",
