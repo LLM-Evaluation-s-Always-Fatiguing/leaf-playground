@@ -2,7 +2,6 @@ import asyncio
 from typing import Any, Callable, Dict, Literal
 from uuid import UUID
 
-from .socket_handler import SocketHandler
 from ...data.log_body import LogBody
 from ...utils.thread_util import run_asynchronously
 
