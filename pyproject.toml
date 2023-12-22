@@ -2,7 +2,9 @@
 name = "leaf-playground"
 version = "0.1.0"
 description = ""
-authors = ["PanQiWei", "Pandazki"]
+authors = [
+    { name = "The LEAF team (past and future) with the help of all our contributors", email = "leaf@shanda.com"},
+]
 readme = "README.md"
 packages = [
     { include = "leaf_playground", from = "src"},
