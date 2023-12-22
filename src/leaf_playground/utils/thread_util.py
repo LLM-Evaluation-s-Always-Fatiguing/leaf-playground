@@ -1,8 +1,10 @@
-import anyio
 import asyncio
 import sys
 from functools import partial
 from typing import Any, Callable
+
+import anyio
+
 if sys.version_info >= (3, 10):  # pragma: no cover
     from typing import ParamSpec
 else:  # pragma: no cover
