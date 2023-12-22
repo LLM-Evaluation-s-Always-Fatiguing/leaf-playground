@@ -22,7 +22,6 @@ service_config: "ServiceConfig" = None
 
 class ServiceConfig(BaseModel):
     zoo_dir: DirectoryPath = Field(default=...)
-    result_dir: DirectoryPath = Field(default=...)
     port: int = Field(default=...)
 
 
@@ -90,8 +89,10 @@ class TaskManager:
         self._task_ports = set(list(range(1000, 9999))) - {service_config.port}
         self._port_lock = Lock()
 
-        self._task_payload_tmp_dir = os.path.join(os.getcwd(), "tmp")
-        os.makedirs(self._task_payload_tmp_dir, exist_ok=True)
+        self.result_dir = os.path.join(service_config.zoo_dir, ".leaf_workspace", "results")
+        self.tmp_dir = os.path.join(service_config.zoo_dir, ".leaf_workspace", "tmp")
+        os.makedirs(self.result_dir, exist_ok=True)
+        os.makedirs(self.tmp_dir, exist_ok=True)
 
         self._tasks: Dict[str, Task] = {}
 
@@ -107,7 +108,7 @@ class TaskManager:
 
     def create_task(self, payload: TaskCreationPayload):
         task_id = "task_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
-        payload_tmp_path = os.path.join(self._task_payload_tmp_dir, f"task_payload_{task_id}.json")
+        payload_tmp_path = os.path.join(self.tmp_dir, f"task_payload_{task_id}.json")
         port = self.acquire_port()
 
         task = Task(id=task_id, port=port, payload_path=payload_tmp_path)
@@ -120,7 +121,7 @@ class TaskManager:
                 f"{sys.executable} {os.path.join(payload.work_dir.as_posix(), '.leaf', 'app.py')} "
                 f"--payload {payload_tmp_path} "
                 f"--port {port} "
-                f"--save_dir {service_config.result_dir.as_posix()} "
+                f"--save_dir {self.result_dir} "
                 f"--callback http://127.0.0.1:{service_config.port}/task/status/update "
                 f"--id {task_id}"
             ).split()
@@ -160,7 +161,7 @@ async def list_scenes() -> JSONResponse:
 
 @app.get("/info", response_model=AppInfo)
 async def get_app_info() -> AppInfo:
-    return AppInfo(paths=AppPaths(zoo_dir=service_config.zoo_dir, result_dir=service_config.result_dir))
+    return AppInfo(paths=AppPaths(zoo_dir=service_config.zoo_dir, result_dir=task_manager.result_dir))
 
 
 @app.get("/task/status/{task_id}")
