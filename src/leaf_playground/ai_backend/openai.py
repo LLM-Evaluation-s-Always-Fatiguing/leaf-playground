@@ -124,10 +124,10 @@ class OpenAIBackendConfig(AIBackendConfig):
 
 
 class OpenAIBackend(AIBackend):
-    config_obj = OpenAIBackendConfig
-    config: config_obj
+    config_cls = OpenAIBackendConfig
+    config: config_cls
 
-    def __init__(self, config: config_obj):
+    def __init__(self, config: config_cls):
         super().__init__(config=config)
         self.client = self.config.creat_client()
         self.async_client = self.config.creat_async_client()
