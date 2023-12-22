@@ -1,9 +1,9 @@
 import json
 from abc import ABC
 from typing import Literal, Optional, Union, Any
-from typing_extensions import Annotated
 
 from pydantic import Field
+from typing_extensions import Annotated
 
 from .base import Data
 
