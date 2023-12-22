@@ -1,10 +1,9 @@
-from typing import Optional, Any
-from uuid import uuid4, UUID
+from typing import Optional
+from uuid import uuid4
 
 from pydantic import Field
 
 from .base import Data
-from ..utils.import_util import DynamicObject
 
 
 class Role(Data):
