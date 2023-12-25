@@ -38,8 +38,7 @@ class Logger:
                 getattr(log_body, field_name)[name] = record
 
         for handler in self._handlers:
-            if "human" not in field_name:
-                handler.notify_update(log_body)
+            handler.notify_update(log_body)
 
     @property
     def logs(self):
