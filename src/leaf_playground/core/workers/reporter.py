@@ -1,5 +1,6 @@
 from collections import defaultdict
 from typing import Any, Dict, List, Union
+from uuid import UUID
 
 from ..scene_definition import SceneDefinition, MetricDefinition, ValueDType
 from ..scene_definition.definitions.metric import (
@@ -39,9 +40,13 @@ class MetricReporter:
                     metric_definitions[metric_def.belonged_chain] = metric_def
         self.metric_definitions: Dict[str, MetricDefinition] = metric_definitions
         self.records: Dict[str, List[_RecordData]] = defaultdict(list)
+        self.human_records: Dict[str, Dict[UUID, _RecordData]] = defaultdict(dict)
 
     def put_record(self, record: _RecordData, metric_belonged_chain: str):
         self.records[metric_belonged_chain].append(record)
+
+    def put_human_record(self, record: _RecordData, metric_belonged_chain: str, log_id: UUID):
+        self.human_records[metric_belonged_chain][log_id] = record
 
     def _cal_record_metric(self, records: List[_RecordData], metric_def: MetricDefinition) -> List[_MetricData]:
         agg_method = metric_def.agg_method
@@ -80,8 +85,9 @@ class MetricReporter:
             records=records
         )
 
-    def _cal_metrics(self) -> Dict[str, Union[_MetricData, List[_MetricData]]]:
+    def _cal_metrics(self) -> Dict[str, Dict[str, Union[_MetricData, List[_MetricData]]]]:
         metrics = {}
+        human_metrics = {}
 
         for metric_belonged_chain, records in self.records.items():
             metric_def = self.metric_definitions[metric_belonged_chain]
@@ -92,10 +98,22 @@ class MetricReporter:
             else:
                 metrics[metric_belonged_chain] = self._cal_compare_metric(records, metric_def)
 
-        return metrics
+        for metric_belonged_chain, records in self.human_records.items():
+            metric_def = self.metric_definitions[metric_belonged_chain]
+            is_compare = metric_def.is_comparison
+
+            if not is_compare:
+                human_metrics[metric_belonged_chain] = self._cal_record_metric(list(records.values()), metric_def)
+            else:
+                human_metrics[metric_belonged_chain] = self._cal_compare_metric(list(records.values()), metric_def)
+
+        return {
+            "metrics": metrics,
+            "human_metrics": human_metrics
+        }
 
     @property
-    def metrics_data(self) -> Dict[str, Union[_MetricData, List[_MetricData]]]:
+    def metrics_data(self) -> Dict[str, Dict[str, Union[_MetricData, List[_MetricData]]]]:
         return self._cal_metrics()
 
     def generate_reports(self):
