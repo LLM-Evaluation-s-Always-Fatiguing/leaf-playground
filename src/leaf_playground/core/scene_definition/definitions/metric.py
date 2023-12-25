@@ -185,7 +185,7 @@ class MetricDefinition(BaseModel):
         return self._belonged_action
 
     @property
-    def belonged_chain(self):
+    def belonged_chain(self) -> str:
         return self.belonged_action.belonged_chain + "." + self.name
 
     def model_post_init(self, __context: Any) -> None:

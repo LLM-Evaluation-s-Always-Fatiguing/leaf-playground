@@ -8,8 +8,9 @@ from uuid import uuid4
 from pydantic import Field
 
 from .scene import Scene
-from .scene_definition import SceneConfig
+from .scene_definition import SceneConfig, SceneDefinition
 from .workers import MetricEvaluator, MetricEvaluatorConfig, MetricReporter, Logger, SocketHandler
+from .workers.chart import Chart
 from .._config import _Config
 from ..data.log_body import SystemLogBody, SystemEvent
 from ..utils.import_util import dynamically_import_obj, DynamicObject
@@ -25,15 +26,26 @@ class SceneObjConfig(_Config):
         return scene_cls(config=scene_config_cls(**self.scene_config_data), logger=logger)
 
 
+class ReporterObjConfig(_Config):
+    charts: List[DynamicObject] = Field(default=...)
+
+    def initialize_reporter(self, scene_definition: SceneDefinition) -> MetricReporter:
+        chart_classes = []
+        for chart_dynamic_obj in self.charts:
+            chart_cls: Type[Chart] = dynamically_import_obj(chart_dynamic_obj)
+            chart_classes.append(chart_cls)
+        return MetricReporter(scene_definition=scene_definition, chart_classes=chart_classes)
+
+
 class MetricEvaluatorObjConfig(_Config):
     evaluator_config_data: dict = Field(default=...)
     evaluator_obj: DynamicObject = Field(default=...)
 
     def initialize_evaluator(
-        self,
-        scene_config: SceneConfig,
-        logger: Logger,
-        reporter: MetricReporter
+            self,
+            scene_config: SceneConfig,
+            logger: Logger,
+            reporter: MetricReporter
     ) -> MetricEvaluator:
         evaluator_cls: Type[MetricEvaluator] = dynamically_import_obj(self.evaluator_obj)
         evaluator_config_cls: Type[MetricEvaluatorConfig] = evaluator_cls.config_cls
@@ -49,10 +61,10 @@ class MetricEvaluatorObjsConfig(_Config):
     evaluators: List[MetricEvaluatorObjConfig] = Field(default=[])
 
     def initialize_evaluators(
-        self,
-        scene_config: SceneConfig,
-        logger: Logger,
-        reporter: MetricReporter
+            self,
+            scene_config: SceneConfig,
+            logger: Logger,
+            reporter: MetricReporter
     ) -> List[MetricEvaluator]:
         return [
             evaluator_obj_config.initialize_evaluator(scene_config=scene_config, logger=logger, reporter=reporter)
@@ -71,9 +83,9 @@ class SceneEngineState(Enum):
 
 class SceneEngineStateProxy:
     def __init__(
-        self,
-        bound_name: str = "_state",
-        callbacks_attr_name: str = "_state_change_callbacks"
+            self,
+            bound_name: str = "_state",
+            callbacks_attr_name: str = "_state_change_callbacks"
     ):
         self._bound_name = bound_name
         self._callbacks_attr_name = callbacks_attr_name
@@ -91,10 +103,11 @@ class SceneEngine:
     state = SceneEngineStateProxy()
 
     def __init__(
-        self,
-        scene_config: SceneObjConfig,
-        evaluators_config: MetricEvaluatorObjsConfig,
-        state_change_callbacks: List[Callable] = []
+            self,
+            scene_config: SceneObjConfig,
+            evaluators_config: MetricEvaluatorObjsConfig,
+            reporter_config: ReporterObjConfig,
+            state_change_callbacks: List[Callable] = []
     ):
         self._state_change_callbacks = state_change_callbacks
         self.state = SceneEngineState.PENDING
@@ -106,7 +119,7 @@ class SceneEngine:
         self.logger.registry_handler(self.socket_handler)
 
         self.scene = scene_config.initialize_scene(logger=self.logger)
-        self.reporter = MetricReporter(scene_definition=self.scene.scene_definition)
+        self.reporter = reporter_config.initialize_reporter(scene_definition=self.scene.scene_definition)
         self.evaluators = evaluators_config.initialize_evaluators(
             scene_config=self.scene.config,
             logger=self.logger,
@@ -179,8 +192,8 @@ class SceneEngine:
         self.socket_handler.stop()
 
     def get_scene_config(
-        self,
-        mode: Literal["pydantic", "dict", "json"] = "dict"
+            self,
+            mode: Literal["pydantic", "dict", "json"] = "dict"
     ) -> Union[SceneConfig, dict, str]:
         if mode == "pydantic":
             return self.scene.config
@@ -192,8 +205,8 @@ class SceneEngine:
             raise ValueError(f"invalid mode {mode}")
 
     def get_evaluator_configs(
-        self,
-        mode: Literal["pydantic", "dict", "json"] = "dict"
+            self,
+            mode: Literal["pydantic", "dict", "json"] = "dict"
     ) -> Union[List[MetricEvaluatorConfig], List[dict], str]:
         if mode == "pydantic":
             return [evaluator.config for evaluator in self.evaluators]
@@ -220,7 +233,7 @@ class SceneEngine:
             for log in self.logger.logs:
                 f.write(json.dumps(log.model_dump(mode="json"), ensure_ascii=False) + "\n")
 
-        metrics_data = self.reporter.metrics_data
+        metrics_data, charts = self.reporter.generate_reports()
         metrics_data = {
             "metrics": {
                 name: [each.model_dump(mode="json") for each in data]
@@ -236,13 +249,15 @@ class SceneEngine:
         with open(join(self.save_dir, "metrics.json"), "w", encoding="utf-8") as f:
             json.dump(metrics_data, f, indent=4, ensure_ascii=False)
 
-        # TODO: save charts
+        with open(join(self.save_dir, "charts.json"), "w", encoding="utf-8") as f:
+            json.dump(charts, f, indent=4, ensure_ascii=False)
 
 
 __all__ = [
     "SceneObjConfig",
     "MetricEvaluatorObjConfig",
     "MetricEvaluatorObjsConfig",
+    "ReporterObjConfig",
     "SceneEngineState",
-    "SceneEngine"
+    "SceneEngine",
 ]
