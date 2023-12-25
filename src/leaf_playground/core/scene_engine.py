@@ -148,7 +148,6 @@ class SceneEngine:
 
         self.state = SceneEngineState.FINISHED
         self.logger.stop()
-        self.socket_handler.stop()
 
     async def a_run(self):
         self.state = SceneEngineState.RUNNING

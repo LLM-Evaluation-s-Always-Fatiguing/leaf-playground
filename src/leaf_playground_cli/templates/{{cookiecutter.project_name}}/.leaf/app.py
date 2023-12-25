@@ -68,6 +68,10 @@ async def get_task_status() -> JSONResponse:
 async def stream_task_info(websocket: WebSocket) -> None:
     await websocket.accept()
     await scene_engine.socket_handler.stream_sockets(websocket)
+    while True:
+        text = await websocket.receive_text()
+        if text == "disconnect":
+            scene_engine.socket_handler.stop()
 
 
 @app.post("/save")
