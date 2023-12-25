@@ -29,8 +29,8 @@ class ServiceConfig(BaseModel):
 class SceneFull(BaseModel):
     scene_metadata: dict = Field(default=...)
     agents_metadata: Dict[str, List[dict]] = Field(default=...)
-    evaluators_metadata: Optional[List[dict]] = Field(default=None)
-    charts_metadata: Optional[List[dict]] = Field(default=None)
+    evaluators_metadata: Optional[List[dict]] = Field(default=...)
+    charts_metadata: Optional[List[dict]] = Field(default=...)
     work_dir: DirectoryPath = Field(default=...)
 
 

@@ -1,6 +1,7 @@
 from collections import defaultdict
 from uuid import UUID
 from typing import Any, Dict, List, Union, Type
+from typing import Any, Dict, List, Union, Type, Literal
 
 from ..scene_definition import SceneDefinition, MetricDefinition, ValueDType
 from ..scene_definition.definitions.metric import (
@@ -8,6 +9,7 @@ from ..scene_definition.definitions.metric import (
 )
 from ...utils.import_util import dynamically_import_fn
 
+CombinedMetricsData = Dict[Literal["metrics", "human_metrics"], Dict[str, Union[_MetricData, List[_MetricData]]]]
 
 def _agg(
         records: List[_RecordData],
@@ -86,7 +88,7 @@ class MetricReporter:
             records=records
         )
 
-    def _cal_metrics(self) -> Dict[str, Dict[str, Union[_MetricData, List[_MetricData]]]]:
+    def _cal_metrics(self) -> CombinedMetricsData:
         metrics = {}
         human_metrics = {}
 
@@ -114,7 +116,7 @@ class MetricReporter:
         }
 
     @property
-    def metrics_data(self) -> Dict[str, Dict[str, Union[_MetricData, List[_MetricData]]]]:
+    def metrics_data(self) -> CombinedMetricsData:
         return self._cal_metrics()
 
     def generate_reports(self):
