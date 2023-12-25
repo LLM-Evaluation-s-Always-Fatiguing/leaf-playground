@@ -28,6 +28,8 @@ tiktoken = "^0.5.2"
 ragas = "^0.0.22"
 typer = {extras = ["all"], version = "^0.9.0"}
 cookiecutter = "^2.5.0"
+altair = "^5.2.0"
+vega-datasets = "^0.9.0"
 
 
 [build-system]

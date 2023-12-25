@@ -5,6 +5,7 @@ from typing import List, Dict, Union, Optional
 
 from pydantic import BaseModel, Field
 
+from . import CombinedMetricsData
 from ..scene_definition.definitions.metric import _MetricData, CompareMetricDefinition
 from ..._type import Immutable
 from ...core.scene_definition import MetricDefinition
@@ -83,17 +84,30 @@ class Chart(ABC, metaclass=ChartMetaClass):
             supported_metric_names=cls.supported_metric_names
         )
 
-    def generate(self, metrics: Dict[str, Union[_MetricData, List[_MetricData]]]) -> Optional[dict]:
+    def generate(self, metrics: CombinedMetricsData) -> Optional[dict]:
         if not metrics:
             return None
+
+        filtered_metrics: CombinedMetricsData = {
+            "metrics": {
+                k: v
+                for k, v in metrics["metrics"].items()
+                if k in self.supported_metric_names
+            },
+            "human_metrics": {
+                k: v
+                for k, v in metrics["human_metrics"].items()
+                if k in self.supported_metric_names
+            }
+        }
         try:
-            return self._generate({k: v for k, v in metrics.items() if k in self.supported_metric_names})
+            return self._generate(filtered_metrics)
         except Exception as e:
             print(f"Error occurred when generating chart {self.__class__.__name__}: {e}")
             return None
 
     @abc.abstractmethod
-    def _generate(self, metrics: Dict[str, Union[_MetricData, List[_MetricData]]]) -> dict:
+    def _generate(self, metrics: CombinedMetricsData) -> dict:
         pass
 
 
