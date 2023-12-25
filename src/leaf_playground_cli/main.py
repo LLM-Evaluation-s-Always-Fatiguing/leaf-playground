@@ -6,13 +6,12 @@ from abc import ABC
 from collections import defaultdict
 from packaging import version
 from pathlib import Path
-from typing import List, Type
+from typing import List, Optional, Type
 from typing_extensions import Annotated
 
 import typer
 from cookiecutter.main import cookiecutter
 
-from .service import start_service, ServiceConfig
 from leaf_playground import __version__ as leaf_version
 from leaf_playground.core.scene import Scene
 from leaf_playground.core.scene_agent import SceneAgent
@@ -122,12 +121,29 @@ def publish_project(
 @app.command(name="start-server")
 def start_server(
     zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
-    port: Annotated[int, typer.Option("--port", "-p")] = 8000
+    port: Annotated[int, typer.Option("--port", "-p")] = 8000,
+    dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None
 ):
+    if dev_dir:
+        dev_dir = os.path.abspath(dev_dir)
+        sys.path.insert(0, dev_dir)
+
+    from .service import init_service, ServiceConfig
+
     if not os.path.exists(zoo_dir):
         raise typer.BadParameter(f"zoo [{zoo_dir}] not exist.")
 
-    start_service(config=ServiceConfig(zoo_dir=zoo_dir, port=port))
+    init_service(config=ServiceConfig(zoo_dir=zoo_dir, port=port))
+
+    import uvicorn
+
+    uvicorn.run(
+        "leaf_playground_cli.service:app",
+        port=port,
+        host="127.0.0.1",
+        reload=bool(dev_dir),
+        reload_dirs=dev_dir
+    )
 
 
 if __name__ == "__main__":
