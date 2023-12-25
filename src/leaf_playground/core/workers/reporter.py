@@ -1,6 +1,6 @@
 from collections import defaultdict
-from typing import Any, Dict, List, Union
 from uuid import UUID
+from typing import Any, Dict, List, Union, Type
 
 from ..scene_definition import SceneDefinition, MetricDefinition, ValueDType
 from ..scene_definition.definitions.metric import (
@@ -10,8 +10,8 @@ from ...utils.import_util import dynamically_import_fn
 
 
 def _agg(
-    records: List[_RecordData],
-    agg_method: DynamicAggregationMethod
+        records: List[_RecordData],
+        agg_method: DynamicAggregationMethod
 ) -> Any:
     if isinstance(agg_method, str):
         agg_method_ = DEFAULT_AGG_METHODS[agg_method]
@@ -21,8 +21,8 @@ def _agg(
 
 
 def _win_ratio(
-    ranks: List[List[str]],
-    top_n: int
+        ranks: List[List[str]],
+        top_n: int
 ):
     counter = {agent: 0 for agent in ranks[0]}
     for rank in ranks:
@@ -32,7 +32,7 @@ def _win_ratio(
 
 
 class MetricReporter:
-    def __init__(self, scene_definition: SceneDefinition):
+    def __init__(self, scene_definition: SceneDefinition, chart_classes: List[Type]):
         metric_definitions = {}
         for role in scene_definition.roles:
             for action in role.actions:
@@ -40,6 +40,7 @@ class MetricReporter:
                     metric_definitions[metric_def.belonged_chain] = metric_def
         self.metric_definitions: Dict[str, MetricDefinition] = metric_definitions
         self.records: Dict[str, List[_RecordData]] = defaultdict(list)
+        self.charts = [chart_cls() for chart_cls in chart_classes]
         self.human_records: Dict[str, Dict[UUID, _RecordData]] = defaultdict(dict)
 
     def put_record(self, record: _RecordData, metric_belonged_chain: str):
@@ -117,4 +118,17 @@ class MetricReporter:
         return self._cal_metrics()
 
     def generate_reports(self):
-        pass  # TODO: impl logics to generate charts
+        metrics = self.metrics_data
+
+        charts = {
+            chart.chart_name: chart.generate(metrics)
+            for chart in self.charts
+        }
+
+        charts = {
+            chart_name: chart
+            for chart_name, chart in charts.items()
+            if chart is not None
+        }
+
+        return metrics, charts
