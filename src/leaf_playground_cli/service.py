@@ -188,12 +188,8 @@ async def create_task(task_creation_payload: TaskCreationPayload) -> Task:
     return task
 
 
-def start_service(config: ServiceConfig):
+def init_service(config: ServiceConfig):
     global service_config, task_manager
 
     service_config = config
     task_manager = TaskManager()
-
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=config.port)
