@@ -232,7 +232,11 @@ class SceneEngine:
             for log in self.logger.logs:
                 f.write(json.dumps(log.model_dump(mode="json"), ensure_ascii=False) + "\n")
 
-        metrics_data, charts = self.reporter.generate_reports()
+        metrics_data, charts = self.reporter.generate_reports(
+            scene_config=self.get_scene_config(mode="pydantic"),
+            evaluator_configs=self.get_evaluator_configs(mode="pydantic"),
+            logs=self.logger.logs
+        )
         metrics_data = {
             "metrics": {
                 name: [each.model_dump(mode="json") for each in data]

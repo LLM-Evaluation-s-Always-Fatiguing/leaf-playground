@@ -2,10 +2,13 @@ from collections import defaultdict
 from uuid import UUID
 from typing import Any, Dict, List, Type
 
-from ..scene_definition import CombinedMetricsData, MetricDefinition, SceneDefinition
+from .chart import Chart
+from .evaluator import MetricEvaluatorConfig
+from ..scene_definition import CombinedMetricsData, MetricDefinition, SceneConfig, SceneDefinition
 from ..scene_definition.definitions.metric import (
     _RecordData, _MetricData, DynamicAggregationMethod, DEFAULT_AGG_METHODS
 )
+from ...data.log_body import LogBody
 from ...utils.import_util import dynamically_import_fn
 
 
@@ -32,7 +35,7 @@ def _win_ratio(
 
 
 class MetricReporter:
-    def __init__(self, scene_definition: SceneDefinition, chart_classes: List[Type]):
+    def __init__(self, scene_definition: SceneDefinition, chart_classes: List[Type[Chart]]):
         metric_definitions = {}
         for role in scene_definition.roles:
             for action in role.actions:
@@ -117,10 +120,17 @@ class MetricReporter:
     def metrics_data(self) -> CombinedMetricsData:
         return self._cal_metrics()
 
-    def generate_reports(self):
+    def generate_reports(
+        self,
+        scene_config: SceneConfig,
+        evaluator_configs: List[MetricEvaluatorConfig],
+        logs: List[LogBody]
+    ):
         metrics = self.metrics_data
 
-        charts = {chart.chart_name: chart.generate(metrics) for chart in self.charts}
+        charts = {
+            chart.chart_name: chart.generate(metrics, scene_config, evaluator_configs, logs) for chart in self.charts
+        }
         charts = {chart_name: chart for chart_name, chart in charts.items() if chart is not None}
 
         return metrics, charts

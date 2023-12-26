@@ -1,12 +1,13 @@
-import abc
-from abc import ABC, ABCMeta
+from abc import abstractmethod, ABC, ABCMeta
 from sys import _getframe
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from .evaluator import MetricEvaluatorConfig
 from ..._type import Immutable
-from ..scene_definition import CombinedMetricsData
+from ..scene_definition import CombinedMetricsData, SceneConfig
+from ...data.log_body import LogBody
 from ...utils.import_util import DynamicObject
 from ...utils.type_util import validate_type
 
@@ -94,7 +95,13 @@ class Chart(ABC, metaclass=ChartMetaClass):
             supported_metric_names=cls.supported_metric_names
         )
 
-    def generate(self, metrics: CombinedMetricsData) -> Optional[dict]:
+    def generate(
+        self,
+        metrics: CombinedMetricsData,
+        scene_config: SceneConfig,
+        evaluator_configs: List[MetricEvaluatorConfig],
+        logs: List[LogBody]
+    ) -> Optional[dict]:
         if not metrics:
             return None
 
@@ -111,13 +118,19 @@ class Chart(ABC, metaclass=ChartMetaClass):
             }
         }
         try:
-            return self._generate(filtered_metrics)
+            return self._generate(filtered_metrics, scene_config, evaluator_configs, logs)
         except Exception as e:
             print(f"Error occurred when generating chart {self.__class__.__name__}: {e}")
             return None
 
-    @abc.abstractmethod
-    def _generate(self, metrics: CombinedMetricsData) -> dict:
+    @abstractmethod
+    def _generate(
+        self,
+        metrics: CombinedMetricsData,
+        scene_config: SceneConfig,
+        evaluator_configs: List[MetricEvaluatorConfig],
+        logs: List[LogBody]
+    ) -> dict:
         pass
 
 
