@@ -14,7 +14,8 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, DirectoryPath, PrivateAttr
 
-from leaf_playground.core.scene_engine import SceneEngineState, SceneObjConfig, MetricEvaluatorObjsConfig
+from leaf_playground.core.scene_engine import SceneEngineState, SceneObjConfig, MetricEvaluatorObjsConfig, \
+    ReporterObjConfig
 
 app = FastAPI()
 service_config: "ServiceConfig" = None
@@ -29,6 +30,7 @@ class SceneFull(BaseModel):
     scene_metadata: dict = Field(default=...)
     agents_metadata: Dict[str, List[dict]] = Field(default=...)
     evaluators_metadata: Optional[List[dict]] = Field(default=...)
+    charts_metadata: Optional[List[dict]] = Field(default=...)
     work_dir: DirectoryPath = Field(default=...)
 
 
@@ -63,6 +65,7 @@ def scan_scenes(zoo_dir: DirectoryPath) -> List[SceneFull]:
 class TaskCreationPayload(BaseModel):
     scene_obj_config: SceneObjConfig = Field(default=...)
     metric_evaluator_objs_config: MetricEvaluatorObjsConfig = Field(default=...)
+    reporter_obj_config: ReporterObjConfig = Field(default=...)
     work_dir: DirectoryPath = Field(default=...)
 
 
