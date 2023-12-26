@@ -6,9 +6,11 @@ from abc import ABC
 from collections import defaultdict
 from pathlib import Path
 from typing import List, Optional, Type
+from typing_extensions import Annotated
 
 import typer
 from cookiecutter.main import cookiecutter
+
 from leaf_playground import __version__ as leaf_version
 from leaf_playground.core.scene import Scene
 from leaf_playground.core.scene_agent import SceneAgent
@@ -127,9 +129,9 @@ def publish_project(
 
 @app.command(name="start-server")
 def start_server(
-        zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
-        port: Annotated[int, typer.Option("--port", "-p")] = 8000,
-        dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None
+    zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
+    port: Annotated[int, typer.Option("--port", "-p")] = 8000,
+    dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None
 ):
     if dev_dir:
         dev_dir = os.path.abspath(dev_dir)
