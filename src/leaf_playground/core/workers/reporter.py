@@ -1,15 +1,13 @@
 from collections import defaultdict
 from uuid import UUID
-from typing import Any, Dict, List, Union, Type
-from typing import Any, Dict, List, Union, Type, Literal
+from typing import Any, Dict, List, Type
 
-from ..scene_definition import SceneDefinition, MetricDefinition, ValueDType
+from ..scene_definition import CombinedMetricsData, MetricDefinition, SceneDefinition
 from ..scene_definition.definitions.metric import (
     _RecordData, _MetricData, DynamicAggregationMethod, DEFAULT_AGG_METHODS
 )
 from ...utils.import_util import dynamically_import_fn
 
-CombinedMetricsData = Dict[Literal["metrics", "human_metrics"], Dict[str, Union[_MetricData, List[_MetricData]]]]
 
 def _agg(
         records: List[_RecordData],
@@ -122,15 +120,10 @@ class MetricReporter:
     def generate_reports(self):
         metrics = self.metrics_data
 
-        charts = {
-            chart.chart_name: chart.generate(metrics)
-            for chart in self.charts
-        }
-
-        charts = {
-            chart_name: chart
-            for chart_name, chart in charts.items()
-            if chart is not None
-        }
+        charts = {chart.chart_name: chart.generate(metrics) for chart in self.charts}
+        charts = {chart_name: chart for chart_name, chart in charts.items() if chart is not None}
 
         return metrics, charts
+
+
+__all__ = ["MetricReporter"]

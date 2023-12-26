@@ -1,15 +1,14 @@
 import abc
 from abc import ABC, ABCMeta
 from sys import _getframe
-from typing import List, Dict, Union, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from . import CombinedMetricsData
-from ..scene_definition.definitions.metric import _MetricData, CompareMetricDefinition
 from ..._type import Immutable
-from ...core.scene_definition import MetricDefinition
+from ..scene_definition import CombinedMetricsData
 from ...utils.import_util import DynamicObject
+
 
 _chart_names = set()
 
