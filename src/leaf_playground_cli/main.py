@@ -180,7 +180,8 @@ def download_web_ui() -> str:
 @app.command(name="start-server")
 def start_server(
     zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
-    port: Annotated[int, typer.Option("--port", "-p")] = 8000,
+    port: Annotated[int, typer.Option("--port")] = 8000,
+    ui_port: Annotated[int, typer.Option(default="--ui_port")] = 3000,
     dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
     web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None
 ):
@@ -188,7 +189,8 @@ def start_server(
         raise typer.BadParameter("value of argument '--web_ui' must be a local existed directory")
     if not web_ui_dir:
         web_ui_dir = download_web_ui()
-    subprocess.Popen(f"node {os.path.join(web_ui_dir, 'server.js')}".split())
+    server_url = f"http://127.0.0.1:{port}"
+    subprocess.Popen(f"node {os.path.join(web_ui_dir, 'start.js')} --port={ui_port} --server={server_url}".split())
 
     if dev_dir:
         dev_dir = os.path.abspath(dev_dir)
