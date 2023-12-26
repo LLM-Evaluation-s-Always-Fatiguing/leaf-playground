@@ -1,15 +1,21 @@
 import json
 import os
+import requests
 import shutil
+import subprocess
 import sys
+import zipfile
 from abc import ABC
 from collections import defaultdict
+from packaging import version
 from pathlib import Path
 from typing import List, Optional, Type
 from typing_extensions import Annotated
+from urllib.request import urlopen
 
 import typer
 from cookiecutter.main import cookiecutter
+from rich.progress import wrap_file
 
 from leaf_playground import __version__ as leaf_version
 from leaf_playground.core.scene import Scene
@@ -17,8 +23,6 @@ from leaf_playground.core.scene_agent import SceneAgent
 from leaf_playground.core.workers import MetricEvaluator
 from leaf_playground.core.workers.chart import Chart
 from leaf_playground.utils.import_util import relevantly_find_subclasses
-from packaging import version
-from typing_extensions import Annotated
 
 app = typer.Typer(name="leaf-playground-cli")
 template_dir = os.path.join(os.path.dirname(__file__), "templates")
@@ -127,12 +131,65 @@ def publish_project(
     raise typer.Exit()
 
 
+# TODO: change to official site after open sourced
+__web_ui_release_site__ = "https://github.com/AIEPhoenix/aie-docusaurus-template/releases/download/v1.0.0/"
+__web_ui_download_url__ = __web_ui_release_site__ + "webui-v0.5.0.zip"
+__web_ui_hash_url__ = __web_ui_release_site__ + "webui-v0.5.0.zip.sha256"
+
+
+def download_web_ui() -> str:
+    leaf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".leaf_workspace")
+    tmp_dir = os.path.join(leaf_dir, "tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+    web_ui_dir = os.path.join(leaf_dir, "web_ui")
+    os.makedirs(web_ui_dir, exist_ok=True)
+
+    web_ui_file_name = os.path.split(__web_ui_download_url__)[-1]
+    web_ui_hash_file_name = os.path.split(__web_ui_hash_url__)[-1]
+
+    web_ui_save_dir = os.path.join(web_ui_dir, os.path.splitext(web_ui_file_name)[0])
+    web_ui_file_save_path = os.path.join(tmp_dir, web_ui_file_name)
+
+    # check hash is the same
+    remote_hash = requests.get(__web_ui_hash_url__).content.decode(encoding="utf-8")
+    local_hash_save_path = os.path.join(web_ui_dir, web_ui_hash_file_name)
+    if os.path.exists(local_hash_save_path):
+        with open(local_hash_save_path, "r", encoding="utf-8") as f:
+            local_hash = f.read().strip()
+        if remote_hash == local_hash:
+            return web_ui_save_dir
+    with open(local_hash_save_path, "w", encoding="utf-8") as f:
+        f.write(remote_hash)
+
+    # (re-)download web ui
+    if os.path.exists(web_ui_save_dir):
+        shutil.rmtree(web_ui_save_dir)
+    response = urlopen(__web_ui_download_url__)
+    size = int(response.headers["Content-Length"])
+    with open(web_ui_file_save_path, "wb") as local_file:
+        with wrap_file(response, size, description="download web ui...") as remote_file:
+            for chunk in remote_file:
+                local_file.write(chunk)
+    with zipfile.ZipFile(web_ui_file_save_path, 'r') as zip_ref:
+        zip_ref.extractall(web_ui_save_dir)
+    os.remove(web_ui_file_save_path)
+
+    return web_ui_save_dir
+
+
 @app.command(name="start-server")
 def start_server(
     zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
     port: Annotated[int, typer.Option("--port", "-p")] = 8000,
-    dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None
+    dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
+    web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None
 ):
+    if web_ui_dir and not os.path.isdir(web_ui_dir):
+        raise typer.BadParameter("value of argument '--web_ui' must be a local existed directory")
+    if not web_ui_dir:
+        web_ui_dir = download_web_ui()
+    subprocess.Popen(f"node {os.path.join(web_ui_dir, 'server.js')}".split())
+
     if dev_dir:
         dev_dir = os.path.abspath(dev_dir)
         sys.path.insert(0, dev_dir)
