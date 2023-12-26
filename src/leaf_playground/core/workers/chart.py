@@ -4,7 +4,6 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from .evaluator import MetricEvaluatorConfig
 from ..._type import Immutable
 from ..scene_definition import CombinedMetricsData, SceneConfig
 from ...data.log_body import LogBody
@@ -99,7 +98,7 @@ class Chart(ABC, metaclass=ChartMetaClass):
         self,
         metrics: CombinedMetricsData,
         scene_config: SceneConfig,
-        evaluator_configs: List[MetricEvaluatorConfig],
+        evaluator_configs: List["leaf_playground.core.workers.MetricEvaluatorConfig"],
         logs: List[LogBody]
     ) -> Optional[dict]:
         if not metrics:
@@ -128,7 +127,7 @@ class Chart(ABC, metaclass=ChartMetaClass):
         self,
         metrics: CombinedMetricsData,
         scene_config: SceneConfig,
-        evaluator_configs: List[MetricEvaluatorConfig],
+        evaluator_configs: List["leaf_playground.core.workers.MetricEvaluatorConfig"],
         logs: List[LogBody]
     ) -> dict:
         pass
