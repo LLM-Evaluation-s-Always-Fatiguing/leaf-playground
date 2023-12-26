@@ -1,7 +1,7 @@
 from typing import Literal
 
-from pandas import DataFrame
 import altair as alt
+from pandas import DataFrame
 
 from .base_vega_chart import BaseVegaChart
 
