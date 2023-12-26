@@ -17,7 +17,6 @@ from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-
 parser = ArgumentParser()
 parser.add_argument("--payload", type=str)
 parser.add_argument("--port", type=int)
@@ -33,6 +32,7 @@ def create_engine(payload: TaskCreationPayload):
     scene_engine = SceneEngine(
         scene_config=payload.scene_obj_config,
         evaluators_config=payload.metric_evaluator_objs_config,
+        reporter_config=payload.reporter_obj_config,
         state_change_callbacks=[update_scene_engine_status]
     )
     scene_engine.save_dir = os.path.join(args.save_dir, args.id)
