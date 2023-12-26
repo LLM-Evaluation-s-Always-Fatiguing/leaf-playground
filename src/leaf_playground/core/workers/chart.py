@@ -35,11 +35,11 @@ class ChartMetaClass(ABCMeta):
 
         DynamicObject.bind_dynamic_obj(attrs["obj_for_import"], new_cls)
 
-        if not validate_type(new_cls.chart_name, expect_type=Immutable[Optional[str]]):
+        if not validate_type(attrs["chart_name"], expect_type=Immutable[Optional[str]]):
             raise TypeError(
                 f"class [{name}]'s class attribute [chart_name] should be a str"
             )
-        if not validate_type(new_cls.supported_metric_names, expect_type=Immutable[Optional[List[str]]]):
+        if not validate_type(attrs["supported_metric_names"], expect_type=Immutable[Optional[List[str]]]):
             raise TypeError(
                 f"class [{name}]'s class attribute [chart_name] should be a List[str]"
             )
