@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from ..._type import Immutable
 from ..scene_definition import CombinedMetricsData
 from ...utils.import_util import DynamicObject
+from ...utils.type_util import validate_type
 
 
 _chart_names = set()
@@ -29,9 +30,19 @@ class ChartMetaClass(ABCMeta):
         attrs["chart_name"] = Immutable(chart_name)
         attrs["supported_metric_names"] = Immutable(supported_metric_names)
         attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, module=_getframe(1).f_globals["__name__"]))
+
         new_cls = super().__new__(cls, name, bases, attrs)
 
         DynamicObject.bind_dynamic_obj(attrs["obj_for_import"], new_cls)
+
+        if not validate_type(new_cls.chart_name, expect_type=Immutable[Optional[str]]):
+            raise TypeError(
+                f"class [{name}]'s class attribute [chart_name] should be a str"
+            )
+        if not validate_type(new_cls.supported_metric_names, expect_type=Immutable[Optional[List[str]]]):
+            raise TypeError(
+                f"class [{name}]'s class attribute [chart_name] should be a List[str]"
+            )
 
         if ABC not in bases:
             # check if those class attrs are empty when the class is not abstract
