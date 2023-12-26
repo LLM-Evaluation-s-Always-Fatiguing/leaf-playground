@@ -183,14 +183,16 @@ def start_server(
     port: Annotated[int, typer.Option("--port")] = 8000,
     ui_port: Annotated[int, typer.Option(default="--ui_port")] = 3000,
     dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
-    web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None
+    web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None,
+    no_web_ui: Annotated[Optional[bool], typer.Option("--no_web_ui")] = False
 ):
-    if web_ui_dir and not os.path.isdir(web_ui_dir):
-        raise typer.BadParameter("value of argument '--web_ui' must be a local existed directory")
-    if not web_ui_dir:
-        web_ui_dir = download_web_ui()
-    server_url = f"http://127.0.0.1:{port}"
-    subprocess.Popen(f"node {os.path.join(web_ui_dir, 'start.js')} --port={ui_port} --server={server_url}".split())
+    if not no_web_ui:
+        if web_ui_dir and not os.path.isdir(web_ui_dir):
+            raise typer.BadParameter("value of argument '--web_ui' must be a local existed directory")
+        if not web_ui_dir:
+            web_ui_dir = download_web_ui()
+        server_url = f"http://127.0.0.1:{port}"
+        subprocess.Popen(f"node {os.path.join(web_ui_dir, 'start.js')} --port={ui_port} --server={server_url}".split())
 
     if dev_dir:
         dev_dir = os.path.abspath(dev_dir)
