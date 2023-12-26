@@ -3,7 +3,6 @@ from uuid import UUID
 from typing import Any, Dict, List, Type
 
 from .chart import Chart
-from .evaluator import MetricEvaluatorConfig
 from ..scene_definition import CombinedMetricsData, MetricDefinition, SceneConfig, SceneDefinition
 from ..scene_definition.definitions.metric import (
     _RecordData, _MetricData, DynamicAggregationMethod, DEFAULT_AGG_METHODS
@@ -123,7 +122,7 @@ class MetricReporter:
     def generate_reports(
         self,
         scene_config: SceneConfig,
-        evaluator_configs: List[MetricEvaluatorConfig],
+        evaluator_configs: List["leaf_playground.core.workers.MetricEvaluatorConfig"],
         logs: List[LogBody]
     ):
         metrics = self.metrics_data
