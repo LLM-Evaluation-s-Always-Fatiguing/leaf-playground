@@ -6,10 +6,11 @@ from pandas import DataFrame
 from .base_vega_chart import BaseVegaChart
 
 
-class GroupedNormalizedBar(BaseVegaChart):
+class GroupedBar(BaseVegaChart):
 
-    def __init__(self, mode: Literal["percent", "value"] = "value"):
+    def __init__(self, mode: Literal["percent", "value"] = "value", max_value=1.0):
         self.mode = mode
+        self.max_value = max_value
 
     def generate(self, data: DataFrame) -> dict:
         # use the data format [{agent: gpt4, metric: accuracy, value: 0.81}, ...]
@@ -18,7 +19,7 @@ class GroupedNormalizedBar(BaseVegaChart):
 
         chart = alt.Chart(data).mark_bar(cornerRadius=5, height={"band": 0.6}).encode(
             y=alt.X("metric:N").axis(labelAngle=0, title=None),
-            x=alt.Y("value:Q").axis(title="value", format=fmt).scale(domain=(0, 1)),
+            x=alt.Y("value:Q").axis(title="value", format=fmt).scale(domain=(0, self.max_value)),
             color=alt.Color("metric:N"),
         )
 
