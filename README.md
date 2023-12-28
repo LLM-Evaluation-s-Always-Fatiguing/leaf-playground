@@ -50,3 +50,20 @@ Below is a video demonstrates how to create and run a task that using MMLU datas
 ## Maintainers
 
 [@PanQiWei](https://github.com/panqiwei); [@Pandazki](https://github.com/pandazki).
+
+## Roadmap
+
+### The Framework
+
+- [ ] support human participant in the scenario simulation as a dynamic agent
+- [ ] running each scenario simulation task in a docker container
+- [ ] refactor `ai_backend` to `llm_backend_tools` to remove some heavy dependencies
+- [ ] support streaming agents' responses
+- [ ] support manage task status(pause, restart, interrupt, etc.)
+- [ ] support full task data persistence
+
+### The Hub
+
+- [ ] optimize scene flow of `who_is_the_spy` project and add metrics and evaluators
+- [ ] create a new project to support using OpenAI [evals](https://github.com/openai/evals)
+- [ ] create a new project to support using Microsoft [promptbench](https://github.com/microsoft/promptbench)
