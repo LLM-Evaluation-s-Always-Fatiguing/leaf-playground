@@ -14,7 +14,8 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, DirectoryPath, PrivateAttr
 
-from leaf_playground.core.scene_engine import SceneEngineState, SceneObjConfig, MetricEvaluatorObjsConfig
+from leaf_playground.core.scene_engine import SceneEngineState, SceneObjConfig, MetricEvaluatorObjsConfig, \
+    ReporterObjConfig
 
 app = FastAPI()
 service_config: "ServiceConfig" = None
@@ -29,6 +30,7 @@ class SceneFull(BaseModel):
     scene_metadata: dict = Field(default=...)
     agents_metadata: Dict[str, List[dict]] = Field(default=...)
     evaluators_metadata: Optional[List[dict]] = Field(default=...)
+    charts_metadata: Optional[List[dict]] = Field(default=...)
     work_dir: DirectoryPath = Field(default=...)
 
 
@@ -63,6 +65,7 @@ def scan_scenes(zoo_dir: DirectoryPath) -> List[SceneFull]:
 class TaskCreationPayload(BaseModel):
     scene_obj_config: SceneObjConfig = Field(default=...)
     metric_evaluator_objs_config: MetricEvaluatorObjsConfig = Field(default=...)
+    reporter_obj_config: ReporterObjConfig = Field(default=...)
     work_dir: DirectoryPath = Field(default=...)
 
 
@@ -86,7 +89,7 @@ class Task(BaseModel):
 
 class TaskManager:
     def __init__(self):
-        self._task_ports = set(list(range(1000, 9999))) - {service_config.port}
+        self._task_ports = set(list(range(10000, 65535))) - {service_config.port}
         self._port_lock = Lock()
 
         self.result_dir = os.path.join(service_config.zoo_dir, ".leaf_workspace", "results")
@@ -185,12 +188,8 @@ async def create_task(task_creation_payload: TaskCreationPayload) -> Task:
     return task
 
 
-def start_service(config: ServiceConfig):
+def init_service(config: ServiceConfig):
     global service_config, task_manager
 
     service_config = config
     task_manager = TaskManager()
-
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=config.port)

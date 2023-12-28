@@ -24,13 +24,13 @@ class SceneAgentMetadata(BaseModel):
 
 class SceneAgentMetaClass(ABCMeta):
     def __new__(
-        cls,
-        name,
-        bases,
-        attrs,
-        *,
-        role_definition: RoleDefinition = None,
-        cls_description: str = None
+            cls,
+            name,
+            bases,
+            attrs,
+            *,
+            role_definition: RoleDefinition = None,
+            cls_description: str = None
     ):
         attrs["role_definition"] = Immutable(role_definition or getattr(bases[0], "role_definition", None))
         attrs["cls_description"] = Immutable(cls_description)
@@ -86,13 +86,13 @@ class SceneAgentMetaClass(ABCMeta):
         return new_cls
 
     def __init__(
-        cls,
-        name,
-        bases,
-        attrs,
-        *,
-        role_definition: RoleDefinition = None,
-        cls_description: str = None
+            cls,
+            name,
+            bases,
+            attrs,
+            *,
+            role_definition: RoleDefinition = None,
+            cls_description: str = None
     ):
         super().__init__(name, bases, attrs)
 
@@ -176,7 +176,21 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
         )
 
 
-class SceneAIAgentConfig(SceneAgentConfig):
+class SceneDynamicAgentConfig(SceneAgentConfig):
+
+    def model_post_init(self, __context) -> None:
+        pass
+
+
+class SceneDynamicAgent(SceneAgent, ABC):
+    config_cls = SceneDynamicAgentConfig
+    config: config_cls
+
+    def __init__(self, config: config_cls):
+        super().__init__(config=config)
+
+
+class SceneAIAgentConfig(SceneDynamicAgentConfig):
     ai_backend_config: AIBackendConfig = Field(default=...)
     ai_backend_obj: DynamicObject = Field(default=..., exclude=True)
 
@@ -196,7 +210,7 @@ class SceneAIAgentConfig(SceneAgentConfig):
             raise TypeError(f"ai_backend_config should be an instance of {ai_backend_cls.config_cls.__name__}")
 
 
-class SceneAIAgent(SceneAgent, ABC):
+class SceneAIAgent(SceneDynamicAgent, ABC):
     config_cls = SceneAIAgentConfig
     config: config_cls
 
