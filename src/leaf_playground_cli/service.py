@@ -89,7 +89,7 @@ class Task(BaseModel):
 
 class TaskManager:
     def __init__(self):
-        self._task_ports = set(list(range(1000, 9999))) - {service_config.port}
+        self._task_ports = set(list(range(10000, 65535))) - {service_config.port}
         self._port_lock = Lock()
 
         self.result_dir = os.path.join(service_config.zoo_dir, ".leaf_workspace", "results")
