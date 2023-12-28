@@ -3,7 +3,7 @@ from inspect import signature, Signature, Parameter
 from functools import partial
 from hashlib import md5
 from sys import _getframe
-from typing import Any, List, Literal, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 from pydantic import create_model, field_serializer, BaseModel, Field, PrivateAttr
 
@@ -50,6 +50,9 @@ class _MetricData(Data):
     records: List[_RecordData] = Field(default=...)
     is_comparison: bool = Field(default=False)
     target_agent: Optional[str] = Field(default=None)
+
+
+CombinedMetricsData = Dict[Literal["metrics", "human_metrics"], Dict[str, Union[_MetricData, List[_MetricData]]]]
 
 
 class AggregationMethodOutput(BaseModel):
@@ -185,7 +188,7 @@ class MetricDefinition(BaseModel):
         return self._belonged_action
 
     @property
-    def belonged_chain(self):
+    def belonged_chain(self) -> str:
         return self.belonged_action.belonged_chain + "." + self.name
 
     def model_post_init(self, __context: Any) -> None:
@@ -256,12 +259,13 @@ class MetricConfig(_Config):
 
 
 __all__ = [
+    "ValueDType",
+    "DisplayType",
+    "CombinedMetricsData",
     "AggregationMethodOutput",
     "DynamicAggregationMethod",
     "DynamicAggregationFn",
     "DEFAULT_AGG_METHODS",
-    "ValueDType",
-    "DisplayType",
     "VALUE_DETYPE_2_DEFAULT_VALUE",
     "CompareMetricDefinition",
     "MetricDefinition",

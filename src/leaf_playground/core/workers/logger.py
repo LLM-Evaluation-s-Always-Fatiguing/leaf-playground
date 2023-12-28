@@ -2,7 +2,6 @@ import asyncio
 from typing import Any, Callable, Dict, Literal
 from uuid import UUID
 
-from .socket_handler import SocketHandler
 from ...data.log_body import LogBody
 from ...utils.thread_util import run_asynchronously
 
@@ -39,8 +38,7 @@ class Logger:
                 getattr(log_body, field_name)[name] = record
 
         for handler in self._handlers:
-            if "human" not in field_name:
-                handler.notify_update(log_body)
+            handler.notify_update(log_body)
 
     @property
     def logs(self):

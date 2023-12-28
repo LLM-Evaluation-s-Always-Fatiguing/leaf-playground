@@ -1,16 +1,15 @@
+import glob
 import importlib
 import importlib.machinery
 import inspect
-import glob
 import os
 import pkgutil
 from functools import partial
 from hashlib import md5
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Type
+from typing import Any, List, Optional, Type
 
 from pydantic import BaseModel, Field, FilePath
-
 
 _IMPORTED_OBJECTS = {}
 _IMPORTED_FUNCTIONS = {}

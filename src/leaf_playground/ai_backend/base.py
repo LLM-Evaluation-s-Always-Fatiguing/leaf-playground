@@ -1,8 +1,3 @@
-from abc import abstractmethod
-from typing import List
-
-from pydantic import BaseModel
-
 from .._config import _Config, _Configurable
 
 

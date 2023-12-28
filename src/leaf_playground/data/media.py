@@ -1,9 +1,9 @@
 import json
 from abc import ABC
 from typing import Literal, Optional, Union, Any
-from typing_extensions import Annotated
 
 from pydantic import Field
+from typing_extensions import Annotated
 
 from .base import Data
 
@@ -48,7 +48,14 @@ class Json(Media):
 
 
 class Image(Media):
+    url: str = Field(default=..., frozen=True)
     type: Literal["image"] = Field(default="image")
+
+    def _generate_display_text(self) -> str:
+        return f"Image [{self.url}]"
+
+    def __repr__(self):
+        return f"<Image {self.url}>"
 
 
 class Audio(Media):

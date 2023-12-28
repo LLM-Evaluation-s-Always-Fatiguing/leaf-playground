@@ -16,7 +16,6 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from .logger import Logger
-from .reporter import MetricReporter
 from ..scene_definition import CompareMetricDefinition, MetricDefinition, VALUE_DETYPE_2_DEFAULT_VALUE, SceneConfig
 from ..._config import _Config, _Configurable
 from ..._type import Immutable
@@ -263,7 +262,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         config: config_cls,
         scene_config: SceneConfig,
         logger: Logger,
-        reporter: MetricReporter
+        reporter: "leaf_playground.core.workers.MetricReporter"
     ):
         super().__init__(config=config)
 
