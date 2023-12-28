@@ -3,9 +3,6 @@ from typing import Literal
 import altair as alt
 from pandas import DataFrame
 
-# from src.leaf_playground.chart_tools.base_vega_chart import BaseVegaChart
-
-
 from .base_vega_chart import BaseVegaChart
 
 
