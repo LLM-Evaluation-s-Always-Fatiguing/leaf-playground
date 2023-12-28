@@ -4,6 +4,8 @@
   </p>
 </h1>
 
+https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground/assets/754493/0c980a97-1b7f-4884-bd85-fbdc60121ac8
+
 ## Introduction
 
 **leaf-playground** is a "definition driven development" framework to build scenario simulation projects that human and LLM-based agents can participant in together to compete to or co-operate with each other. It is primarily designed to efficiently evaluate the performance of LLM-based agents at the action level in specific scenarios or tasks, but it also possesses enormous potential for LLM native applications, such as developing [a language-based game](https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-hub/tree/main/who_is_the_spy).
