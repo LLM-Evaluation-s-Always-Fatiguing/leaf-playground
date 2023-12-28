@@ -50,5 +50,3 @@ Below is a video demonstrates how to create and run a task that using MMLU datas
 ## Maintainers
 
 [@PanQiWei](https://github.com/panqiwei); [@Pandazki](https://github.com/pandazki).
-
-## License
