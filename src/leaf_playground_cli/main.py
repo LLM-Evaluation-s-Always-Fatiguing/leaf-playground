@@ -131,10 +131,10 @@ def publish_project(
     raise typer.Exit()
 
 
-# TODO: change to official site after open sourced
-__web_ui_release_site__ = "https://github.com/AIEPhoenix/aie-docusaurus-template/releases/download/v1.0.0/"
-__web_ui_download_url__ = __web_ui_release_site__ + "webui-v0.5.0.zip"
-__web_ui_hash_url__ = __web_ui_release_site__ + "webui-v0.5.0.zip.sha256"
+__web_ui_version__ = "v0.2.0"
+__web_ui_release_site__ = "https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-webui/releases/download"
+__web_ui_download_url__ = __web_ui_release_site__ + f"/{__web_ui_version__}/webui-{__web_ui_version__}.zip"
+__web_ui_hash_url__ = __web_ui_release_site__ + f"{__web_ui_version__}/webui-{__web_ui_version__}.zip.sha256"
 
 
 def download_web_ui() -> str:
