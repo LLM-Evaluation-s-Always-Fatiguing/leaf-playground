@@ -216,5 +216,15 @@ def start_server(
     )
 
 
+@app.command(name="version")
+def get_version():
+    print(f"v{leaf_version}")
+
+
+@app.command(name="web-ui-version")
+def get_web_ui_version():
+    print(__web_ui_version__)
+
+
 if __name__ == "__main__":
     app()
