@@ -29,7 +29,7 @@ pip install leaf-playground
 ```
 
 ### Install from source
-To install **leaf-playground** from the source, you need to clone the project by using `git clone`, then in the `leaf-playground` directory, run:
+To install **leaf-playground** from the source, you need to clone the project by using `git clone`, then in your local `leaf-playground` directory, run:
 ```shell
 pip install .
 ```
@@ -38,6 +38,14 @@ pip install .
 
 ### Start Server and Create a Task
 
+To start the server that contains projects hosted in **leaf-playground-hub**, you need to first clone this project, then in the directory of your local **leaf-playground-hub**, using CLI command to start server with webui:
+```shell
+leaf-out start-server [--port PORT] [--ui_port UI_PORT]
+```
+
+By default, the backend service will run on port 8000, the UI service will run on port 3000, you can use `--port` and `--ui_port` options to use different ports respectively.
+
+Below is a video demonstrates how to create and run a task that using MMLU dataset to evaluate LLM-based agents.
 
 ## Maintainers
 
