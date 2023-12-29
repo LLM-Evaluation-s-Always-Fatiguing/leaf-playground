@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "leaf-playground"
-version = "0.2.0"
+version = "0.3.0.dev0"
 description = "A framework to build scenario simulation projects where human and LLM based agents can participant in, with a user-friendly web UI to visualize simulation, support automatically evaluation on agent action level."
 authors = [
     "The LEAF team (past and future) with the help of all our contributors <leaf@shanda.com>",
