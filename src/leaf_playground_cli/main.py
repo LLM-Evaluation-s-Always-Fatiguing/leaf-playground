@@ -278,12 +278,12 @@ def start_server(
     )
 
 
-@app.command(name="version")
+@app.command(name="version", help="currently installed leaf-playground framework version")
 def get_version():
     print(f"v{leaf_version}")
 
 
-@app.command(name="web-ui-version")
+@app.command(name="web-ui-version", help="bounded web ui version currently installed leaf-playground framework uses")
 def get_web_ui_version():
     print(__web_ui_version__)
 
