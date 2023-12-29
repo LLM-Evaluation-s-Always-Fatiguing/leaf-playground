@@ -57,12 +57,11 @@ def update_project_structure(
     template_package_dir = os.path.join(template_project_dir, "{{cookiecutter.project_name}}")
 
     dot_leaf_dir = os.path.join(target, ".leaf")
+    if not os.path.exists(dot_leaf_dir):
+        raise typer.BadParameter("not a leaf playground project.")
     with open(os.path.join(dot_leaf_dir, "project_config.json"), "r", encoding="utf-8") as f:
         project_config = json.load(f)
     package_dir = os.path.join(target, project_config["name"])
-
-    if not os.path.exists(dot_leaf_dir):
-        raise typer.BadParameter("not a leaf playground project.")
 
     # update files in project dir (not its sub directories)
 
