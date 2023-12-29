@@ -7,6 +7,7 @@ import sys
 import zipfile
 from abc import ABC
 from collections import defaultdict
+from glob import glob1
 from packaging import version
 from pathlib import Path
 from typing import List, Optional, Type
@@ -28,9 +29,9 @@ app = typer.Typer(name="leaf-playground-cli")
 template_dir = os.path.join(os.path.dirname(__file__), "templates")
 
 
-@app.command(name="new-project")
+@app.command(name="new-project", help="initialize a new leaf-playground scenario simulation project from template.")
 def create_new_project(
-        name: Annotated[str, typer.Argument(metavar="project_name")]
+    name: Annotated[str, typer.Argument(metavar="project_name")]
 ):
     project_name = name.lower().replace(" ", "_").replace("-", "_")
     cookiecutter(
@@ -47,10 +48,71 @@ def create_new_project(
     raise typer.Exit()
 
 
-@app.command(name="publish")
+@app.command(name="update-project-structure", help="sync project structure to the template.")
+def update_project_structure(
+    target: Annotated[str, typer.Argument(metavar="target_dir")]
+):
+    template_project_dir = os.path.join(template_dir, "{{cookiecutter.project_name}}")
+    template_dot_leaf_dir = os.path.join(template_project_dir, ".leaf")
+    template_package_dir = os.path.join(template_project_dir, "{{cookiecutter.project_name}}")
+
+    dot_leaf_dir = os.path.join(target, ".leaf")
+    with open(os.path.join(dot_leaf_dir, "project_config.json"), "r", encoding="utf-8") as f:
+        project_config = json.load(f)
+    package_dir = os.path.join(target, project_config["name"])
+
+    if not os.path.exists(dot_leaf_dir):
+        raise typer.BadParameter("not a leaf playground project.")
+
+    # update files in project dir (not its sub directories)
+
+    for fname in glob1(template_project_dir, "*.*"):
+        fpath = os.path.join(template_project_dir, fname)
+        target_fpath = os.path.join(target, fname)
+        if not os.path.isdir(fpath) and not os.path.exists(target_fpath):
+            shutil.copy(fpath, target_fpath)
+
+    # update .leaf dir
+
+    # replace .leaf/app.py
+    shutil.copy(os.path.join(template_dot_leaf_dir, "app.py"), os.path.join(dot_leaf_dir, "app.py"))
+
+    # add new fields to .leaf/project_config.json
+    with open(os.path.join(template_dot_leaf_dir, "project_config.json"), "r", encoding="utf-8") as f:
+        template_project_config = json.load(f)
+    removed_fields = []
+    for k, v in project_config.items():
+        if k not in template_project_config:
+            removed_fields.append(k)
+    for field in removed_fields:
+        project_config.pop(field)
+    for k, v in template_project_config.items():
+        if k not in project_config:
+            project_config[k] = v
+
+    # update package
+    for dir_path, dir_names, file_names in os.walk(template_package_dir):
+        # Calculate the relative path to the source directory
+        rel_path = os.path.relpath(dir_path, template_package_dir)
+        # Ensure the corresponding directory exists in the target directory
+        target_path = os.path.join(package_dir, rel_path)
+        if not os.path.exists(target_path):
+            os.makedirs(target_path)
+        for file in file_names:
+            source_file = os.path.join(dir_path, file)
+            target_file = os.path.join(target_path, file)
+            # Copy the file if it does not exist in the target directory
+            if not os.path.exists(target_file):
+                shutil.copy2(source_file, target_file)
+
+
+@app.command(
+    name="publish",
+    help="publish project, at this time, will only copy the newest app.py and update project_config.json"
+)
 def publish_project(
-        target: Annotated[str, typer.Argument(metavar="target_dir")],
-        version_str: Annotated[str, typer.Option("--version", "-v")] = "0.1.0",
+    target: Annotated[str, typer.Argument(metavar="target_dir")],
+    version_str: Annotated[str, typer.Option("--version", "-v")] = "0.1.0",
 ):
     dot_leaf_dir = os.path.join(target, ".leaf")
 
@@ -177,7 +239,7 @@ def download_web_ui() -> str:
     return web_ui_save_dir
 
 
-@app.command(name="start-server")
+@app.command(name="start-server", help="start a leaf-playground server, will firstly download WEB UI if necessary.")
 def start_server(
     zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
     port: Annotated[int, typer.Option("--port")] = 8000,
