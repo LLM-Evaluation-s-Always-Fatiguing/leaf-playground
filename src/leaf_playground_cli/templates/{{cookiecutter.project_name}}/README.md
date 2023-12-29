@@ -17,3 +17,12 @@ When all samples are answered by all examinees, a reporter will generate a bar c
 Make sure you have all the additional required packages listed below installed in your environment before using this project:
 
 <!-- make sure all listed dependencies are exactly the same as those in requirements.txt -->
+<!-- 
+un-comment to list dependencies in the code block below:
+
+```txt
+# requirements.txt
+```
+-->
+
+You can copy above dependencies to a `requirements.txt` file and run `pip install -r requirements.txt` to install those dependencies.
