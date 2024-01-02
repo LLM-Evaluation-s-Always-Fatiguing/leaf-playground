@@ -118,6 +118,10 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
             self._dynamic_agents.update(**{agent.id: agent for agent in agents_})
 
     @property
+    def dynamic_agents(self) -> Dict[str, SceneDynamicAgent]:
+        return self._dynamic_agents
+
+    @property
     def human_agents(self) -> List[SceneHumanAgent]:
         return self._human_agents
 

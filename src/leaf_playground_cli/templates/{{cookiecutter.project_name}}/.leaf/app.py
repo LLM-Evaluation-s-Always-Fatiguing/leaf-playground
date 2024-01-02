@@ -93,9 +93,13 @@ async def get_task_status() -> JSONResponse:
     return JSONResponse(content={"status": scene_engine.state.value})
 
 
-@app.get("/agent/connected/{agent_id}")
-async def agent_connected(agent_id: str) -> JSONResponse:
-    return JSONResponse(content={"connected": scene_engine.scene.get_dynamic_agent(agent_id).connected})
+@app.get("/agents_connected")
+async def agents_connected() -> JSONResponse:
+    return JSONResponse(
+        content={
+            agent_id: agent.connected for agent_id, agent in scene_engine.scene.dynamic_agents.items()
+        }
+    )
 
 
 @app.websocket("/ws")
