@@ -1,3 +1,4 @@
+import asyncio
 from abc import abstractmethod, ABC, ABCMeta
 from inspect import signature
 from sys import _getframe
@@ -251,20 +252,20 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
     def __init__(self, config: config_cls):
         super().__init__(config=config)
 
-        self.socket = None
+        self.received_texts = []
 
-    def connect(self, socket: WebSocket):
-        self.socket = socket
+    def connect(self):
         self.connected = True
 
     def disconnect(self):
-        self.socket = None
         self.connected = False
 
     async def wait_human_text_input(self) -> Optional[str]:
-        if not self.socket:
+        if not self.connected:
             return None
-        return await self.socket.receive_text()
+        while not self.received_texts:
+            await asyncio.sleep(0.01)
+        return self.received_texts.pop(0)
 
     async def wait_human_image_input(self, *args, **kwargs):
         raise NotImplementedError()  # TODO: impl
