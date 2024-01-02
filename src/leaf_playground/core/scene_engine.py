@@ -135,7 +135,12 @@ class SceneEngine:
     def id(self) -> str:
         return self._id
 
+    def _wait_agents_ready(self):
+        self.scene.wait_agents_ready()
+
     def run(self):
+        self._wait_agents_ready()
+
         self.state = SceneEngineState.RUNNING
 
         for evaluator in self.evaluators:
@@ -163,6 +168,8 @@ class SceneEngine:
         self.logger.stop()
 
     async def a_run(self):
+        self._wait_agents_ready()
+
         self.state = SceneEngineState.RUNNING
 
         for evaluator in self.evaluators:

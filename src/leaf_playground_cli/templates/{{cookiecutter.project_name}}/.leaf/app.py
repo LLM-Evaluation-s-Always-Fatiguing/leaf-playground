@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import requests
@@ -8,7 +9,7 @@ from threading import Thread
 from typing import Any, List, Optional
 from uuid import UUID
 
-from fastapi import status, FastAPI, HTTPException, WebSocket
+from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
 from leaf_playground.core.scene_engine import SceneEngine
 from leaf_playground.core.scene_definition.definitions.metric import DisplayType
@@ -24,6 +25,29 @@ parser.add_argument("--save_dir", type=str)
 parser.add_argument("--callback", type=str)
 parser.add_argument("--id", type=str)
 args = parser.parse_args()
+
+
+class HumanConnectionManager:
+    def __init__(self):
+        self._human_agents = {agent.id: agent for agent in scene_engine.scene.human_agents}
+        self.active_connections = {}
+
+    def validate_agent_id(self, agent_id: str):
+        if agent_id not in self._human_agents:
+            return JSONResponse(f"agent [{agent_id}] not exists.", status_code=status.HTTP_404_NOT_FOUND)
+        if agent_id in self.active_connections:
+            return JSONResponse(f"agent [{agent_id}] already connected.", status_code=status.HTTP_403_FORBIDDEN)
+
+    async def connect(self, socket: WebSocket, agent_id: str):
+        await socket.accept()
+        agent = self._human_agents[agent_id]
+        self.active_connections[agent_id] = socket
+        agent.connect(socket)
+
+    def disconnect(self, agent_id: str):
+        agent = self._human_agents[agent_id]
+        agent.disconnect()
+        del self.active_connections[agent_id]
 
 
 def create_engine(payload: TaskCreationPayload):
@@ -52,16 +76,26 @@ async def lifespan(application: FastAPI):
         create_engine(TaskCreationPayload(**json.load(f)))
     os.remove(args.payload)
 
+    global human_conn_manager
+
+    human_conn_manager = HumanConnectionManager()
+
     yield
 
 
 app = FastAPI(lifespan=lifespan)
+human_conn_manager: HumanConnectionManager = None
 scene_engine: SceneEngine = None
 
 
 @app.get("/status", response_class=JSONResponse)
 async def get_task_status() -> JSONResponse:
     return JSONResponse(content={"status": scene_engine.state.value})
+
+
+@app.get("/agent/connected/{agent_id}")
+async def agent_connected(agent_id: str) -> JSONResponse:
+    return JSONResponse(content={"connected": scene_engine.scene.get_dynamic_agent(agent_id).connected})
 
 
 @app.websocket("/ws")
@@ -72,6 +106,23 @@ async def stream_task_info(websocket: WebSocket) -> None:
         text = await websocket.receive_text()
         if text == "disconnect":
             scene_engine.socket_handler.stop()
+
+
+@app.middleware("http")
+async def validate_human(request: Request, call_next):
+    if request.scope['root_path'] + request.scope['route'].path == "/ws/human/{agent_id}":
+        human_conn_manager.validate_agent_id((await request.json())["agent_id"])
+    return await call_next(request)
+
+
+@app.websocket("/ws/human/{agent_id}")
+async def human_input(websocket: WebSocket, agent_id: str):
+    await human_conn_manager.connect(websocket, agent_id)
+    try:
+        while True:
+            await asyncio.sleep(0.1)
+    except WebSocketDisconnect:
+        human_conn_manager.disconnect(agent_id)
 
 
 @app.post("/save")

@@ -1,9 +1,10 @@
-from abc import ABC, ABCMeta
+from abc import abstractmethod, ABC, ABCMeta
 from inspect import signature
 from sys import _getframe
 from typing import Any, Dict, Optional
 
-from pydantic import create_model, BaseModel, Field
+from pydantic import create_model, BaseModel, PrivateAttr, Field
+from fastapi import WebSocket
 
 from .scene_definition import RoleDefinition
 from .._config import _Config, _Configurable
@@ -20,6 +21,7 @@ class SceneAgentMetadata(BaseModel):
     description: str = Field(default=...)
     config_schema: Optional[dict] = Field(default=...)
     obj_for_import: DynamicObject = Field(default=...)
+    is_human: bool = Field(default=...)
 
 
 class SceneAgentMetaClass(ABCMeta):
@@ -172,7 +174,8 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
             cls_name=cls.__name__,
             description=cls.cls_description,
             config_schema=cls.config_cls.get_json_schema(by_alias=True) if not cls.role_definition.is_static else None,
-            obj_for_import=cls.obj_for_import
+            obj_for_import=cls.obj_for_import,
+            is_human=False
         )
 
 
@@ -188,6 +191,16 @@ class SceneDynamicAgent(SceneAgent, ABC):
 
     def __init__(self, config: config_cls):
         super().__init__(config=config)
+
+        self.connected = False
+
+    @abstractmethod
+    def connect(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def disconnect(self, *args, **kwargs):
+        pass
 
 
 class SceneAIAgentConfig(SceneDynamicAgentConfig):
@@ -219,23 +232,47 @@ class SceneAIAgent(SceneDynamicAgent, ABC):
 
         self.backend = self.config.create_backend_instance()
 
+    def connect(self):
+        self.connected = True
 
-class SceneHumanAgentConfig(SceneAgentConfig):
+    def disconnect(self):
+        raise NotImplementedError(f"{self.__class__.__name__} not support disconnect")
+
+
+class SceneHumanAgentConfig(SceneDynamicAgentConfig):
     pass
 
 
-class SceneHumanAgent(SceneAgent, ABC):
+class SceneHumanAgent(SceneDynamicAgent, ABC):
     config_cls = SceneHumanAgentConfig
     config: config_cls
 
     def __init__(self, config: config_cls):
         super().__init__(config=config)
 
-    async def wait_human_text_input(self, *args, **kwargs):
-        raise NotImplementedError()  # TODO: impl
+        self.socket = None
+
+    def connect(self, socket: WebSocket):
+        self.socket = socket
+        self.connected = True
+
+    def disconnect(self):
+        self.socket = None
+        self.connected = False
+
+    async def wait_human_text_input(self) -> Optional[str]:
+        if not self.socket:
+            return None
+        return await self.socket.receive_text()
 
     async def wait_human_image_input(self, *args, **kwargs):
         raise NotImplementedError()  # TODO: impl
+
+    @classmethod
+    def get_metadata(cls):
+        metadata = super().get_metadata()
+        metadata.is_human = True
+        return metadata
 
 
 class SceneStaticAgentConfig(SceneAgentConfig):
@@ -272,10 +309,12 @@ __all__ = [
     "SceneAgentMetadata",
     "SceneAgentConfig",
     "SceneAgent",
+    "SceneStaticAgentConfig",
+    "SceneStaticAgent",
+    "SceneDynamicAgentConfig",
+    "SceneDynamicAgent",
     "SceneAIAgentConfig",
     "SceneAIAgent",
     "SceneHumanAgentConfig",
     "SceneHumanAgent",
-    "SceneStaticAgentConfig",
-    "SceneStaticAgent",
 ]
