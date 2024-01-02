@@ -231,12 +231,13 @@ class SceneAIAgent(SceneDynamicAgent, ABC):
         super().__init__(config=config)
 
         self.backend = self.config.create_backend_instance()
-
-    def connect(self):
         self.connected = True
 
+    def connect(self):
+        pass
+
     def disconnect(self):
-        raise NotImplementedError(f"{self.__class__.__name__} not support disconnect")
+        pass
 
 
 class SceneHumanAgentConfig(SceneDynamicAgentConfig):
