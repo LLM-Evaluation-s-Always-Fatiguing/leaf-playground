@@ -5,6 +5,7 @@ import requests
 import sys
 from argparse import ArgumentParser
 from contextlib import asynccontextmanager
+from functools import partial
 from threading import Thread
 from typing import Any, List, Optional
 from uuid import UUID
@@ -122,11 +123,10 @@ async def validate_human(request: Request, call_next):
 @app.websocket("/ws/human/{agent_id}")
 async def human_input(websocket: WebSocket, agent_id: str):
     await human_conn_manager.connect(websocket, agent_id)
-    try:
-        while True:
-            await asyncio.sleep(0.1)
-    except WebSocketDisconnect:
-        human_conn_manager.disconnect(agent_id)
+    await scene_engine.socket_handler.stream_sockets(
+        websocket,
+        postprocess_on_disconnect=partial(human_conn_manager.disconnect, **{"agent_id": agent_id})
+    )
 
 
 @app.post("/save")
