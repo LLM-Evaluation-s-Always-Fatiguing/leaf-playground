@@ -115,7 +115,7 @@ async def stream_task_info(websocket: WebSocket) -> None:
 
 @app.middleware("http")
 async def validate_human(request: Request, call_next):
-    if request.scope['root_path'] + request.scope['route'].path == "/ws/human/{agent_id}":
+    if request.url.path.startswith("/ws/human"):
         human_conn_manager.validate_agent_id((await request.json())["agent_id"])
     return await call_next(request)
 
