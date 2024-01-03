@@ -2,6 +2,7 @@ import json
 import os
 import random
 import signal
+import socket
 import sys
 import subprocess
 from datetime import datetime
@@ -113,8 +114,8 @@ class TaskManager:
         task_id = "task_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
         payload_tmp_path = os.path.join(self.tmp_dir, f"task_payload_{task_id}.json")
         port = self.acquire_port()
-
-        task = Task(id=task_id, port=port, payload_path=payload_tmp_path)
+        host = socket.gethostbyname(socket.gethostname())
+        task = Task(id=task_id, port=port, host=host, payload_path=payload_tmp_path)
         self._tasks[task_id] = task
 
         with open(payload_tmp_path, "w", encoding="utf-8") as f:
@@ -124,6 +125,7 @@ class TaskManager:
                 f"{sys.executable} {os.path.join(payload.work_dir.as_posix(), '.leaf', 'app.py')} "
                 f"--payload {payload_tmp_path} "
                 f"--port {port} "
+                f"--host {host} "
                 f"--save_dir {self.result_dir} "
                 f"--callback http://127.0.0.1:{service_config.port}/task/status/update "
                 f"--id {task_id}"
