@@ -2,10 +2,9 @@ import asyncio
 from abc import abstractmethod, ABC, ABCMeta
 from inspect import signature
 from sys import _getframe
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
-from pydantic import create_model, BaseModel, PrivateAttr, Field
-from fastapi import WebSocket
+from pydantic import create_model, BaseModel, Field
 
 from .scene_definition import RoleDefinition
 from .._config import _Config, _Configurable
@@ -15,6 +14,19 @@ from ..data.environment import EnvironmentVariable
 from ..data.profile import Profile
 from ..utils.import_util import dynamically_import_obj, DynamicObject
 from ..utils.type_util import validate_type
+
+
+class _ActionHandler:
+    def __init__(self, action_fn: callable, action_name: str, exec_timeout: int):
+        self.action_fn = action_fn
+        self.action_name = action_name
+        self.exec_timeout = exec_timeout
+
+    async def execute(self, *args, **kwargs):
+        try:
+            return await asyncio.wait_for(self.action_fn(*args, **kwargs), timeout=self.exec_timeout)
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"action [{self.action_name}] execution exceeded the time limit: {self.exec_timeout}s.")
 
 
 class SceneAgentMetadata(BaseModel):
@@ -33,10 +45,12 @@ class SceneAgentMetaClass(ABCMeta):
             attrs,
             *,
             role_definition: RoleDefinition = None,
-            cls_description: str = None
+            cls_description: str = None,
+            action_exec_timeout: int = 30,
     ):
         attrs["role_definition"] = Immutable(role_definition or getattr(bases[0], "role_definition", None))
         attrs["cls_description"] = Immutable(cls_description)
+        attrs["action_exec_timeout"] = Immutable(action_exec_timeout)
         attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, module=_getframe(1).f_globals["__name__"]))
 
         new_cls = super().__new__(cls, name, bases, attrs)
@@ -52,6 +66,11 @@ class SceneAgentMetaClass(ABCMeta):
             raise TypeError(
                 f"class [{name}]'s class attribute [cls_description] should be a [str] instance, "
                 f"got [{type(attrs['cls_description']).__name__}] type"
+            )
+        if not validate_type(attrs["action_exec_timeout"], Immutable[int]):
+            raise TypeError(
+                f"class [{name}]'s class attribute [action_exec_timeout] should be a [int] instance, "
+                f"got [{type(attrs['action_exec_timeout']).__name__}] type"
             )
 
         if ABC not in bases:
@@ -80,6 +99,8 @@ class SceneAgentMetaClass(ABCMeta):
                     raise AttributeError(f"missing [{action_name}] action in class [{name}]")
                 if not callable(attrs[action_name]):
                     raise TypeError(f"[{action_name}] action must be a method of class [{name}]")
+                if not asyncio.iscoroutinefunction(attrs[action_name]):
+                    raise TypeError(f"[{action_name}] action must be an asynchronous method of class [{name}]")
                 if signature(attrs[action_name]) != action_sig:
                     raise TypeError(
                         f"expected signature of [{action_name}] action in class [{name}] is {str(action_sig)}, "
@@ -95,7 +116,8 @@ class SceneAgentMetaClass(ABCMeta):
             attrs,
             *,
             role_definition: RoleDefinition = None,
-            cls_description: str = None
+            cls_description: str = None,
+            action_exec_timeout: int = 30,
     ):
         super().__init__(name, bases, attrs)
 
@@ -124,6 +146,7 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
     # class attributes initialized in metaclass
     role_definition: RoleDefinition
     cls_description: str
+    action_exec_timeout:int
     obj_for_import: DynamicObject
 
     def __init__(self, config: config_cls):
@@ -133,6 +156,16 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
         self._role = self.role_definition.role_instance
         self._profile.role = self._role
         self._env_vars: Dict[str, EnvironmentVariable] = None
+
+        if ABC not in self.__class__.__bases__:
+            for action in self.role_definition.actions:
+                action_name = action.name
+                action_handler = _ActionHandler(
+                    getattr(self, action_name),
+                    action_name,
+                    self.action_exec_timeout,
+                )
+                setattr(self, action_name, action_handler.execute)
 
     def bind_env_vars(self, env_vars: Dict[str, EnvironmentVariable]):
         self._env_vars = env_vars
