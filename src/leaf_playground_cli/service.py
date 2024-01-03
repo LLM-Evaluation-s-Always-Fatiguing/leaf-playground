@@ -63,6 +63,19 @@ def scan_scenes(zoo_dir: DirectoryPath) -> List[SceneFull]:
     return scenes
 
 
+def get_local_ip() -> str:
+    try:
+        # Create a temporary socket
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            # Connect to a public DNS server (Google's)
+            s.connect(("8.8.8.8", 80))
+            # Get the local IP address from the socket
+            local_ip = s.getsockname()[0]
+            return local_ip
+    except Exception:
+        return "127.0.0.1"
+
+
 class TaskCreationPayload(BaseModel):
     scene_obj_config: SceneObjConfig = Field(default=...)
     metric_evaluator_objs_config: MetricEvaluatorObjsConfig = Field(default=...)
@@ -114,7 +127,7 @@ class TaskManager:
         task_id = "task_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
         payload_tmp_path = os.path.join(self.tmp_dir, f"task_payload_{task_id}.json")
         port = self.acquire_port()
-        host = socket.gethostbyname(socket.gethostname())
+        host = get_local_ip()
         task = Task(id=task_id, port=port, host=host, payload_path=payload_tmp_path)
         self._tasks[task_id] = task
 
