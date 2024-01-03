@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 parser = ArgumentParser()
 parser.add_argument("--payload", type=str)
 parser.add_argument("--port", type=int)
+parser.add_argument("--host", type=str)
 parser.add_argument("--save_dir", type=str)
 parser.add_argument("--callback", type=str)
 parser.add_argument("--id", type=str)
@@ -235,4 +236,4 @@ async def update_metric_compare(payload: MetricCompareRecordUpdatePayload):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port)
