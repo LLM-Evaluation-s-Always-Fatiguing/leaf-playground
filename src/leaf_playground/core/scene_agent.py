@@ -2,9 +2,10 @@ import asyncio
 from abc import abstractmethod, ABC, ABCMeta
 from inspect import signature
 from sys import _getframe
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import create_model, BaseModel, Field
+from fastapi import WebSocket, WebSocketDisconnect
 
 from .scene_definition import RoleDefinition
 from .._config import _Config, _Configurable
@@ -12,6 +13,7 @@ from .._type import Immutable
 from ..ai_backend.base import AIBackend, AIBackendConfig
 from ..data.environment import EnvironmentVariable
 from ..data.profile import Profile
+from ..data.socket_data import SocketEvent
 from ..utils.import_util import dynamically_import_obj, DynamicObject
 from ..utils.type_util import validate_type
 
@@ -274,6 +276,38 @@ class SceneAIAgent(SceneDynamicAgent, ABC):
         pass
 
 
+class HumanConnection:
+    def __init__(self, agent: "SceneHumanAgent", socket: WebSocket):
+        self.agent = agent
+        self.socket = socket
+
+        self.events = asyncio.Queue()
+
+    async def connect(self):
+        await self.socket.accept()
+        self.agent.connect(self)
+
+    def disconnect(self):
+        self.agent.disconnect()
+
+    def notify_human_to_input(self):
+        self.events.put_nowait(
+            SocketEvent(event="wait_human_input")
+        )
+
+    async def run(self):
+        try:
+            while True:
+                event: SocketEvent = await self.events.get()
+                await self.socket.send_json(event.model_dump_json())
+                human_input = await self.socket.receive_text()
+                while self.agent.human_input is not None:
+                    await asyncio.sleep(0.01)
+                self.agent.human_input = human_input
+        except WebSocketDisconnect:
+            pass
+
+
 class SceneHumanAgentConfig(SceneDynamicAgentConfig):
     pass
 
@@ -285,20 +319,26 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
     def __init__(self, config: config_cls):
         super().__init__(config=config)
 
-        self.received_texts = []
+        self.connection: HumanConnection = None
+        self.human_input = None
 
-    def connect(self):
+    def connect(self, connection: HumanConnection):
+        self.connection = connection
         self.connected = True
 
     def disconnect(self):
+        self.connection = None
         self.connected = False
 
     async def wait_human_text_input(self) -> Optional[str]:
         if not self.connected:
             return None
-        while not self.received_texts:
-            await asyncio.sleep(0.01)
-        return self.received_texts.pop(0)
+        self.connection.notify_human_to_input()
+        while not self.human_input:
+            await asyncio.sleep(0.001)
+        human_input = self.human_input
+        self.human_input = None
+        return human_input
 
     async def wait_human_image_input(self, *args, **kwargs):
         raise NotImplementedError()  # TODO: impl
