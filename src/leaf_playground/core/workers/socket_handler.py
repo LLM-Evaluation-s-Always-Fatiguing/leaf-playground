@@ -30,11 +30,7 @@ class SocketHandler:
             )
         )
 
-    async def stream_sockets(
-        self,
-        websocket: WebSocket,
-        postprocess_on_disconnect: Optional[Callable] = None
-    ):
+    async def stream_sockets(self, websocket: WebSocket):
         cur = 0
         try:
             while not self._stopped:
@@ -47,8 +43,7 @@ class SocketHandler:
             for socket in self._socket_cache[cur:]:
                 await websocket.send_json(socket.model_dump_json())
         except WebSocketDisconnect:
-            if postprocess_on_disconnect:
-                await run_asynchronously(postprocess_on_disconnect())
+            pass
 
     def stop(self):
         self._stopped = True
