@@ -1,15 +1,18 @@
+import asyncio
 import json
 import os
 import requests
 import sys
 from argparse import ArgumentParser
 from contextlib import asynccontextmanager
+from functools import partial
 from threading import Thread
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from fastapi import status, FastAPI, HTTPException, WebSocket
+from fastapi import status, FastAPI, HTTPException, WebSocket, Request
 from fastapi.responses import JSONResponse
+from leaf_playground.core.scene_agent import HumanConnection
 from leaf_playground.core.scene_engine import SceneEngine
 from leaf_playground.core.scene_definition.definitions.metric import DisplayType
 from leaf_playground_cli.service import TaskCreationPayload
@@ -20,10 +23,34 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 parser = ArgumentParser()
 parser.add_argument("--payload", type=str)
 parser.add_argument("--port", type=int)
+parser.add_argument("--host", type=str)
 parser.add_argument("--save_dir", type=str)
 parser.add_argument("--callback", type=str)
 parser.add_argument("--id", type=str)
 args = parser.parse_args()
+
+
+class HumanConnectionManager:
+    def __init__(self):
+        self._human_agents = {agent.id: agent for agent in scene_engine.scene.human_agents}
+        self.active_connections: Dict[str, HumanConnection] = {}
+
+    def validate_agent_id(self, agent_id: str) -> Tuple[bool, Optional[str]]:
+        if agent_id not in self._human_agents:
+            return False, f"agent [{agent_id}] not exists."
+        if agent_id in self.active_connections:
+            return False, f"agent [{agent_id}] already connected."
+        return True, None
+
+    async def connect(self, socket: WebSocket, agent_id: str) -> HumanConnection:
+        connection = HumanConnection(agent=self._human_agents[agent_id], socket=socket)
+        await connection.connect()
+        self.active_connections[agent_id] = connection
+        return connection
+
+    def disconnect(self, agent_id: str):
+        self.active_connections[agent_id].disconnect()
+        del self.active_connections[agent_id]
 
 
 def create_engine(payload: TaskCreationPayload):
@@ -52,16 +79,30 @@ async def lifespan(application: FastAPI):
         create_engine(TaskCreationPayload(**json.load(f)))
     os.remove(args.payload)
 
+    global human_conn_manager
+
+    human_conn_manager = HumanConnectionManager()
+
     yield
 
 
 app = FastAPI(lifespan=lifespan)
+human_conn_manager: HumanConnectionManager = None
 scene_engine: SceneEngine = None
 
 
 @app.get("/status", response_class=JSONResponse)
 async def get_task_status() -> JSONResponse:
     return JSONResponse(content={"status": scene_engine.state.value})
+
+
+@app.get("/agents_connected")
+async def agents_connected() -> JSONResponse:
+    return JSONResponse(
+        content={
+            agent_id: agent.connected for agent_id, agent in scene_engine.scene.dynamic_agents.items()
+        }
+    )
 
 
 @app.websocket("/ws")
@@ -72,6 +113,24 @@ async def stream_task_info(websocket: WebSocket) -> None:
         text = await websocket.receive_text()
         if text == "disconnect":
             scene_engine.socket_handler.stop()
+
+
+@app.websocket("/ws/human/{agent_id}")
+async def human_input(websocket: WebSocket, agent_id: str):
+    valid, reason = human_conn_manager.validate_agent_id(agent_id)
+    if not valid:
+        await websocket.close(reason=reason)
+        return
+    connection = await human_conn_manager.connect(websocket, agent_id)
+    await asyncio.gather(
+        *[
+            scene_engine.socket_handler.stream_sockets(
+                websocket,
+                postprocess_on_disconnect=partial(human_conn_manager.disconnect, **{"agent_id": agent_id})
+            ),
+            connection.run()
+        ]
+    )
 
 
 @app.post("/save")
@@ -167,4 +226,4 @@ async def update_metric_compare(payload: MetricCompareRecordUpdatePayload):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port)

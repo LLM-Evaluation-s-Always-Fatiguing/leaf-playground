@@ -1,9 +1,11 @@
 import asyncio
+from typing import Callable, Optional
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from ...data.log_body import LogBody
 from ...data.socket_data import SocketData, SocketOperation
+from ...utils.thread_util import run_asynchronously
 
 
 class SocketHandler:
@@ -28,7 +30,11 @@ class SocketHandler:
             )
         )
 
-    async def stream_sockets(self, websocket: WebSocket):
+    async def stream_sockets(
+        self,
+        websocket: WebSocket,
+        postprocess_on_disconnect: Optional[Callable] = None
+    ):
         cur = 0
         try:
             while not self._stopped:
@@ -41,7 +47,8 @@ class SocketHandler:
             for socket in self._socket_cache[cur:]:
                 await websocket.send_json(socket.model_dump_json())
         except WebSocketDisconnect:
-            pass
+            if postprocess_on_disconnect:
+                await run_asynchronously(postprocess_on_disconnect())
 
     def stop(self):
         self._stopped = True
