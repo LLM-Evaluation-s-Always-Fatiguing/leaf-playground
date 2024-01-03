@@ -6,7 +6,9 @@ from typing import Any, Dict, Optional
 
 from pydantic import create_model, BaseModel, Field
 from fastapi import WebSocket, WebSocketDisconnect
+from fastapi.websockets import WebSocketState
 
+from .workers.socket_handler import SocketHandler
 from .scene_definition import RoleDefinition
 from .._config import _Config, _Configurable
 from .._type import Immutable
@@ -277,25 +279,29 @@ class SceneAIAgent(SceneDynamicAgent, ABC):
 
 
 class HumanConnection:
-    def __init__(self, agent: "SceneHumanAgent", socket: WebSocket):
+    def __init__(self, agent: "SceneHumanAgent", socket: WebSocket, socket_handler: SocketHandler):
         self.agent = agent
         self.socket = socket
 
         self.events = asyncio.Queue()
+        self.socket_handler = socket_handler
+        self.state = WebSocketState.CONNECTING
 
     async def connect(self):
         await self.socket.accept()
         self.agent.connect(self)
+        self.state = WebSocketState.CONNECTED
 
     def disconnect(self):
         self.agent.disconnect()
+        self.state = WebSocketState.DISCONNECTED
 
     def notify_human_to_input(self):
         self.events.put_nowait(
             SocketEvent(event="wait_human_input")
         )
 
-    async def run(self):
+    async def _run(self):
         try:
             while True:
                 event: SocketEvent = await self.events.get()
@@ -305,7 +311,15 @@ class HumanConnection:
                     await asyncio.sleep(0.01)
                 self.agent.human_input = human_input
         except WebSocketDisconnect:
-            pass
+            self.disconnect()
+
+    async def run(self):
+        await asyncio.gather(
+            *[
+                self.socket_handler.stream_sockets(self.socket),
+                self._run()
+            ]
+        )
 
 
 class SceneHumanAgentConfig(SceneDynamicAgentConfig):

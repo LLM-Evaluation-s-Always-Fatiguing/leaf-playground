@@ -1,17 +1,19 @@
 import asyncio
 import json
 import os
+import time
+
 import requests
 import sys
 from argparse import ArgumentParser
 from contextlib import asynccontextmanager
-from functools import partial
 from threading import Thread
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import status, FastAPI, HTTPException, WebSocket, Request
 from fastapi.responses import JSONResponse
+from fastapi.websockets import WebSocketState
 from leaf_playground.core.scene_agent import HumanConnection
 from leaf_playground.core.scene_engine import SceneEngine
 from leaf_playground.core.scene_definition.definitions.metric import DisplayType
@@ -43,14 +45,21 @@ class HumanConnectionManager:
         return True, None
 
     async def connect(self, socket: WebSocket, agent_id: str) -> HumanConnection:
-        connection = HumanConnection(agent=self._human_agents[agent_id], socket=socket)
+        connection = HumanConnection(
+            agent=self._human_agents[agent_id],
+            socket=socket,
+            socket_handler=scene_engine.socket_handler
+        )
         await connection.connect()
         self.active_connections[agent_id] = connection
         return connection
 
-    def disconnect(self, agent_id: str):
-        self.active_connections[agent_id].disconnect()
-        del self.active_connections[agent_id]
+    def clean_closed_connections(self):
+        while True:
+            time.sleep(0.001)
+            for agent_id, connection in self.active_connections.items():
+                if connection.state == WebSocketState.DISCONNECTED:
+                    del self.active_connections[agent_id]
 
 
 def create_engine(payload: TaskCreationPayload):
@@ -122,15 +131,7 @@ async def human_input(websocket: WebSocket, agent_id: str):
         await websocket.close(reason=reason)
         return
     connection = await human_conn_manager.connect(websocket, agent_id)
-    await asyncio.gather(
-        *[
-            scene_engine.socket_handler.stream_sockets(
-                websocket,
-                postprocess_on_disconnect=partial(human_conn_manager.disconnect, **{"agent_id": agent_id})
-            ),
-            connection.run()
-        ]
-    )
+    await connection.run()
 
 
 @app.post("/save")
