@@ -52,7 +52,7 @@ class Image(Media):
     type: Literal["image"] = Field(default="image")
 
     def _generate_display_text(self) -> str:
-        return f"Image [{self.url}]"
+        return f"![Image]({self.url})"
 
     def __repr__(self):
         return f"<Image {self.url}>"

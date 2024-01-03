@@ -1,11 +1,12 @@
 import asyncio
+import time
 from abc import abstractmethod, ABC, ABCMeta
 from sys import _getframe
 from typing import Dict, List, Optional, Type
 
 from pydantic import BaseModel, Field
 
-from .scene_agent import SceneAgent
+from .scene_agent import SceneAgent, SceneDynamicAgent, SceneHumanAgent
 from .scene_definition import SceneDefinition, SceneConfig
 from .workers import MetricEvaluator, Logger
 from .._config import _Configurable
@@ -110,6 +111,23 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         self.logger = logger
         self.message_pool: MessagePool = MessagePool()
 
+        self._dynamic_agents = {}
+        self._human_agents = []
+        for agents_ in self.agents.values():
+            self._human_agents += [agent for agent in agents_ if isinstance(agent, SceneHumanAgent)]
+            self._dynamic_agents.update(**{agent.id: agent for agent in agents_})
+
+    @property
+    def dynamic_agents(self) -> Dict[str, SceneDynamicAgent]:
+        return self._dynamic_agents
+
+    @property
+    def human_agents(self) -> List[SceneHumanAgent]:
+        return self._human_agents
+
+    def get_dynamic_agent(self, agent_id: str) -> SceneDynamicAgent:
+        return self._dynamic_agents[agent_id]
+
     def _bind_env_vars_to_agents(self):
         for agents in self.static_agents.values():
             for agent in agents:
@@ -117,6 +135,17 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         for agents in self.agents.values():
             for agent in agents:
                 agent.bind_env_vars(self.env_vars)
+
+    def wait_agents_ready(self):
+        while True:
+            all_agents_ready = True
+            for agents in self.agents.values():
+                agents: List[SceneDynamicAgent]
+                if not all(agent.connected for agent in agents):
+                    all_agents_ready = False
+            if all_agents_ready:
+                break
+            time.sleep(0.1)
 
     def registry_metric_evaluator(self, evaluator: MetricEvaluator):
         self.evaluators.append(evaluator)
