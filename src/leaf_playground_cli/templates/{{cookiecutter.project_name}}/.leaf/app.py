@@ -7,10 +7,10 @@ from argparse import ArgumentParser
 from contextlib import asynccontextmanager
 from functools import partial
 from threading import Thread
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import status, FastAPI, HTTPException, WebSocket, Request
 from fastapi.responses import JSONResponse
 from leaf_playground.core.scene_agent import HumanConnection
 from leaf_playground.core.scene_engine import SceneEngine
@@ -35,11 +35,12 @@ class HumanConnectionManager:
         self._human_agents = {agent.id: agent for agent in scene_engine.scene.human_agents}
         self.active_connections: Dict[str, HumanConnection] = {}
 
-    def validate_agent_id(self, agent_id: str):
+    def validate_agent_id(self, agent_id: str) -> Tuple[bool, Optional[str]]:
         if agent_id not in self._human_agents:
-            return JSONResponse(f"agent [{agent_id}] not exists.", status_code=status.HTTP_404_NOT_FOUND)
+            return False, f"agent [{agent_id}] not exists."
         if agent_id in self.active_connections:
-            return JSONResponse(f"agent [{agent_id}] already connected.", status_code=status.HTTP_403_FORBIDDEN)
+            return False, f"agent [{agent_id}] already connected."
+        return True, None
 
     async def connect(self, socket: WebSocket, agent_id: str) -> HumanConnection:
         connection = HumanConnection(agent=self._human_agents[agent_id], socket=socket)
@@ -114,15 +115,12 @@ async def stream_task_info(websocket: WebSocket) -> None:
             scene_engine.socket_handler.stop()
 
 
-@app.middleware("http")
-async def validate_human(request: Request, call_next):
-    if request.url.path.startswith("/ws/human"):
-        human_conn_manager.validate_agent_id((await request.json())["agent_id"])
-    return await call_next(request)
-
-
 @app.websocket("/ws/human/{agent_id}")
 async def human_input(websocket: WebSocket, agent_id: str):
+    valid, reason = human_conn_manager.validate_agent_id(agent_id)
+    if not valid:
+        await websocket.close(reason=reason)
+        return
     connection = await human_conn_manager.connect(websocket, agent_id)
     await asyncio.gather(
         *[
