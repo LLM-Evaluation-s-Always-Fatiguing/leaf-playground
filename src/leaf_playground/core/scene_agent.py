@@ -41,7 +41,7 @@ class _HumanActionHandler(_ActionHandler):
 
     async def execute(self, *args, **kwargs):
         try:
-            await super().execute(*args, **kwargs)
+            return super().execute(*args, **kwargs)
         except:
             self.human_agent.wait_human_input = False
             if self.human_agent.connected:
@@ -346,7 +346,7 @@ class HumanConnection:
                 try:
                     human_input = await asyncio.wait_for(
                         self.socket.receive_text(),
-                        timeout=self.agent.action_exec_timeout
+                        timeout=self.agent.timeout_left
                     )
                 except asyncio.TimeoutError:
                     human_input = None
@@ -380,6 +380,7 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
         self.connection: HumanConnection = None
         self.human_input = None
         self.wait_human_input = False
+        self.timeout_left = self.action_exec_timeout
 
         if ABC not in self.__class__.__bases__:
             for action in self.role_definition.actions:
@@ -407,11 +408,13 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
         self.wait_human_input = True
         self.connection.notify_human_to_input()
         while not self.human_input:
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.1)
+            self.timeout_left -= 0.1
         self.wait_human_input = False
-        human_input = self.human_input
         if self.connected:
             await self.connection.notify_human_to_not_input()
+        self.timeout_left = self.action_exec_timeout
+        human_input = self.human_input
         self.human_input = None
         return human_input
 
