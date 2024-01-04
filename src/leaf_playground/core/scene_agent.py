@@ -41,7 +41,7 @@ class _HumanActionHandler(_ActionHandler):
 
     async def execute(self, *args, **kwargs):
         try:
-            return super().execute(*args, **kwargs)
+            return await super().execute(*args, **kwargs)
         except:
             self.human_agent.wait_human_input = False
             if self.human_agent.connected:
