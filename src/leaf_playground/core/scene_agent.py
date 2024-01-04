@@ -316,7 +316,13 @@ class HumanConnection:
             while True:
                 event: SocketEvent = await self.events.get()
                 await self.socket.send_json(event.model_dump_json())
-                human_input = await self.socket.receive_text()
+                try:
+                    human_input = await asyncio.wait_for(
+                        self.socket.receive_text(),
+                        timeout=self.agent.action_exec_timeout
+                    )
+                except asyncio.TimeoutError:
+                    human_input = None
                 while self.agent.human_input is not None:
                     await asyncio.sleep(0.01)
                 self.agent.human_input = human_input
