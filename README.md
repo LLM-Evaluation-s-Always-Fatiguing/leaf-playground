@@ -57,7 +57,7 @@ https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground/assets/7544
 
 ### The Framework
 
-- [ ] support human participant in the scenario simulation as a dynamic agent
+- [x] support human participant in the scenario simulation as a dynamic agent
 - [ ] running each scenario simulation task in a docker container
 - [ ] refactor `ai_backend` to `llm_backend_tools` to remove some heavy dependencies
 - [ ] support streaming agents' responses
