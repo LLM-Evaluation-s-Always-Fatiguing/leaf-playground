@@ -1,11 +1,10 @@
 import asyncio
-from typing import Callable, Optional
 
 from fastapi import WebSocket, WebSocketDisconnect
+from websockets.exceptions import ConnectionClosed, ConnectionClosedError, ConnectionClosedOK
 
 from ...data.log_body import LogBody
 from ...data.socket_data import SocketData, SocketOperation
-from ...utils.thread_util import run_asynchronously
 
 
 class SocketHandler:
@@ -42,8 +41,8 @@ class SocketHandler:
                     cur += 1
             for socket in self._socket_cache[cur:]:
                 await websocket.send_json(socket.model_dump_json())
-        except WebSocketDisconnect:
-            pass
+        except:
+            return
 
     def stop(self):
         self._stopped = True
