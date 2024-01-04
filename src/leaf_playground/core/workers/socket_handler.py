@@ -29,8 +29,9 @@ class SocketHandler:
             )
         )
 
-    async def stream_sockets(self, websocket: WebSocket):
+    async def stream_sockets(self, websocket: WebSocket) -> bool:
         cur = 0
+        closed = False
         try:
             while not self._stopped:
                 if cur >= len(self._socket_cache):
@@ -42,7 +43,8 @@ class SocketHandler:
             for socket in self._socket_cache[cur:]:
                 await websocket.send_json(socket.model_dump_json())
         except:
-            return
+            closed = True
+        return closed
 
     def stop(self):
         self._stopped = True

@@ -124,7 +124,10 @@ async def agents_connected() -> JSONResponse:
 @app.websocket("/ws")
 async def stream_task_info(websocket: WebSocket) -> None:
     await websocket.accept()
-    await scene_engine.socket_handler.stream_sockets(websocket)
+    closed = await scene_engine.socket_handler.stream_sockets(websocket)
+    if closed:
+        scene_engine.socket_handler.stop()
+        return
     while True:
         try:
             text = await websocket.receive_text()
@@ -143,6 +146,7 @@ async def human_input(websocket: WebSocket, agent_id: str):
         return
     if agent.connected:
         await websocket.close(reason=f"agent [{agent_id}] already connected.")
+        return
     connection = HumanConnection(
         agent=agent,
         socket=websocket,
