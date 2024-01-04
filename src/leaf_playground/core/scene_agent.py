@@ -352,10 +352,13 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
 
         self.connection: HumanConnection = None
         self.human_input = None
+        self.wait_human_input = False
 
     def connect(self, connection: HumanConnection):
         self.connection = connection
         self.connected = True
+        if self.wait_human_input:
+            self.connection.notify_human_to_input()
 
     def disconnect(self):
         self.connection = None
@@ -364,9 +367,11 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
     async def wait_human_text_input(self) -> Optional[str]:
         if not self.connected:
             return None
+        self.wait_human_input = True
         self.connection.notify_human_to_input()
         while not self.human_input:
             await asyncio.sleep(0.001)
+        self.wait_human_input = False
         human_input = self.human_input
         self.human_input = None
         return human_input
