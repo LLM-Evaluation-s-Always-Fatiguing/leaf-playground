@@ -195,7 +195,6 @@ class SceneEngine:
 
         self.state = SceneEngineState.FINISHED
         self.logger.stop()
-        self.socket_handler.stop()
 
     def get_scene_config(
             self,

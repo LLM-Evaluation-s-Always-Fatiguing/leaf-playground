@@ -11,7 +11,7 @@ from threading import Thread
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from fastapi import status, FastAPI, HTTPException, WebSocket, Request
+from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.websockets import WebSocketState
 from leaf_playground.core.scene_agent import HumanConnection
@@ -32,34 +32,44 @@ parser.add_argument("--id", type=str)
 args = parser.parse_args()
 
 
-class HumanConnectionManager:
-    def __init__(self):
-        self._human_agents = {agent.id: agent for agent in scene_engine.scene.human_agents}
-        self.active_connections: Dict[str, HumanConnection] = {}
-
-    def validate_agent_id(self, agent_id: str) -> Tuple[bool, Optional[str]]:
-        if agent_id not in self._human_agents:
-            return False, f"agent [{agent_id}] not exists."
-        if agent_id in self.active_connections:
-            return False, f"agent [{agent_id}] already connected."
-        return True, None
-
-    async def connect(self, socket: WebSocket, agent_id: str) -> HumanConnection:
-        connection = HumanConnection(
-            agent=self._human_agents[agent_id],
-            socket=socket,
-            socket_handler=scene_engine.socket_handler
-        )
-        await connection.connect()
-        self.active_connections[agent_id] = connection
-        return connection
-
-    def clean_closed_connections(self):
-        while True:
-            time.sleep(0.001)
-            for agent_id, connection in self.active_connections.items():
-                if connection.state == WebSocketState.DISCONNECTED:
-                    del self.active_connections[agent_id]
+# class HumanConnectionManager:
+#     def __init__(self):
+#         self._human_agents = {agent.id: agent for agent in scene_engine.scene.human_agents}
+#         self.active_connections: Dict[str, HumanConnection] = {}
+#
+#         Thread(target=self._clean_closed_connections, daemon=True).start()
+#
+#     def validate_agent_id(self, agent_id: str) -> Tuple[bool, Optional[str]]:
+#         if agent_id not in self._human_agents:
+#             return False, f"agent [{agent_id}] not exists."
+#         if agent_id in self.active_connections:
+#             # if self._clean_if_closed(agent_id):
+#             #     return True, None
+#             return False, f"agent [{agent_id}] already connected."
+#         return True, None
+#
+#     async def connect(self, socket: WebSocket, agent_id: str) -> HumanConnection:
+#         connection = HumanConnection(
+#             agent=self._human_agents[agent_id],
+#             socket=socket,
+#             socket_handler=scene_engine.socket_handler
+#         )
+#         await connection.connect()
+#         self.active_connections[agent_id] = connection
+#         return connection
+#
+#     def _clean_if_closed(self, agent_id) -> bool:
+#         connection = self.active_connections.get(agent_id, None)
+#         if connection and connection.state == WebSocketState.DISCONNECTED:
+#             del self.active_connections[agent_id]
+#             return True
+#         return False
+#
+#     def _clean_closed_connections(self):
+#         while True:
+#             time.sleep(0.001)
+#             for agent_id in self._human_agents:
+#                 self._clean_if_closed(agent_id)
 
 
 def create_engine(payload: TaskCreationPayload):
@@ -90,13 +100,10 @@ async def lifespan(application: FastAPI):
 
     global human_conn_manager
 
-    human_conn_manager = HumanConnectionManager()
-
     yield
 
 
 app = FastAPI(lifespan=lifespan)
-human_conn_manager: HumanConnectionManager = None
 scene_engine: SceneEngine = None
 
 
@@ -117,20 +124,34 @@ async def agents_connected() -> JSONResponse:
 @app.websocket("/ws")
 async def stream_task_info(websocket: WebSocket) -> None:
     await websocket.accept()
-    await scene_engine.socket_handler.stream_sockets(websocket)
+    closed = await scene_engine.socket_handler.stream_sockets(websocket)
+    if closed:
+        return
     while True:
-        text = await websocket.receive_text()
-        if text == "disconnect":
-            scene_engine.socket_handler.stop()
+        try:
+            text = await websocket.receive_text()
+            if text == "disconnect":
+                scene_engine.socket_handler.stop()
+        except WebSocketDisconnect:
+            return
 
 
 @app.websocket("/ws/human/{agent_id}")
 async def human_input(websocket: WebSocket, agent_id: str):
-    valid, reason = human_conn_manager.validate_agent_id(agent_id)
-    if not valid:
-        await websocket.close(reason=reason)
+    try:
+        agent = scene_engine.scene.get_dynamic_agent(agent_id)
+    except KeyError:
+        await websocket.close(reason=f"agent [{agent_id}] not exists.")
         return
-    connection = await human_conn_manager.connect(websocket, agent_id)
+    if agent.connected:
+        await websocket.close(reason=f"agent [{agent_id}] already connected.")
+        return
+    connection = HumanConnection(
+        agent=agent,
+        socket=websocket,
+        socket_handler=scene_engine.socket_handler
+    )
+    await connection.connect()
     await connection.run()
 
 

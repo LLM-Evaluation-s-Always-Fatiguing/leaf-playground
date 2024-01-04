@@ -1,11 +1,10 @@
 import asyncio
-from typing import Callable, Optional
 
 from fastapi import WebSocket, WebSocketDisconnect
+from websockets.exceptions import ConnectionClosed, ConnectionClosedError, ConnectionClosedOK
 
 from ...data.log_body import LogBody
 from ...data.socket_data import SocketData, SocketOperation
-from ...utils.thread_util import run_asynchronously
 
 
 class SocketHandler:
@@ -30,8 +29,9 @@ class SocketHandler:
             )
         )
 
-    async def stream_sockets(self, websocket: WebSocket):
+    async def stream_sockets(self, websocket: WebSocket) -> bool:
         cur = 0
+        closed = False
         try:
             while not self._stopped:
                 if cur >= len(self._socket_cache):
@@ -42,8 +42,9 @@ class SocketHandler:
                     cur += 1
             for socket in self._socket_cache[cur:]:
                 await websocket.send_json(socket.model_dump_json())
-        except WebSocketDisconnect:
-            pass
+        except:
+            closed = True
+        return closed
 
     def stop(self):
         self._stopped = True

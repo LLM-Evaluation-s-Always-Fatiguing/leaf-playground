@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 from pydantic import create_model, BaseModel, Field
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
+from websockets.exceptions import ConnectionClosed, ConnectionClosedOK, ConnectionClosedError
 
 from .workers.socket_handler import SocketHandler
 from .scene_definition import RoleDefinition
@@ -301,6 +302,15 @@ class HumanConnection:
             SocketEvent(event="wait_human_input")
         )
 
+    async def _keep_alive(self):
+        try:
+            while True:
+                await self.socket.send_json(SocketEvent(event="heart_beat").model_dump_json())
+                await asyncio.sleep(0.1)
+        except:
+            self.disconnect()
+            return
+
     async def _run(self):
         try:
             while True:
@@ -310,14 +320,15 @@ class HumanConnection:
                 while self.agent.human_input is not None:
                     await asyncio.sleep(0.01)
                 self.agent.human_input = human_input
-        except WebSocketDisconnect:
-            self.disconnect()
+        except (WebSocketDisconnect, ConnectionClosed, ConnectionClosedError, ConnectionClosedOK):
+            return
 
     async def run(self):
         await asyncio.gather(
             *[
                 self.socket_handler.stream_sockets(self.socket),
-                self._run()
+                self._run(),
+                self._keep_alive()
             ]
         )
 
