@@ -32,46 +32,6 @@ parser.add_argument("--id", type=str)
 args = parser.parse_args()
 
 
-# class HumanConnectionManager:
-#     def __init__(self):
-#         self._human_agents = {agent.id: agent for agent in scene_engine.scene.human_agents}
-#         self.active_connections: Dict[str, HumanConnection] = {}
-#
-#         Thread(target=self._clean_closed_connections, daemon=True).start()
-#
-#     def validate_agent_id(self, agent_id: str) -> Tuple[bool, Optional[str]]:
-#         if agent_id not in self._human_agents:
-#             return False, f"agent [{agent_id}] not exists."
-#         if agent_id in self.active_connections:
-#             # if self._clean_if_closed(agent_id):
-#             #     return True, None
-#             return False, f"agent [{agent_id}] already connected."
-#         return True, None
-#
-#     async def connect(self, socket: WebSocket, agent_id: str) -> HumanConnection:
-#         connection = HumanConnection(
-#             agent=self._human_agents[agent_id],
-#             socket=socket,
-#             socket_handler=scene_engine.socket_handler
-#         )
-#         await connection.connect()
-#         self.active_connections[agent_id] = connection
-#         return connection
-#
-#     def _clean_if_closed(self, agent_id) -> bool:
-#         connection = self.active_connections.get(agent_id, None)
-#         if connection and connection.state == WebSocketState.DISCONNECTED:
-#             del self.active_connections[agent_id]
-#             return True
-#         return False
-#
-#     def _clean_closed_connections(self):
-#         while True:
-#             time.sleep(0.001)
-#             for agent_id in self._human_agents:
-#                 self._clean_if_closed(agent_id)
-
-
 def create_engine(payload: TaskCreationPayload):
     global scene_engine
 
