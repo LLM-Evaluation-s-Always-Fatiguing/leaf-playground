@@ -34,6 +34,21 @@ class _ActionHandler:
             raise TimeoutError(f"action [{self.action_name}] execution exceeded the time limit: {self.exec_timeout}s.")
 
 
+class _HumanActionHandler(_ActionHandler):
+    def __init__(self, human_agent: "SceneHumanAgent", action_fn: callable, action_name: str, exec_timeout: int):
+        super().__init__(action_fn, action_name, exec_timeout)
+        self.human_agent = human_agent
+
+    async def execute(self, *args, **kwargs):
+        try:
+            await super().execute(*args, **kwargs)
+        except:
+            self.human_agent.wait_human_input = False
+            if self.human_agent.connected:
+                await self.human_agent.connection.notify_human_to_not_input()
+            raise
+
+
 class SceneAgentMetadata(BaseModel):
     cls_name: str = Field(default=...)
     description: str = Field(default=...)
@@ -151,7 +166,7 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
     # class attributes initialized in metaclass
     role_definition: RoleDefinition
     cls_description: str
-    action_exec_timeout:int
+    action_exec_timeout: int
     obj_for_import: DynamicObject
 
     def __init__(self, config: config_cls):
@@ -162,6 +177,7 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
         self._profile.role = self._role
         self._env_vars: Dict[str, EnvironmentVariable] = None
 
+        self._action2handler = {}
         if ABC not in self.__class__.__bases__:
             for action in self.role_definition.actions:
                 action_name = action.name
@@ -171,6 +187,7 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
                     self.action_exec_timeout,
                 )
                 setattr(self, action_name, action_handler.execute)
+                self._action2handler[action_name] = action_handler
 
     def bind_env_vars(self, env_vars: Dict[str, EnvironmentVariable]):
         self._env_vars = env_vars
@@ -292,6 +309,10 @@ class HumanConnection:
         await self.socket.accept()
         self.agent.connect(self)
         self.state = WebSocketState.CONNECTED
+        if self.agent.wait_human_input:
+            self.notify_human_to_input()
+        else:
+            await self.notify_human_to_not_input()
 
     def disconnect(self):
         self.agent.disconnect()
@@ -301,6 +322,12 @@ class HumanConnection:
         self.events.put_nowait(
             SocketEvent(event="wait_human_input")
         )
+
+    async def notify_human_to_not_input(self):
+        try:
+            await self.socket.send_json(SocketEvent(event="disable_human_input").model_dump_json())
+        except:
+            pass
 
     async def _keep_alive(self):
         try:
@@ -354,11 +381,21 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
         self.human_input = None
         self.wait_human_input = False
 
+        if ABC not in self.__class__.__bases__:
+            for action in self.role_definition.actions:
+                action_name = action.name
+                action_handler = _HumanActionHandler(
+                    self,
+                    self._action2handler[action_name].action_fn,
+                    action_name,
+                    self.action_exec_timeout,
+                )
+                setattr(self, action_name, action_handler.execute)
+                self._action2handler[action_name] = action_handler
+
     def connect(self, connection: HumanConnection):
         self.connection = connection
         self.connected = True
-        if self.wait_human_input:
-            self.connection.notify_human_to_input()
 
     def disconnect(self):
         self.connection = None
@@ -373,6 +410,8 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
             await asyncio.sleep(0.001)
         self.wait_human_input = False
         human_input = self.human_input
+        if self.connected:
+            await self.connection.notify_human_to_not_input()
         self.human_input = None
         return human_input
 
