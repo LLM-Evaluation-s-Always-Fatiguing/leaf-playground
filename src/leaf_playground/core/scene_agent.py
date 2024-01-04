@@ -45,7 +45,8 @@ class _HumanActionHandler(_ActionHandler):
         except:
             self.human_agent.wait_human_input = False
             if self.human_agent.connected:
-                await self.human_agent.connection.notify_human_to_not_input()
+                self.human_agent.connection.notify_to_cancel()
+                self.human_agent.connection.notify_human_to_not_input()
             raise
 
 
@@ -305,6 +306,8 @@ class HumanConnection:
         self.socket_handler = socket_handler
         self.state = WebSocketState.CONNECTING
 
+        self.cancel_event = asyncio.Event()
+
     async def connect(self):
         await self.socket.accept()
         self.agent.connect(self)
@@ -312,7 +315,7 @@ class HumanConnection:
         if self.agent.wait_human_input:
             self.notify_human_to_input()
         else:
-            await self.notify_human_to_not_input()
+            self.notify_human_to_not_input()
 
     def disconnect(self):
         self.agent.disconnect()
@@ -323,11 +326,13 @@ class HumanConnection:
             SocketEvent(event="wait_human_input")
         )
 
-    async def notify_human_to_not_input(self):
-        try:
-            await self.socket.send_json(SocketEvent(event="disable_human_input").model_dump_json())
-        except:
-            pass
+    def notify_human_to_not_input(self):
+        self.events.put_nowait(
+            SocketEvent(event="disable_human_input")
+        )
+
+    def notify_to_cancel(self):
+        self.cancel_event.set()
 
     async def _keep_alive(self):
         try:
@@ -338,29 +343,43 @@ class HumanConnection:
             self.disconnect()
             return
 
-    async def _run(self):
-        try:
-            while True:
+    async def _send_socket_event(self):
+        while True:
+            if self.state == WebSocketState.DISCONNECTED:
+                break
+            try:
                 event: SocketEvent = await self.events.get()
                 await self.socket.send_json(event.model_dump_json())
-                try:
-                    human_input = await asyncio.wait_for(
-                        self.socket.receive_text(),
-                        timeout=self.agent.timeout_left
-                    )
-                except asyncio.TimeoutError:
-                    human_input = None
-                while self.agent.human_input is not None:
+            except:
+                continue
+
+    async def _receive_human_input(self):
+        while True:
+            if self.state == WebSocketState.DISCONNECTED:
+                break
+            try:
+                fut = asyncio.ensure_future(self.socket.receive_text(), loop=asyncio.get_running_loop())
+                while not fut.done():
+                    if self.cancel_event.is_set():
+                        fut.cancel()
+                        self.cancel_event.clear()
+                        break
                     await asyncio.sleep(0.01)
-                self.agent.human_input = human_input
-        except (WebSocketDisconnect, ConnectionClosed, ConnectionClosedError, ConnectionClosedOK):
-            return
+                try:
+                    await fut
+                except asyncio.CancelledError:
+                    continue
+                if fut.done():
+                    self.agent.human_input = fut.result()
+            except:
+                continue
 
     async def run(self):
         await asyncio.gather(
             *[
                 self.socket_handler.stream_sockets(self.socket),
-                self._run(),
+                self._send_socket_event(),
+                self._receive_human_input(),
                 self._keep_alive()
             ]
         )
@@ -412,7 +431,7 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
             self.timeout_left -= 0.1
         self.wait_human_input = False
         if self.connected:
-            await self.connection.notify_human_to_not_input()
+            self.connection.notify_human_to_not_input()
         self.timeout_left = self.action_exec_timeout
         human_input = self.human_input
         self.human_input = None
