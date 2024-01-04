@@ -126,7 +126,6 @@ async def stream_task_info(websocket: WebSocket) -> None:
     await websocket.accept()
     closed = await scene_engine.socket_handler.stream_sockets(websocket)
     if closed:
-        scene_engine.socket_handler.stop()
         return
     while True:
         try:
@@ -134,7 +133,7 @@ async def stream_task_info(websocket: WebSocket) -> None:
             if text == "disconnect":
                 scene_engine.socket_handler.stop()
         except WebSocketDisconnect:
-            scene_engine.socket_handler.stop()
+            return
 
 
 @app.websocket("/ws/human/{agent_id}")
