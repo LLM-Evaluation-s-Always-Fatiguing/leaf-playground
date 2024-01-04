@@ -20,6 +20,7 @@ from ..scene_definition import CompareMetricDefinition, MetricDefinition, VALUE_
 from ..._config import _Config, _Configurable
 from ..._type import Immutable
 from ...data.log_body import ActionLogBody
+from ...data.message import Message
 from ...utils.import_util import DynamicObject
 from ...utils.type_util import validate_type
 
@@ -244,7 +245,7 @@ class MetricEvaluatorState(Enum):
 
 
 class MetricEvaluatorConfig(_Config):
-    pass
+    non_ignored_message_type: Optional[List[Type[Message]]] = Field(default=None, exclude=True)
 
 
 class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
@@ -349,7 +350,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
 
     def record(self, log: ActionLogBody) -> None:
         resp_type = type(log.response)
-        if resp_type not in self.resp_msg_type2metric_defs:
+        if resp_type not in list(self.resp_msg_type2metric_defs.keys()) + (self.config.non_ignored_message_type or []):
             return
         target_agent = log.response.sender_id
         # this may very slow
