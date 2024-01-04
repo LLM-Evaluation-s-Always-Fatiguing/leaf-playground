@@ -307,7 +307,7 @@ class HumanConnection:
             while True:
                 await self.socket.send_json(SocketEvent(event="heart_beat").model_dump_json())
                 await asyncio.sleep(0.1)
-        except (WebSocketDisconnect, ConnectionClosed, ConnectionClosedError, ConnectionClosedOK):
+        except:
             self.disconnect()
             return
 
