@@ -1,3 +1,4 @@
+import asyncio
 import json
 from enum import Enum
 from os import makedirs
@@ -138,7 +139,7 @@ class SceneEngine:
     def _wait_agents_ready(self):
         self.scene.wait_agents_ready()
 
-    def run(self):
+    async def run(self):
         self._wait_agents_ready()
 
         self.state = SceneEngineState.RUNNING
@@ -149,7 +150,12 @@ class SceneEngine:
         self.logger.add_log(
             SystemLogBody(system_event=SystemEvent.SIMULATION_START)
         )
-        self.scene.start()
+        try:
+            await self.scene.run()
+        except asyncio.CancelledError:
+            pass
+        except:
+            self.state = SceneEngineState.FAILED
         self.logger.add_log(
             SystemLogBody(system_event=SystemEvent.SIMULATION_FINISHED)
         )
@@ -167,34 +173,22 @@ class SceneEngine:
         self.state = SceneEngineState.FINISHED
         self.logger.stop()
 
-    async def a_run(self):
-        self._wait_agents_ready()
+    def pause(self):
+        if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
+            self.state = SceneEngineState.PAUSED
+            self.scene.pause()
 
-        self.state = SceneEngineState.RUNNING
+    def resume(self):
+        if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
+            self.state = SceneEngineState.RUNNING
+            self.scene.resume()
 
-        for evaluator in self.evaluators:
-            evaluator.start()
-
-        self.logger.add_log(
-            SystemLogBody(system_event=SystemEvent.SIMULATION_START)
-        )
-        await self.scene.a_start()
-        self.logger.add_log(
-            SystemLogBody(system_event=SystemEvent.SIMULATION_FINISHED)
-        )
-
-        for evaluator in self.evaluators:
-            evaluator.join()
-        self.logger.add_log(
-            SystemLogBody(system_event=SystemEvent.EVALUATION_FINISHED)
-        )
-
-        self.logger.add_log(
-            SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE)
-        )
-
-        self.state = SceneEngineState.FINISHED
-        self.logger.stop()
+    def interrupt(self):
+        if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
+            self.state = SceneEngineState.INTERRUPTED
+            self.scene.interrupt()
+            for evaluator in self.evaluators:
+                evaluator.terminate()
 
     def get_scene_config(
             self,

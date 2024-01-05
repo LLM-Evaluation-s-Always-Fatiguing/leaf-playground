@@ -111,11 +111,17 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         self.logger = logger
         self.message_pool: MessagePool = MessagePool()
 
-        self._dynamic_agents = {}
-        self._human_agents = []
+        self._dynamic_agents: Dict[str, SceneDynamicAgent] = {}
+        self._agent_list: List[SceneAgent] = []
+        self._human_agents: List[SceneHumanAgent] = []
         for agents_ in self.agents.values():
             self._human_agents += [agent for agent in agents_ if isinstance(agent, SceneHumanAgent)]
+            self._agent_list += agents_
             self._dynamic_agents.update(**{agent.id: agent for agent in agents_})
+        for agents_ in self.static_agents.values():
+            self._agent_list += agents_
+
+        self._run_task: Optional[asyncio.Task] = None
 
     @property
     def dynamic_agents(self) -> Dict[str, SceneDynamicAgent]:
@@ -166,19 +172,26 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
     async def _run(self):
         pass
 
-    def start(self):
-        async def _run_wrapper():
-            await self._run()
+    async def run(self):
+        self._run_task = asyncio.ensure_future(self._run())
+        try:
+            await self._run_task
             self.notify_evaluators_can_stop()
-
-        asyncio.new_event_loop().run_until_complete(_run_wrapper())
-
-    async def a_start(self):
-        async def _run_wrapper():
-            await self._run()
+        except:
             self.notify_evaluators_can_stop()
+            raise
 
-        await _run_wrapper()
+    def pause(self):
+        for agent in self._agent_list:
+            agent.pause()
+
+    def resume(self):
+        for agent in self._agent_list:
+            agent.resume()
+
+    def interrupt(self):
+        if self._run_task and not self._run_task.done():
+            self._run_task.cancel()
 
     @classmethod
     def get_metadata(cls) -> SceneMetadata:
