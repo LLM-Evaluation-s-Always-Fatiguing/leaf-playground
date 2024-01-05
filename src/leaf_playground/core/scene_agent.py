@@ -22,12 +22,21 @@ from ..utils.type_util import validate_type
 
 
 class _ActionHandler:
-    def __init__(self, action_fn: callable, action_name: str, exec_timeout: int):
+    def __init__(
+        self,
+        action_fn: callable,
+        action_name: str,
+        exec_timeout: int,
+        executable: asyncio.Event
+    ):
         self.action_fn = action_fn
         self.action_name = action_name
         self.exec_timeout = exec_timeout
 
+        self.executable = executable
+
     async def execute(self, *args, **kwargs):
+        await self.executable.wait()
         try:
             return await asyncio.wait_for(self.action_fn(*args, **kwargs), timeout=self.exec_timeout)
         except asyncio.TimeoutError:
@@ -35,8 +44,15 @@ class _ActionHandler:
 
 
 class _HumanActionHandler(_ActionHandler):
-    def __init__(self, human_agent: "SceneHumanAgent", action_fn: callable, action_name: str, exec_timeout: int):
-        super().__init__(action_fn, action_name, exec_timeout)
+    def __init__(
+        self,
+        human_agent: "SceneHumanAgent",
+        action_fn: callable,
+        action_name: str,
+        exec_timeout: int,
+        executable: asyncio.Event
+    ):
+        super().__init__(action_fn, action_name, exec_timeout, executable)
         self.human_agent = human_agent
 
     async def execute(self, *args, **kwargs):
@@ -178,6 +194,8 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
         self._profile.role = self._role
         self._env_vars: Dict[str, EnvironmentVariable] = None
 
+        self._not_paused = asyncio.Event()
+        self._not_paused.set()
         self._action2handler = {}
         if ABC not in self.__class__.__bases__:
             for action in self.role_definition.actions:
@@ -186,12 +204,19 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
                     getattr(self, action_name),
                     action_name,
                     self.action_exec_timeout,
+                    self._not_paused
                 )
                 setattr(self, action_name, action_handler.execute)
                 self._action2handler[action_name] = action_handler
 
     def bind_env_vars(self, env_vars: Dict[str, EnvironmentVariable]):
         self._env_vars = env_vars
+
+    def pause(self):
+        self._not_paused.clear()
+
+    def resume(self):
+        self._not_paused.set()
 
     @property
     def env_vars(self) -> Dict[str, EnvironmentVariable]:
@@ -409,6 +434,7 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
                     self._action2handler[action_name].action_fn,
                     action_name,
                     self.action_exec_timeout,
+                    self._not_paused
                 )
                 setattr(self, action_name, action_handler.execute)
                 self._action2handler[action_name] = action_handler
