@@ -7,9 +7,12 @@ from .base import EvalTool, EvalToolConfig
 
 
 class RegexEvalToolConfig(EvalToolConfig):
-    regex_rules: List[str] = Field(default=[r"\b([A-D])\b"],
-                                   description="Regex rules for extracting answers from the scene.")
-    ignore_case: bool = Field(default=True, description="Whether to ignore case when matching regex rules and answers.")
+    regex_rules: List[str] = Field(
+        default=[r"\b([A-D])\b"], description="Regex rules for extracting answers from the scene."
+    )
+    ignore_case: bool = Field(
+        default=True, description="Whether to ignore case when matching regex rules and answers."
+    )
 
 
 class RegexEvalTool(EvalTool):

@@ -28,7 +28,7 @@ class Logger:
         self,
         log_id: UUID,
         records: Dict[str, dict],
-        field_name: Literal["eval_records", "compare_records", "human_eval_records", "human_compare_records"]
+        field_name: Literal["eval_records", "compare_records", "human_eval_records", "human_compare_records"],
     ):
         log_body = self._id2log[log_id]
         for name, record in records.items():

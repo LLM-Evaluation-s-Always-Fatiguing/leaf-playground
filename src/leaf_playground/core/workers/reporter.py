@@ -5,16 +5,16 @@ from typing import Any, Dict, List, Type
 from .chart import Chart
 from ..scene_definition import CombinedMetricsData, MetricDefinition, SceneConfig, SceneDefinition
 from ..scene_definition.definitions.metric import (
-    _RecordData, _MetricData, DynamicAggregationMethod, DEFAULT_AGG_METHODS
+    _RecordData,
+    _MetricData,
+    DynamicAggregationMethod,
+    DEFAULT_AGG_METHODS,
 )
 from ...data.log_body import LogBody
 from ...utils.import_util import dynamically_import_fn
 
 
-def _agg(
-        records: List[_RecordData],
-        agg_method: DynamicAggregationMethod
-) -> Any:
+def _agg(records: List[_RecordData], agg_method: DynamicAggregationMethod) -> Any:
     if isinstance(agg_method, str):
         agg_method_ = DEFAULT_AGG_METHODS[agg_method]
     else:
@@ -22,10 +22,7 @@ def _agg(
     return agg_method_(records).value
 
 
-def _win_ratio(
-        ranks: List[List[str]],
-        top_n: int
-):
+def _win_ratio(ranks: List[List[str]], top_n: int):
     counter = {agent: 0 for agent in ranks[0]}
     for rank in ranks:
         for agent in rank[:top_n]:
@@ -62,11 +59,7 @@ class MetricReporter:
         metrics = []
         for agent_id, agent_records in agent2records.items():
             metrics.append(
-                metric_data_model(
-                    value=_agg(agent_records, agg_method),
-                    records=agent_records,
-                    target_agent=agent_id
-                )
+                metric_data_model(value=_agg(agent_records, agg_method), records=agent_records, target_agent=agent_id)
             )
 
         return metrics
@@ -83,10 +76,7 @@ class MetricReporter:
         if num_agents >= 30:
             result["top10_ratio"] = _win_ratio(record_values, top_n=10)
 
-        return metric_data_model(
-            value=result,
-            records=records
-        )
+        return metric_data_model(value=result, records=records)
 
     def _cal_metrics(self) -> CombinedMetricsData:
         metrics = {}
@@ -110,10 +100,7 @@ class MetricReporter:
             else:
                 human_metrics[metric_belonged_chain] = self._cal_compare_metric(list(records.values()), metric_def)
 
-        return {
-            "metrics": metrics,
-            "human_metrics": human_metrics
-        }
+        return {"metrics": metrics, "human_metrics": human_metrics}
 
     @property
     def metrics_data(self) -> CombinedMetricsData:
@@ -123,7 +110,7 @@ class MetricReporter:
         self,
         scene_config: SceneConfig,
         evaluator_configs: List["leaf_playground.core.workers.MetricEvaluatorConfig"],
-        logs: List[LogBody]
+        logs: List[LogBody],
     ):
         metrics = self.metrics_data
 

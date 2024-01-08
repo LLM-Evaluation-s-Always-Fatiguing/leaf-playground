@@ -50,9 +50,7 @@ def dynamically_import_obj(o: DynamicObject):
     if o.module is not None:
         module = importlib.import_module(o.module)
     else:
-        module = importlib.machinery.SourceFileLoader(
-            o.source_file.name, o.source_file.as_posix()
-        ).load_module()
+        module = importlib.machinery.SourceFileLoader(o.source_file.name, o.source_file.as_posix()).load_module()
     obj = module.__dict__[o.obj]
     _IMPORTED_OBJECTS[o.hash] = obj
     return obj
@@ -87,11 +85,9 @@ def dynamically_import_fn(f: DynamicFn):
 def find_subclasses(package_path: str, base_class: Type) -> List[DynamicObject]:
     classes = []
 
-    for file in glob.glob(os.path.join(package_path, f'**/*.py'), recursive=True):
+    for file in glob.glob(os.path.join(package_path, f"**/*.py"), recursive=True):
         module_path = Path(file)
-        module = importlib.machinery.SourceFileLoader(
-            module_path.name, module_path.as_posix()
-        ).load_module()
+        module = importlib.machinery.SourceFileLoader(module_path.name, module_path.as_posix()).load_module()
 
         if not hasattr(module, "__all__"):
             continue
@@ -130,5 +126,5 @@ __all__ = [
     "dynamically_import_obj",
     "dynamically_import_fn",
     "find_subclasses",
-    "relevantly_find_subclasses"
+    "relevantly_find_subclasses",
 ]

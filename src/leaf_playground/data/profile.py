@@ -18,7 +18,4 @@ class Profile(Data):
     role: Optional[Role] = Field(default=None)
 
 
-__all__ = [
-    "Role",
-    "Profile"
-]
+__all__ = ["Role", "Profile"]

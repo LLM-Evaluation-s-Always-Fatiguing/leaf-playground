@@ -41,11 +41,7 @@ class RoleDefinition(BaseModel):
     @property
     def role_instance(self) -> Role:
         if not self._role_instance:
-            self._role_instance = Role(
-                name=self.name,
-                description=self.description,
-                is_static=self.is_static
-            )
+            self._role_instance = Role(name=self.name, description=self.description, is_static=self.is_static)
         return self._role_instance
 
     def model_post_init(self, __context: Any) -> None:
@@ -153,29 +149,32 @@ class RoleConfig(_Config):
     def create_config_model(cls, role_definition: RoleDefinition) -> "RoleConfig":
         model_name = "".join([each.capitalize() for each in role_definition.name.split("_")]) + cls.__name__
         module = _getframe(1).f_globals["__name__"]
-        cls_kwargs = {
-            "_role_definition": role_definition
-        }
+        cls_kwargs = {"_role_definition": role_definition}
         fields = {
             "actions_config": (RoleActionsConfig.create_config_model(role_definition), Field(default=...)),
             "agents_config": (
                 List[RoleAgentConfig],
                 Field(
-                    default=... if not role_definition.is_static else
-                    [RoleAgentConfig(config_data={}, obj_for_import=role_definition.agents_cls[0].obj_for_import)],
+                    default=(
+                        ...
+                        if not role_definition.is_static
+                        else [
+                            RoleAgentConfig(
+                                config_data={}, obj_for_import=role_definition.agents_cls[0].obj_for_import
+                            )
+                        ]
+                    ),
                     min_items=role_definition.min_agents_num,
-                    max_items=role_definition.max_agents_num if role_definition.max_agents_num != -1 else PydanticUndefined
-                )
+                    max_items=(
+                        role_definition.max_agents_num if role_definition.max_agents_num != -1 else PydanticUndefined
+                    ),
+                ),
             ),
-            "is_static": (Literal[role_definition.is_static], Field(default=role_definition.is_static))
+            "is_static": (Literal[role_definition.is_static], Field(default=role_definition.is_static)),
         }
 
         return create_model(
-            __model_name=model_name,
-            __module__=module,
-            __base__=cls,
-            __cls_kwargs__=cls_kwargs,
-            **fields
+            __model_name=model_name, __module__=module, __base__=cls, __cls_kwargs__=cls_kwargs, **fields
         )
 
     def get_action_config(self, action_name: str) -> ActionConfig:
@@ -185,9 +184,4 @@ class RoleConfig(_Config):
         return [conf.initiate_agent() for conf in self.agents_config]
 
 
-__all__ = [
-    "RoleDefinition",
-    "RoleActionsConfig",
-    "RoleAgentConfig",
-    "RoleConfig"
-]
+__all__ = ["RoleDefinition", "RoleActionsConfig", "RoleAgentConfig", "RoleConfig"]

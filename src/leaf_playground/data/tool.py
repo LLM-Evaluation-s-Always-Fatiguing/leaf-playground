@@ -16,7 +16,4 @@ class HFTool(Tool):
     remote: bool = Field(default=False)
 
 
-__all__ = [
-    "Tool",
-    "HFTool"
-]
+__all__ = ["Tool", "HFTool"]

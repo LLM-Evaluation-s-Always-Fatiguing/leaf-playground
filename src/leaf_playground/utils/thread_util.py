@@ -23,6 +23,4 @@ async def run_asynchronously(func: Callable[P, Any], *args: P.args, **kwargs: P.
         return await anyio.to_thread.run_sync(func, *args)
 
 
-__all__ = [
-    "run_asynchronously"
-]
+__all__ = ["run_asynchronously"]

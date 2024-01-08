@@ -20,7 +20,4 @@ class EvalTool(_Configurable):
         return cls(config=config)
 
 
-__all__ = [
-    "EvalToolConfig",
-    "EvalTool"
-]
+__all__ = ["EvalToolConfig", "EvalTool"]

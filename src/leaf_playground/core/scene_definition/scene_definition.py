@@ -19,9 +19,7 @@ class SceneDefinition(BaseModel):
 
     @property
     def roles_agent_num_range(self) -> Dict[str, Tuple[PositiveInt, Union[PositiveInt, Literal[-1]]]]:
-        return {
-            role.name: role.num_agents_range for role in self.roles
-        }
+        return {role.name: role.num_agents_range for role in self.roles}
 
     def model_post_init(self, __context: Any) -> None:
         if len(set([r.name for r in self.roles])) != len(self.roles):
@@ -43,7 +41,9 @@ class SceneDefinition(BaseModel):
 
     def get_metric_definition(self, metric_belonged_chain: str) -> MetricDefinition:
         role_name, action_name, metric_name = metric_belonged_chain.split(".")
-        return self.get_role_definition(role_name).get_action_definition(action_name).get_metric_definition(metric_name)
+        return (
+            self.get_role_definition(role_name).get_action_definition(action_name).get_metric_definition(metric_name)
+        )
 
 
 class SceneEnvVarsConfig(_Config):
@@ -62,9 +62,7 @@ class SceneEnvVarsConfig(_Config):
         return getattr(self, env_var_name)
 
     def initiate_env_vars(self) -> Dict[_EnvVarName, "leaf_playground.data.environment.EnvironmentVariable"]:
-        return {
-            f_name: getattr(self, f_name).initiate_env_var() for f_name in self.model_fields_set
-        }
+        return {f_name: getattr(self, f_name).initiate_env_var() for f_name in self.model_fields_set}
 
 
 class SceneRolesConfig(_Config):
@@ -81,9 +79,7 @@ class SceneRolesConfig(_Config):
         return getattr(self, role_name)
 
     def initiate_agents(self) -> Dict[_RoleName, List["leaf_playground.core.scene_agent.SceneAgent"]]:
-        return {
-            f_name: getattr(self, f_name).initiate_agents() for f_name in self.model_fields_set
-        }
+        return {f_name: getattr(self, f_name).initiate_agents() for f_name in self.model_fields_set}
 
 
 class SceneConfig(_Config):
@@ -94,7 +90,7 @@ class SceneConfig(_Config):
     def create_config_model(
         cls,
         scene_definition: SceneDefinition,
-        additional_config_fields: Optional[Dict[str, Tuple[Type, Field]]] = None
+        additional_config_fields: Optional[Dict[str, Tuple[Type, Field]]] = None,
     ) -> Type["SceneConfig"]:
         model_name = "".join([each.capitalize() for each in scene_definition.name.split("_")]) + cls.__name__
         module = _getframe(1).f_globals["__name__"]
@@ -127,9 +123,4 @@ class SceneConfig(_Config):
         return self.roles_config.initiate_agents()
 
 
-__all__ = [
-    "SceneDefinition",
-    "SceneEnvVarsConfig",
-    "SceneRolesConfig",
-    "SceneConfig"
-]
+__all__ = ["SceneDefinition", "SceneEnvVarsConfig", "SceneRolesConfig", "SceneConfig"]

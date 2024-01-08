@@ -69,7 +69,4 @@ class MethodOutputsTypeChecker:
         pass
 
 
-__all__ = [
-    "validate_type",
-    "MethodOutputsTypeChecker"
-]
+__all__ = ["validate_type", "MethodOutputsTypeChecker"]

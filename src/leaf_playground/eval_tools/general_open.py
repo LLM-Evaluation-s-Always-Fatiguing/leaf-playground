@@ -9,7 +9,7 @@ from ..ai_backend.openai import OpenAIBackend, OpenAIBackendConfig
 
 
 class EvalOpenAIBackendConfig(OpenAIBackendConfig):
-    model: Literal['gpt-4-1106-preview', 'gpt-4'] = Field(default='gpt-4-1106-preview')
+    model: Literal["gpt-4-1106-preview", "gpt-4"] = Field(default="gpt-4-1106-preview")
 
 
 class GeneralOpenEvalToolConfig(EvalToolConfig):
@@ -21,7 +21,7 @@ class GeneralOpenEvalTool(EvalTool):
     config: config_obj
 
     temperature: float
-    response_format: Dict[Literal['type'], Literal['text', 'json']]
+    response_format: Dict[Literal["type"], Literal["text", "json"]]
     max_tokens: int
 
     def __init__(self, config: config_obj):
@@ -34,7 +34,7 @@ class GeneralOpenEvalTool(EvalTool):
     def set_temperature(self, temperature: float):
         self.temperature = temperature
 
-    def set_response_format(self, response_format: Literal['text', 'json']):
+    def set_response_format(self, response_format: Literal["text", "json"]):
         self.response_format = {"type": response_format}
 
     def set_max_tokens(self, max_tokens: int):
@@ -49,13 +49,17 @@ class GeneralOpenEvalTool(EvalTool):
         messages.append(ChatCompletionUserMessageParam(role="user", content=tpl.render(value_dict)))
 
         result = (
-            await self.client.chat.completions.create(
-                messages=messages,
-                model=self.config.openai_backend_config.model,
-                max_tokens=self.max_tokens,
-                response_format=self.response_format,
-                temperature=self.temperature
+            (
+                await self.client.chat.completions.create(
+                    messages=messages,
+                    model=self.config.openai_backend_config.model,
+                    max_tokens=self.max_tokens,
+                    response_format=self.response_format,
+                    temperature=self.temperature,
+                )
             )
-        ).choices[0].message.content
+            .choices[0]
+            .message.content
+        )
 
         return result
