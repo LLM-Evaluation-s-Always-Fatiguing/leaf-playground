@@ -44,20 +44,5 @@ class Logger:
     def logs(self):
         return self._logs
 
-    async def stream_logs(self, log_handler: Callable[[LogBody], Any] = print):
-        cur = 0
-        while not self._stopped:
-            if cur >= len(self.logs):
-                await asyncio.sleep(0.001)
-            else:
-                await run_asynchronously(log_handler, self.logs[cur])
-                await asyncio.sleep(0.001)
-                cur += 1
-        for log in self.logs[cur:]:
-            await run_asynchronously(log_handler, log)
-
-    def stop(self):
-        self._stopped = True
-
 
 __all__ = ["Logger"]
