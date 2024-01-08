@@ -1,19 +1,18 @@
 import asyncio
 import json
 import os
-import time
+import signal
 
 import requests
 import sys
 from argparse import ArgumentParser
 from contextlib import asynccontextmanager
 from threading import Thread
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional
 from uuid import UUID
 
 from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from fastapi.websockets import WebSocketState
 from leaf_playground.core.scene_agent import HumanConnection
 from leaf_playground.core.scene_engine import SceneEngine
 from leaf_playground.core.scene_definition.definitions.metric import DisplayType
@@ -42,7 +41,7 @@ def create_engine(payload: TaskCreationPayload):
         state_change_callbacks=[update_scene_engine_status]
     )
     scene_engine.save_dir = os.path.join(args.save_dir, args.id)
-    Thread(target=scene_engine.run, daemon=True).start()
+    asyncio.create_task(scene_engine.run())
 
 
 def update_scene_engine_status():
@@ -52,18 +51,33 @@ def update_scene_engine_status():
         pass
 
 
+class AppManager:
+    def __init__(self):
+        self.shutdown_event = asyncio.Event()
+        self.shutdown_task = asyncio.create_task(self.maybe_shutdown(), name="shutdown_service")
+
+    async def maybe_shutdown(self):
+        await self.shutdown_event.wait()
+        await asyncio.sleep(3)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     with open(args.payload, "r", encoding="utf-8") as f:
         create_engine(TaskCreationPayload(**json.load(f)))
     os.remove(args.payload)
 
-    global human_conn_manager
+    global app_manager
+    app_manager = AppManager()
 
     yield
 
+    app_manager.shutdown_task.cancel()
+
 
 app = FastAPI(lifespan=lifespan)
+app_manager: AppManager = None
 scene_engine: SceneEngine = None
 
 
@@ -115,9 +129,26 @@ async def human_input(websocket: WebSocket, agent_id: str):
     await connection.run()
 
 
+@app.post("/pause")
+async def pause_engine():
+    scene_engine.pause()
+
+
+@app.post("/resume")
+async def resume_engine():
+    scene_engine.resume()
+
+
+@app.post("/interrupt")
+async def interrupt_engine():
+    scene_engine.interrupt()
+    app_manager.shutdown_event.set()
+
+
 @app.post("/save")
 async def save_task():
     scene_engine.save()
+    app_manager.shutdown_event.set()
 
 
 class MetricEvalRecordUpdatePayload(BaseModel):
@@ -200,9 +231,6 @@ async def update_metric_compare(payload: MetricCompareRecordUpdatePayload):
         field_name="human_compare_records"
     )
     reporter.put_human_record(record=record_data, metric_belonged_chain=payload.metric_name, log_id=payload.log_id)
-
-
-# TODO: more apis to pause, resume, interrupt, update log, etc.
 
 
 if __name__ == "__main__":
