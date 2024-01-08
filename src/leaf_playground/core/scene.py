@@ -142,7 +142,7 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
             for agent in agents:
                 agent.bind_env_vars(self.env_vars)
 
-    def wait_agents_ready(self):
+    async def wait_agents_ready(self):
         while True:
             all_agents_ready = True
             for agents in self.agents.values():
@@ -151,7 +151,7 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
                     all_agents_ready = False
             if all_agents_ready:
                 break
-            time.sleep(0.1)
+            await asyncio.sleep(0.001)
 
     def registry_metric_evaluator(self, evaluator: MetricEvaluator):
         self.evaluators.append(evaluator)

@@ -137,11 +137,11 @@ class SceneEngine:
     def id(self) -> str:
         return self._id
 
-    def _wait_agents_ready(self):
-        self.scene.wait_agents_ready()
+    async def _wait_agents_ready(self):
+        await self.scene.wait_agents_ready()
 
     async def run(self):
-        self._wait_agents_ready()
+        await self._wait_agents_ready()
 
         self.state = SceneEngineState.RUNNING
 
