@@ -5,9 +5,8 @@ from sys import _getframe
 from typing import Any, Dict, Optional
 
 from pydantic import create_model, BaseModel, Field
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
-from websockets.exceptions import ConnectionClosed, ConnectionClosedOK, ConnectionClosedError
 
 from .workers.socket_handler import SocketHandler
 from .scene_definition import RoleDefinition
@@ -22,21 +21,90 @@ from ..utils.type_util import validate_type
 
 
 class _ActionHandler:
-    def __init__(self, action_fn: callable, action_name: str, exec_timeout: int):
+    def __init__(
+        self,
+        action_fn: callable,
+        action_name: str,
+        exec_timeout: int,
+        executable: asyncio.Event
+    ):
         self.action_fn = action_fn
         self.action_name = action_name
         self.exec_timeout = exec_timeout
 
+        self.executable = executable
+        # this will force the same action of one instance be called once in every moment
+        # thus calling the same action of one instance multiple times concurrently
+        # it will still run sequentially
+        self._lock = asyncio.Lock()
+        self._task = None
+        self._clock = None
+        self._executed_seconds = 0.0
+
+    async def _record_executed_seconds(self):
+        interval = 1
+        while True:
+            await asyncio.sleep(interval)
+            self._executed_seconds += interval
+
+    def _reset_clock(self):
+        self._clock: asyncio.Task
+        if self._clock is not None:
+            self._clock.cancel()
+        self._clock = None
+
+    def _reset(self):
+        self._task = None
+        self._reset_clock()
+        self._executed_seconds = 0.0
+
     async def execute(self, *args, **kwargs):
+        await self.executable.wait()
         try:
-            return await asyncio.wait_for(self.action_fn(*args, **kwargs), timeout=self.exec_timeout)
-        except asyncio.TimeoutError:
-            raise TimeoutError(f"action [{self.action_name}] execution exceeded the time limit: {self.exec_timeout}s.")
+            async with self._lock:
+                if not self._clock:
+                    self._clock = asyncio.ensure_future(self._record_executed_seconds())
+                self._task = asyncio.ensure_future(
+                    asyncio.wait_for(
+                        self.action_fn(*args, **kwargs),
+                        timeout=self.exec_timeout - self._executed_seconds
+                    )
+                )
+                await self._task
+                res = self._task.result()
+                self._reset()
+            return res
+        except asyncio.CancelledError as e:
+            if not self.executable.is_set():  # cancel will be called when agent is paused
+                self._reset_clock()
+                return await self.execute(*args, **kwargs)
+            else:  # other case, raise cancel error
+                self._reset()
+                raise
+        except asyncio.TimeoutError as e:
+            self._reset()
+            raise TimeoutError(
+                f"action [{self.action_name}] execution exceeded the time limit: {self.exec_timeout}s."
+            )
+        except Exception as e:
+            self._reset()
+            raise
+
+    @property
+    def task(self):
+        return self._task
 
 
 class _HumanActionHandler(_ActionHandler):
-    def __init__(self, human_agent: "SceneHumanAgent", action_fn: callable, action_name: str, exec_timeout: int):
-        super().__init__(action_fn, action_name, exec_timeout)
+    def __init__(
+        self,
+        human_agent: "SceneHumanAgent",
+        action_fn: callable,
+        action_name: str,
+        exec_timeout: int,
+        executable: asyncio.Event
+    ):
+        super().__init__(action_fn, action_name, exec_timeout, executable)
         self.human_agent = human_agent
 
     async def execute(self, *args, **kwargs):
@@ -56,6 +124,7 @@ class SceneAgentMetadata(BaseModel):
     config_schema: Optional[dict] = Field(default=...)
     obj_for_import: DynamicObject = Field(default=...)
     is_human: bool = Field(default=...)
+    action_timeout_seconds: int = Field(default=...)
 
 
 class SceneAgentMetaClass(ABCMeta):
@@ -178,6 +247,8 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
         self._profile.role = self._role
         self._env_vars: Dict[str, EnvironmentVariable] = None
 
+        self._not_paused = asyncio.Event()
+        self._not_paused.set()
         self._action2handler = {}
         if ABC not in self.__class__.__bases__:
             for action in self.role_definition.actions:
@@ -186,12 +257,23 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
                     getattr(self, action_name),
                     action_name,
                     self.action_exec_timeout,
+                    self._not_paused
                 )
                 setattr(self, action_name, action_handler.execute)
                 self._action2handler[action_name] = action_handler
 
     def bind_env_vars(self, env_vars: Dict[str, EnvironmentVariable]):
         self._env_vars = env_vars
+
+    def pause(self):
+        self._not_paused.clear()
+        for action_handler in self._action2handler.values():
+            if action_handler.task is not None and not action_handler.task.done():
+                # TODO: can't using cancel in the future if we want to support streaming the action result
+                action_handler.task.cancel()
+
+    def resume(self):
+        self._not_paused.set()
 
     @property
     def env_vars(self) -> Dict[str, EnvironmentVariable]:
@@ -232,7 +314,8 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
             description=cls.cls_description,
             config_schema=cls.config_cls.get_json_schema(by_alias=True) if not cls.role_definition.is_static else None,
             obj_for_import=cls.obj_for_import,
-            is_human=False
+            is_human=False,
+            action_timeout_seconds=cls.action_exec_timeout
         )
 
 
@@ -399,7 +482,6 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
         self.connection: HumanConnection = None
         self.human_input = None
         self.wait_human_input = False
-        self.timeout_left = self.action_exec_timeout
 
         if ABC not in self.__class__.__bases__:
             for action in self.role_definition.actions:
@@ -409,6 +491,7 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
                     self._action2handler[action_name].action_fn,
                     action_name,
                     self.action_exec_timeout,
+                    self._not_paused
                 )
                 setattr(self, action_name, action_handler.execute)
                 self._action2handler[action_name] = action_handler
@@ -428,11 +511,9 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
         self.connection.notify_human_to_input()
         while not self.human_input:
             await asyncio.sleep(0.1)
-            self.timeout_left -= 0.1
         self.wait_human_input = False
         if self.connected:
             self.connection.notify_human_to_not_input()
-        self.timeout_left = self.action_exec_timeout
         human_input = self.human_input
         self.human_input = None
         return human_input
