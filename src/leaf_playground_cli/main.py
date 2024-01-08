@@ -217,7 +217,7 @@ def download_web_ui() -> str:
     if os.path.exists(local_hash_save_path):
         with open(local_hash_save_path, "r", encoding="utf-8") as f:
             local_hash = f.read().strip()
-        if remote_hash == local_hash:
+        if remote_hash == local_hash and os.path.exists(web_ui_save_dir):
             return web_ui_save_dir
     with open(local_hash_save_path, "w", encoding="utf-8") as f:
         f.write(remote_hash)
@@ -225,12 +225,21 @@ def download_web_ui() -> str:
     # (re-)download web ui
     if os.path.exists(web_ui_save_dir):
         shutil.rmtree(web_ui_save_dir)
-    response = urlopen(__web_ui_download_url__)
-    size = int(response.headers["Content-Length"])
-    with open(web_ui_file_save_path, "wb") as local_file:
-        with wrap_file(response, size, description="download web ui...") as remote_file:
-            for chunk in remote_file:
-                local_file.write(chunk)
+    try:
+        response = urlopen(__web_ui_download_url__)
+        size = int(response.headers["Content-Length"])
+        with open(web_ui_file_save_path, "wb") as local_file:
+            with wrap_file(response, size, description="download web ui...") as remote_file:
+                for chunk in remote_file:
+                    local_file.write(chunk)
+    except:
+        # download failed, clean
+        print("download failed, clean caches")
+        if os.path.exists(local_hash_save_path):
+            os.remove(local_hash_save_path)
+        if os.path.exists(web_ui_file_save_path):
+            os.remove(web_ui_file_save_path)
+        raise
     with zipfile.ZipFile(web_ui_file_save_path, 'r') as zip_ref:
         zip_ref.extractall(web_ui_save_dir)
     os.remove(web_ui_file_save_path)
