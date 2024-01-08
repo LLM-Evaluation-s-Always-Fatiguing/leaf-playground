@@ -51,6 +51,12 @@ class ActionDefinition(BaseModel):
     def belonged_chain(self):
         return self.belonged_role.name + "." + self.name
 
+    def get_metric_definition(self, metric_name: str) -> MetricDefinition:
+        for metric in self.metrics or []:
+            if metric.name == metric_name:
+                return metric
+        raise ValueError(f"metric [{metric_name}] not found")
+
     def model_post_init(self, __context: Any) -> None:
         if self.signature.return_annotation in [None, Signature.empty] and self.metrics:
             warn(
