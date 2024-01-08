@@ -162,16 +162,8 @@ class SceneEngine:
 
         for evaluator in self.evaluators:
             evaluator.join()
-        self.logger.add_log(
-            SystemLogBody(system_event=SystemEvent.EVALUATION_FINISHED)
-        )
 
-        self.logger.add_log(
-            SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE)
-        )
-
-        self.state = SceneEngineState.FINISHED
-        self.logger.stop()
+        self.stop()
 
     def pause(self):
         if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
@@ -189,6 +181,16 @@ class SceneEngine:
             self.scene.interrupt()
             for evaluator in self.evaluators:
                 evaluator.terminate()
+
+    def stop(self):
+        if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
+            self.logger.add_log(
+                SystemLogBody(system_event=SystemEvent.EVALUATION_FINISHED)
+            )
+            self.logger.add_log(
+                SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE)
+            )
+            self.state = SceneEngineState.FINISHED
 
     def get_scene_config(
             self,
