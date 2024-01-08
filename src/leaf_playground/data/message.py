@@ -84,10 +84,7 @@ class MessagePool(Data):
         """Put one message into the cache"""
         self.messages.append(message)
 
-    def get_messages(
-            self,
-            agent: Profile
-    ) -> List[Message]:
+    def get_messages(self, agent: Profile) -> List[Message]:
         """
         Get messages that sent by the agent or is visible by the agent
 
@@ -105,14 +102,7 @@ class MessagePool(Data):
 
 
 BasicMessageType = Annotated[
-    Union[
-        TextMessage,
-        JsonMessage,
-        ImageMessage,
-        AudioMessage,
-        VideoMessage
-    ],
-    Field(discriminator="msg_type")
+    Union[TextMessage, JsonMessage, ImageMessage, AudioMessage, VideoMessage], Field(discriminator="msg_type")
 ]
 
 __all__ = [
@@ -123,5 +113,5 @@ __all__ = [
     "AudioMessage",
     "VideoMessage",
     "MessagePool",
-    "BasicMessageType"
+    "BasicMessageType",
 ]

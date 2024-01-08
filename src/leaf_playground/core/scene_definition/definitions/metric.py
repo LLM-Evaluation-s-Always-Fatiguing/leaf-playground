@@ -22,11 +22,7 @@ class ValueDType(Enum):
     BOOLEAN = bool
 
 
-VALUE_DETYPE_2_DEFAULT_VALUE = {
-    ValueDType.INT: 0,
-    ValueDType.FLOAT: 0.0,
-    ValueDType.BOOLEAN: False
-}
+VALUE_DETYPE_2_DEFAULT_VALUE = {ValueDType.INT: 0, ValueDType.FLOAT: 0.0, ValueDType.BOOLEAN: False}
 
 
 class DisplayType(Enum):
@@ -73,7 +69,7 @@ class DynamicAggregationFn(DynamicFn):
 
         required_signature = Signature(
             parameters=[Parameter(name="records", kind=Parameter.POSITIONAL_OR_KEYWORD, annotation=List[_RecordData])],
-            return_annotation=AggregationMethodOutput
+            return_annotation=AggregationMethodOutput,
         )
 
         if required_signature != new_fn_signature:
@@ -94,7 +90,7 @@ DEFAULT_AGG_METHODS = {
     "min": lambda x: AggregationMethodOutput(value=min([each.value for each in x])),
     "max": lambda x: AggregationMethodOutput(value=max([each.value for each in x])),
     "median": lambda x: AggregationMethodOutput(value=sorted([each.value for each in x])[len(x) // 2]),
-    "sum": lambda x: AggregationMethodOutput(value=sum([each.value for each in x]))
+    "sum": lambda x: AggregationMethodOutput(value=sum([each.value for each in x])),
 }
 
 
@@ -104,9 +100,9 @@ class CompareMetricDefinition(BaseModel):
     expect_resp_msg_type: Type = Field(default=...)
     is_comparison: Literal[True] = Field(default=True)
 
-    _belonged_action: Optional[
-        "leaf_playground.core.scene_info.definitions.action.ActionDefinition"
-    ] = PrivateAttr(default=None)
+    _belonged_action: Optional["leaf_playground.core.scene_info.definitions.action.ActionDefinition"] = PrivateAttr(
+        default=None
+    )
 
     @property
     def belonged_action(self) -> "leaf_playground.core.scene_info.definitions.action.ActionDefinition":
@@ -124,9 +120,7 @@ class CompareMetricDefinition(BaseModel):
         if not self.expect_resp_msg_type:
             raise ValueError(f"valid_msg_types should not be empty")
         if not issubclass(self.expect_resp_msg_type, Message):
-            raise TypeError(
-                f"expect_resp_msg_type must be a subclass of Message"
-            )
+            raise TypeError(f"expect_resp_msg_type must be a subclass of Message")
 
     def create_data_models(self) -> Tuple[Type[_MetricData], Type[_RecordData]]:
         hash_id = md5(self.model_dump_json().encode()).hexdigest()
@@ -142,27 +136,21 @@ class CompareMetricDefinition(BaseModel):
             "value": (List[str], Field(default=[])),
             "display_type": (Literal[None], Field(default=None)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
-            "target_agent": (Literal[None], Field(default=None))
+            "target_agent": (Literal[None], Field(default=None)),
         }
 
         record_model = create_model(
-            __model_name=record_model_name,
-            __module__=module,
-            __base__=_RecordData,
-            **record_model_fields
+            __model_name=record_model_name, __module__=module, __base__=_RecordData, **record_model_fields
         )
 
         metric_model_fields = {
             "records": (List[record_model], Field(default=...)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
-            "target_agent": (Literal[None], Field(default=None))
+            "target_agent": (Literal[None], Field(default=None)),
         }
 
         metric_model = create_model(
-            __model_name=metric_model_name,
-            __module__=module,
-            __base__=_MetricData,
-            **metric_model_fields
+            __model_name=metric_model_name, __module__=module, __base__=_MetricData, **metric_model_fields
         )
 
         _METRIC_MODELS[hash_id] = (metric_model, record_model)
@@ -179,9 +167,9 @@ class MetricDefinition(BaseModel):
     agg_method: DynamicAggregationMethod = Field(default=...)
     is_comparison: Literal[False] = Field(default=False)
 
-    _belonged_action: Optional[
-        "leaf_playground.core.scene_info.definitions.action.ActionDefinition"
-    ] = PrivateAttr(default=None)
+    _belonged_action: Optional["leaf_playground.core.scene_info.definitions.action.ActionDefinition"] = PrivateAttr(
+        default=None
+    )
 
     @property
     def belonged_action(self) -> "leaf_playground.core.scene_info.definitions.action.ActionDefinition":
@@ -195,9 +183,7 @@ class MetricDefinition(BaseModel):
         if not self.expect_resp_msg_type:
             raise ValueError(f"valid_msg_types should not be empty")
         if not issubclass(self.expect_resp_msg_type, Message):
-            raise TypeError(
-                f"expect_resp_msg_type must be a subclass of Message"
-            )
+            raise TypeError(f"expect_resp_msg_type must be a subclass of Message")
 
     @field_serializer("expect_resp_msg_type")
     def serialize_valid_msg_types(self, expect_resp_msg_type: Type, _info):
@@ -226,27 +212,21 @@ class MetricDefinition(BaseModel):
             "value": (value_annotation, Field(default=VALUE_DETYPE_2_DEFAULT_VALUE[self.record_value_dtype])),
             "display_type": (Literal[self.record_display_type], Field(default=self.record_display_type)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
-            "target_agent": (str, Field(default=...))
+            "target_agent": (str, Field(default=...)),
         }
 
         record_model = create_model(
-            __model_name=record_model_name,
-            __module__=module,
-            __base__=_RecordData,
-            **record_model_fields
+            __model_name=record_model_name, __module__=module, __base__=_RecordData, **record_model_fields
         )
 
         metric_model_fields = {
             "records": (List[record_model], Field(default=...)),
             "is_comparison": (Literal[self.is_comparison], Field(default=self.is_comparison)),
-            "target_agent": (str, Field(default=...))
+            "target_agent": (str, Field(default=...)),
         }
 
         metric_model = create_model(
-            __model_name=metric_model_name,
-            __module__=module,
-            __base__=_MetricData,
-            **metric_model_fields
+            __model_name=metric_model_name, __module__=module, __base__=_MetricData, **metric_model_fields
         )
 
         _METRIC_MODELS[hash_id] = (metric_model, record_model)
@@ -269,5 +249,5 @@ __all__ = [
     "VALUE_DETYPE_2_DEFAULT_VALUE",
     "CompareMetricDefinition",
     "MetricDefinition",
-    "MetricConfig"
+    "MetricConfig",
 ]

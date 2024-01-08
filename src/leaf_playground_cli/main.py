@@ -30,18 +30,16 @@ template_dir = os.path.join(os.path.dirname(__file__), "templates")
 
 
 @app.command(name="new-project", help="initialize a new leaf-playground scenario simulation project from template.")
-def create_new_project(
-    name: Annotated[str, typer.Argument(metavar="project_name")]
-):
+def create_new_project(name: Annotated[str, typer.Argument(metavar="project_name")]):
     project_name = name.lower().replace(" ", "_").replace("-", "_")
     cookiecutter(
         template=template_dir,
         extra_context={
             "project_name": project_name,
             "project_name_camel_case": "".join([each.capitalize() for each in project_name.split("_")]),
-            "leaf_version": leaf_version
+            "leaf_version": leaf_version,
         },
-        no_input=True
+        no_input=True,
     )
 
     print(f"project [{name}] created.")
@@ -49,9 +47,7 @@ def create_new_project(
 
 
 @app.command(name="update-project-structure", help="sync project structure to the template.")
-def update_project_structure(
-    target: Annotated[str, typer.Argument(metavar="target_dir")]
-):
+def update_project_structure(target: Annotated[str, typer.Argument(metavar="target_dir")]):
     template_project_dir = os.path.join(template_dir, "{{cookiecutter.project_name}}")
     template_dot_leaf_dir = os.path.join(template_project_dir, ".leaf")
     template_package_dir = os.path.join(template_project_dir, "{{cookiecutter.project_name}}")
@@ -107,7 +103,7 @@ def update_project_structure(
 
 @app.command(
     name="publish",
-    help="publish project, at this time, will only copy the newest app.py and update project_config.json"
+    help="publish project, at this time, will only copy the newest app.py and update project_config.json",
 )
 def publish_project(
     target: Annotated[str, typer.Argument(metavar="target_dir")],
@@ -138,24 +134,18 @@ def publish_project(
     pkg_root = Path(os.path.join(target, project_name))
     sys.path.insert(0, pkg_root.parent.as_posix())
     scene_class: Type[Scene] = relevantly_find_subclasses(
-        root_path=pkg_root.as_posix(),
-        prefix=project_name,
-        base_class=Scene
+        root_path=pkg_root.as_posix(), prefix=project_name, base_class=Scene
     )[0]
     agent_classes: List[Type[SceneAgent]] = relevantly_find_subclasses(
-        root_path=os.path.join(pkg_root, "agents"),
-        prefix=f"{project_name}.agents",
-        base_class=SceneAgent
+        root_path=os.path.join(pkg_root, "agents"), prefix=f"{project_name}.agents", base_class=SceneAgent
     )
     evaluator_classes: List[Type[MetricEvaluator]] = relevantly_find_subclasses(
         root_path=os.path.join(pkg_root, "metric_evaluators"),
         prefix=f"{project_name}.metric_evaluators",
-        base_class=MetricEvaluator
+        base_class=MetricEvaluator,
     )
     chart_classes: List[Type[Chart]] = relevantly_find_subclasses(
-        root_path=os.path.join(pkg_root, "charts"),
-        prefix=f"{project_name}.charts",
-        base_class=Chart
+        root_path=os.path.join(pkg_root, "charts"), prefix=f"{project_name}.charts", base_class=Chart
     )
 
     agents_metadata = defaultdict(list)
@@ -169,23 +159,25 @@ def publish_project(
     project_config["metadata"] = {
         "scene_metadata": scene_class.get_metadata().model_dump(mode="json", by_alias=True),
         "agents_metadata": agents_metadata,
-        "evaluators_metadata": [
-            evaluator_cls.get_metadata().model_dump(mode="json", by_alias=True) for evaluator_cls in evaluator_classes
-        ] if evaluator_classes else None,
-        "charts_metadata": [
-            chart_cls.get_metadata().model_dump(mode="json", by_alias=True) for chart_cls in chart_classes
-        ] if chart_classes else None
+        "evaluators_metadata": (
+            [
+                evaluator_cls.get_metadata().model_dump(mode="json", by_alias=True)
+                for evaluator_cls in evaluator_classes
+            ]
+            if evaluator_classes
+            else None
+        ),
+        "charts_metadata": (
+            [chart_cls.get_metadata().model_dump(mode="json", by_alias=True) for chart_cls in chart_classes]
+            if chart_classes
+            else None
+        ),
     }
 
     with open(os.path.join(dot_leaf_dir, "project_config.json"), "w", encoding="utf-8") as f:
         json.dump(project_config, f, indent=4, ensure_ascii=False)
 
-    app_py_file_path = os.path.join(
-        template_dir,
-        "{{cookiecutter.project_name}}",
-        ".leaf",
-        "app.py"
-    )
+    app_py_file_path = os.path.join(template_dir, "{{cookiecutter.project_name}}", ".leaf", "app.py")
     shutil.copy(app_py_file_path, os.path.join(dot_leaf_dir, "app.py"))
 
     print(f"publish new version [{version_str}]")
@@ -193,7 +185,9 @@ def publish_project(
 
 
 __web_ui_version__ = "v0.3.0"
-__web_ui_release_site__ = "https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-webui/releases/download"
+__web_ui_release_site__ = (
+    "https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-webui/releases/download"
+)
 __web_ui_download_url__ = __web_ui_release_site__ + f"/{__web_ui_version__}/webui-{__web_ui_version__}.zip"
 __web_ui_hash_url__ = __web_ui_release_site__ + f"/{__web_ui_version__}/webui-{__web_ui_version__}.zip.sha256"
 
@@ -240,7 +234,7 @@ def download_web_ui() -> str:
         if os.path.exists(web_ui_file_save_path):
             os.remove(web_ui_file_save_path)
         raise
-    with zipfile.ZipFile(web_ui_file_save_path, 'r') as zip_ref:
+    with zipfile.ZipFile(web_ui_file_save_path, "r") as zip_ref:
         zip_ref.extractall(web_ui_save_dir)
     os.remove(web_ui_file_save_path)
 
@@ -254,7 +248,7 @@ def start_server(
     ui_port: Annotated[int, typer.Option(default="--ui_port")] = 3000,
     dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
     web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None,
-    no_web_ui: Annotated[Optional[bool], typer.Option("--no_web_ui")] = False
+    no_web_ui: Annotated[Optional[bool], typer.Option("--no_web_ui")] = False,
 ):
     if not no_web_ui:
         if web_ui_dir and not os.path.isdir(web_ui_dir):
@@ -278,11 +272,7 @@ def start_server(
     import uvicorn
 
     uvicorn.run(
-        "leaf_playground_cli.service:app",
-        port=port,
-        host="127.0.0.1",
-        reload=bool(dev_dir),
-        reload_dirs=dev_dir
+        "leaf_playground_cli.service:app", port=port, host="127.0.0.1", reload=bool(dev_dir), reload_dirs=dev_dir
     )
 
 

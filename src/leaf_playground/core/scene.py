@@ -42,9 +42,7 @@ class SceneMetaClass(ABCMeta):
                 f"got [{type(attrs['scene_definition']).__name__}] type"
             )
         if not validate_type(attrs["log_body_class"], Immutable[Type[ActionLogBody]]):
-            raise TypeError(
-                f"class [{name}]'s class attribute [log_body_class] should be subclass of [ActionLogBody]"
-            )
+            raise TypeError(f"class [{name}]'s class attribute [log_body_class] should be subclass of [ActionLogBody]")
 
         if ABC not in bases:
             # check if those class attrs are empty when the class is not abstract
@@ -64,7 +62,7 @@ class SceneMetaClass(ABCMeta):
         attrs,
         *,
         scene_definition: SceneDefinition = None,
-        log_body_class: Type[ActionLogBody] = ActionLogBody
+        log_body_class: Type[ActionLogBody] = ActionLogBody,
     ):
         super().__init__(name, bases, attrs)
 
@@ -198,7 +196,7 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         return SceneMetadata(
             scene_definition=cls.scene_definition,
             config_schema=cls.config_cls.get_json_schema(by_alias=True),
-            obj_for_import=cls.obj_for_import
+            obj_for_import=cls.obj_for_import,
         )
 
     @classmethod
@@ -210,7 +208,4 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         raise NotImplementedError()
 
 
-__all__ = [
-    "Scene",
-    "SceneMetadata"
-]
+__all__ = ["Scene", "SceneMetadata"]

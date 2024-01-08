@@ -14,7 +14,4 @@ class AIBackend(_Configurable):
         return cls(config=config)
 
 
-__all__ = [
-    "AIBackendConfig",
-    "AIBackend"
-]
+__all__ = ["AIBackendConfig", "AIBackend"]

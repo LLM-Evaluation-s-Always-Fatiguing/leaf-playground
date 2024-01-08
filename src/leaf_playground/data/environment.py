@@ -18,6 +18,7 @@ class EnvironmentVariable(Data):
     :param current_value: the value that the environment variable holds for current phase
     :type current_value: Any
     """
+
     name: str = Field(default=...)
     description: str = Field(default=...)
     current_value: Any = Field(default=...)
@@ -36,6 +37,7 @@ class RandomnessEnvironmentVariable(EnvironmentVariable):
     :param current_value: the value that the environment variable holds for current phase
     :type current_value: Optional[Any]
     """
+
     random_space: Set[Any] = Field(default=...)
     current_value: Optional[Any] = Field(default=None)
 
@@ -44,8 +46,7 @@ class RandomnessEnvironmentVariable(EnvironmentVariable):
             self.update()
         if self.current_value not in self.random_space:
             raise ValueError(
-                f"value of 'current_value' must in 'random_space'({self.random_space}), "
-                f"but get {self.current_value}."
+                f"value of 'current_value' must in 'random_space'({self.random_space}), but get {self.current_value}."
             )
 
     def update(self, exclude_current: bool = False) -> None:
@@ -73,6 +74,7 @@ class ChainedEnvironmentVariable(EnvironmentVariable):
     :param recurrent: whether the chain is a recurrent chain
     :type recurrent: bool
     """
+
     chain: List[Any] = Field(default=...)
     current_value: Optional[Any] = Field(default=None)
     recurrent: bool = Field(default=False)
@@ -81,10 +83,7 @@ class ChainedEnvironmentVariable(EnvironmentVariable):
         if self.current_value is None:
             self.current_value = self.chain[0]
         if self.current_value not in self.chain:
-            raise ValueError(
-                f"value of 'current_value' must in 'chain'({self.chain}), "
-                f"but get {self.current_value}."
-            )
+            raise ValueError(f"value of 'current_value' must in 'chain'({self.chain}), but get {self.current_value}.")
 
     def update(self) -> None:
         current_position = self.chain.index(self.current_value)
@@ -118,10 +117,7 @@ class NumericEnvironmentVariable(EnvironmentVariable):
         if self.ge is not None and value < self.ge:
             legal = False
         if not legal:
-            raise ValueError(
-                f"'{value_name}'({self.current_value}) isn't legal for "
-                f"'le'={self.le} and 'ge'={self.ge}"
-            )
+            raise ValueError(f"'{value_name}'({self.current_value}) isn't legal for 'le'={self.le} and 'ge'={self.ge}")
 
     def update(self, new_value: float) -> None:
         self._check_value_legality(value=new_value, value_name="new_value")
@@ -154,5 +150,5 @@ __all__ = [
     "RandomnessEnvironmentVariable",
     "ChainedEnvironmentVariable",
     "NumericEnvironmentVariable",
-    "ConstantEnvironmentVariable"
+    "ConstantEnvironmentVariable",
 ]

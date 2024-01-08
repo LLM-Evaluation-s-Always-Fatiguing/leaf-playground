@@ -39,9 +39,9 @@ class ActionDefinition(BaseModel):
     signature: ActionSignatureDefinition = Field(default=...)
     metrics: Optional[List[MetricDefinition]] = Field(default=None)
 
-    _belonged_role: Optional[
-        "leaf_playground.core.scene_info.definitions.role.RoleDefinition"
-    ] = PrivateAttr(default=None)
+    _belonged_role: Optional["leaf_playground.core.scene_info.definitions.role.RoleDefinition"] = PrivateAttr(
+        default=None
+    )
 
     @property
     def belonged_role(self):
@@ -61,7 +61,7 @@ class ActionDefinition(BaseModel):
         if self.signature.return_annotation in [None, Signature.empty] and self.metrics:
             warn(
                 f"action [{self.name}] hasn't output, but metrics are specified, "
-                f"this may cause some unexpected behaviors"
+                "this may cause some unexpected behaviors"
             )
         if self.metrics and len(set([m.name for m in self.metrics])) != len(self.metrics):
             raise ValueError(f"metrics of action [{self.name}] should have unique names")
@@ -79,8 +79,9 @@ class ActionDefinition(BaseModel):
 
         if not self.signature.is_static_method:
             self.signature.parameters = (
-                [ActionSignatureParameterDefinition(name="self")] if not self.signature.parameters else
-                [ActionSignatureParameterDefinition(name="self")] + self.signature.parameters
+                [ActionSignatureParameterDefinition(name="self")]
+                if not self.signature.parameters
+                else [ActionSignatureParameterDefinition(name="self")] + self.signature.parameters
             )
 
     def get_signature(self) -> Signature:
@@ -89,7 +90,7 @@ class ActionDefinition(BaseModel):
                 Parameter(name=p.name, kind=Parameter.POSITIONAL_OR_KEYWORD, annotation=p.annotation)
                 for p in (self.signature.parameters or [])
             ],
-            return_annotation=self.signature.return_annotation
+            return_annotation=self.signature.return_annotation,
         )
 
 
@@ -135,5 +136,5 @@ __all__ = [
     "ActionSignatureDefinition",
     "ActionDefinition",
     "ActionMetricsConfig",
-    "ActionConfig"
+    "ActionConfig",
 ]

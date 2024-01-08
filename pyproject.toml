@@ -32,6 +32,13 @@ accelerate = "^0.25.0"
 [tool.poetry.extras]
 transformers = ["torch", "transformers", "sentencepiece", "accelerate"]
 
+[tool.black]
+line-length = 119
+extend-exclude = "(src/leaf_playground_cli/templates)"
+skip-magic-trailing-comma = true
+safe = true
+required-version = "23.12.1"
+
 
 [build-system]
 requires = ["poetry-core"]

@@ -44,10 +44,7 @@ class MetricEvaluatorObjConfig(_Config):
     evaluator_obj: DynamicObject = Field(default=...)
 
     def initialize_evaluator(
-            self,
-            scene_config: SceneConfig,
-            logger: Logger,
-            reporter: MetricReporter
+        self, scene_config: SceneConfig, logger: Logger, reporter: MetricReporter
     ) -> MetricEvaluator:
         evaluator_cls: Type[MetricEvaluator] = dynamically_import_obj(self.evaluator_obj)
         evaluator_config_cls: Type[MetricEvaluatorConfig] = evaluator_cls.config_cls
@@ -55,7 +52,7 @@ class MetricEvaluatorObjConfig(_Config):
             config=evaluator_config_cls(**self.evaluator_config_data),
             scene_config=scene_config,
             logger=logger,
-            reporter=reporter
+            reporter=reporter,
         )
 
 
@@ -63,10 +60,7 @@ class MetricEvaluatorObjsConfig(_Config):
     evaluators: List[MetricEvaluatorObjConfig] = Field(default=[])
 
     def initialize_evaluators(
-            self,
-            scene_config: SceneConfig,
-            logger: Logger,
-            reporter: MetricReporter
+        self, scene_config: SceneConfig, logger: Logger, reporter: MetricReporter
     ) -> List[MetricEvaluator]:
         return [
             evaluator_obj_config.initialize_evaluator(scene_config=scene_config, logger=logger, reporter=reporter)
@@ -84,11 +78,7 @@ class SceneEngineState(Enum):
 
 
 class SceneEngineStateProxy:
-    def __init__(
-            self,
-            bound_name: str = "_state",
-            callbacks_attr_name: str = "_state_change_callbacks"
-    ):
+    def __init__(self, bound_name: str = "_state", callbacks_attr_name: str = "_state_change_callbacks"):
         self._bound_name = bound_name
         self._callbacks_attr_name = callbacks_attr_name
 
@@ -105,11 +95,11 @@ class SceneEngine:
     state = SceneEngineStateProxy()
 
     def __init__(
-            self,
-            scene_config: SceneObjConfig,
-            evaluators_config: MetricEvaluatorObjsConfig,
-            reporter_config: ReporterObjConfig,
-            state_change_callbacks: List[Callable] = []
+        self,
+        scene_config: SceneObjConfig,
+        evaluators_config: MetricEvaluatorObjsConfig,
+        reporter_config: ReporterObjConfig,
+        state_change_callbacks: List[Callable] = [],
     ):
         self._state_change_callbacks = state_change_callbacks
         self.state = SceneEngineState.PENDING
@@ -123,9 +113,7 @@ class SceneEngine:
         self.scene = scene_config.initialize_scene(logger=self.logger)
         self.reporter = reporter_config.initialize_reporter(scene_definition=self.scene.scene_definition)
         self.evaluators = evaluators_config.initialize_evaluators(
-            scene_config=self.scene.config,
-            logger=self.logger,
-            reporter=self.reporter
+            scene_config=self.scene.config, logger=self.logger, reporter=self.reporter
         )
 
         for evaluator in self.evaluators:
@@ -148,9 +136,7 @@ class SceneEngine:
         for evaluator in self.evaluators:
             evaluator.start()
 
-        self.logger.add_log(
-            SystemLogBody(system_event=SystemEvent.SIMULATION_START)
-        )
+        self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_START))
         try:
             await self.scene.run()
         except asyncio.CancelledError:
@@ -164,47 +150,32 @@ class SceneEngine:
             for evaluator in self.evaluators:
                 evaluator.terminate()
         else:
-            self.logger.add_log(
-                SystemLogBody(system_event=SystemEvent.SIMULATION_FINISHED)
-            )
+            self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_FINISHED))
             for evaluator in self.evaluators:
                 evaluator.join()
             self.state = SceneEngineState.FINISHED
-            self.logger.add_log(
-                SystemLogBody(system_event=SystemEvent.EVALUATION_FINISHED)
-            )
-            self.logger.add_log(
-                SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE)
-            )
+            self.logger.add_log(SystemLogBody(system_event=SystemEvent.EVALUATION_FINISHED))
+            self.logger.add_log(SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE))
 
     def pause(self):
         if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
-            self.logger.add_log(
-                SystemLogBody(system_event=SystemEvent.SIMULATION_PAUSED)
-            )
+            self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_PAUSED))
             self.state = SceneEngineState.PAUSED
             self.scene.pause()
 
     def resume(self):
         if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
-            self.logger.add_log(
-                SystemLogBody(system_event=SystemEvent.SIMULATION_RESUME)
-            )
+            self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_RESUME))
             self.state = SceneEngineState.RUNNING
             self.scene.resume()
 
     def interrupt(self):
         if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
-            self.logger.add_log(
-                SystemLogBody(system_event=SystemEvent.SIMULATION_INTERRUPTED)
-            )
+            self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_INTERRUPTED))
             self.state = SceneEngineState.INTERRUPTED
             self.scene.interrupt()
 
-    def get_scene_config(
-            self,
-            mode: Literal["pydantic", "dict", "json"] = "dict"
-    ) -> Union[SceneConfig, dict, str]:
+    def get_scene_config(self, mode: Literal["pydantic", "dict", "json"] = "dict") -> Union[SceneConfig, dict, str]:
         if mode == "pydantic":
             return self.scene.config
         elif mode == "dict":
@@ -215,8 +186,7 @@ class SceneEngine:
             raise ValueError(f"invalid mode {mode}")
 
     def get_evaluator_configs(
-            self,
-            mode: Literal["pydantic", "dict", "json"] = "dict"
+        self, mode: Literal["pydantic", "dict", "json"] = "dict"
     ) -> Union[List[MetricEvaluatorConfig], List[dict], str]:
         if mode == "pydantic":
             return [evaluator.config for evaluator in self.evaluators]
@@ -246,19 +216,25 @@ class SceneEngine:
         metrics_data, charts = self.reporter.generate_reports(
             scene_config=self.get_scene_config(mode="pydantic"),
             evaluator_configs=self.get_evaluator_configs(mode="pydantic"),
-            logs=self.logger.logs
+            logs=self.logger.logs,
         )
         metrics_data = {
             "metrics": {
-                name: [each.model_dump(mode="json") for each in data]
-                if isinstance(data, list) else data.model_dump(mode="json")
+                name: (
+                    [each.model_dump(mode="json") for each in data]
+                    if isinstance(data, list)
+                    else data.model_dump(mode="json")
+                )
                 for name, data in metrics_data["metrics"].items()
             },
             "human_metrics": {
-                name: [each.model_dump(mode="json") for each in data]
-                if isinstance(data, list) else data.model_dump(mode="json")
+                name: (
+                    [each.model_dump(mode="json") for each in data]
+                    if isinstance(data, list)
+                    else data.model_dump(mode="json")
+                )
                 for name, data in metrics_data["human_metrics"].items()
-            }
+            },
         }
         with open(join(self.save_dir, "metrics.json"), "w", encoding="utf-8") as f:
             json.dump(metrics_data, f, indent=4, ensure_ascii=False)

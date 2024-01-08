@@ -73,10 +73,4 @@ class SystemLogBody(LogBody):
             self.log_msg = self.system_event.value
 
 
-__all__ = [
-    "LogBody",
-    "LogType",
-    "ActionLogBody",
-    "SystemLogBody",
-    "SystemEvent"
-]
+__all__ = ["LogBody", "LogType", "ActionLogBody", "SystemLogBody", "SystemEvent"]

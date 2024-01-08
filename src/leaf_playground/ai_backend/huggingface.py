@@ -29,7 +29,7 @@ class HFLocalModelConfig(_Config):
             use_fast=self.config.use_fast_tokenizer,
             padding_side="left",
             truncation_side="left",
-            trust_remote_code=self.config.trust_remote_code
+            trust_remote_code=self.config.trust_remote_code,
         )
         # TODO: specify pad_token_id to eos_token_id if it not exists using new way that transformers now supports
 
@@ -44,7 +44,7 @@ class HFLocalModelConfig(_Config):
             max_memory=max_memory,
             low_cpu_mem_usage=self.config.low_cpu_mem_usage,
             revision=self.config.revision,
-            trust_remote_code=self.config.trust_remote_code
+            trust_remote_code=self.config.trust_remote_code,
         )
 
         return model, tokenizer
@@ -81,10 +81,7 @@ class HFAgentBackendConfig(AIBackendConfig):
     def create_hf_agent(self):
         from transformers import HfAgent, Tool
 
-        payload = {
-            "chat_prompt_template": self.chat_prompt_template,
-            "run_prompt_template": self.run_prompt_template,
-        }
+        payload = {"chat_prompt_template": self.chat_prompt_template, "run_prompt_template": self.run_prompt_template}
         if self.additional_tools:
             payload["additional_tools"] = [Tool.from_hub(**tool.model_dump()) for tool in self.additional_tools]
         if self.remote_endpoint_config:
@@ -99,7 +96,6 @@ class HFAgentBackendConfig(AIBackendConfig):
 
 
 class HFPipelineBackendConfig(HFLocalModelConfig):
-
     def prepare_pipeline(self):
         from transformers import TextGenerationPipeline
 

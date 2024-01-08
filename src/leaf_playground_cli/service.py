@@ -15,8 +15,12 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, DirectoryPath, PrivateAttr
 
-from leaf_playground.core.scene_engine import SceneEngineState, SceneObjConfig, MetricEvaluatorObjsConfig, \
-    ReporterObjConfig
+from leaf_playground.core.scene_engine import (
+    SceneEngineState,
+    SceneObjConfig,
+    MetricEvaluatorObjsConfig,
+    ReporterObjConfig,
+)
 
 app = FastAPI()
 service_config: "ServiceConfig" = None
@@ -52,9 +56,7 @@ def scan_scenes(zoo_dir: DirectoryPath) -> List[SceneFull]:
         with open(os.path.join(work_dir.as_posix(), ".leaf", "project_config.json"), "r", encoding="utf-8") as f:
             proj_metadata = json.load(f)["metadata"]
         if proj_metadata:
-            scenes.append(
-                SceneFull(**proj_metadata, work_dir=work_dir)
-            )
+            scenes.append(SceneFull(**proj_metadata, work_dir=work_dir))
     else:
         for root, dirs, _ in os.walk(zoo_dir.as_posix()):
             for work_dir in dirs:
@@ -160,6 +162,7 @@ class TaskManager:
         is_windows = os.name == "nt"
         if is_windows:
             import ctypes
+
             ctypes.windll.kernel32.GenerateConsoleCtrlEvent(0, pid)  # TODO: truly kill
         else:
             os.kill(pid, signal.SIGINT)
@@ -171,9 +174,10 @@ task_manager: TaskManager = None
 @app.get("/", response_class=JSONResponse)
 async def list_scenes() -> JSONResponse:
     return JSONResponse(
-        content=[scene_full.model_dump(mode="json", by_alias=True) for scene_full in
-                 scan_scenes(service_config.zoo_dir)],
-        media_type="application/json"
+        content=[
+            scene_full.model_dump(mode="json", by_alias=True) for scene_full in scan_scenes(service_config.zoo_dir)
+        ],
+        media_type="application/json",
     )
 
 

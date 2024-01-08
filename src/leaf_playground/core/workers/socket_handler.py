@@ -15,18 +15,12 @@ class SocketHandler:
 
     def notify_create(self, log_body: LogBody):
         self._socket_cache.append(
-            SocketData(
-                data=log_body.model_dump(mode="json", by_alias=True),
-                operation=SocketOperation.CREATE
-            )
+            SocketData(data=log_body.model_dump(mode="json", by_alias=True), operation=SocketOperation.CREATE)
         )
 
     def notify_update(self, log_body: LogBody):
         self._socket_cache.append(
-            SocketData(
-                data=log_body.model_dump(mode="json", by_alias=True),
-                operation=SocketOperation.UPDATE
-            )
+            SocketData(data=log_body.model_dump(mode="json", by_alias=True), operation=SocketOperation.UPDATE)
         )
 
     async def stream_sockets(self, websocket: WebSocket) -> bool:

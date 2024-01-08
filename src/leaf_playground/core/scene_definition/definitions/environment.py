@@ -37,30 +37,22 @@ class EnvVarConfig(_Config):
     def create_config_model(cls, env_var_definition: EnvVarDefinition) -> Type["EnvironmentVariable"]:
         model_name = "".join([each.capitalize() for each in env_var_definition.name.split("_")]) + cls.__name__
         module = _getframe(1).f_globals["__name__"]
-        cls_kwargs = {
-            "_env_var_definition": env_var_definition
-        }
+        cls_kwargs = {"_env_var_definition": env_var_definition}
         fields = {
-            f_name: (f_info.annotation, f_info) for f_name, f_info in env_var_definition.env_var_cls.model_fields.items()
+            f_name: (f_info.annotation, f_info)
+            for f_name, f_info in env_var_definition.env_var_cls.model_fields.items()
             if f_name not in ["name", "description"] and not f_info.exclude
         }
         return create_model(
-            __model_name=model_name,
-            __module__=module,
-            __base__=cls,
-            __cls_kwargs__=cls_kwargs,
-            **fields
+            __model_name=model_name, __module__=module, __base__=cls, __cls_kwargs__=cls_kwargs, **fields
         )
 
     def initiate_env_var(self) -> EnvironmentVariable:
         return self.env_var_definition.env_var_cls(
             name=self.env_var_definition.name,
             description=self.env_var_definition.description,
-            **self.model_dump(mode="json", by_alias=True)
+            **self.model_dump(mode="json", by_alias=True),
         )
 
 
-__all__ = [
-    "EnvVarDefinition",
-    "EnvVarConfig"
-]
+__all__ = ["EnvVarDefinition", "EnvVarConfig"]

@@ -48,7 +48,7 @@ class MetricEvaluatorProxy(Process):
         config_data: dict,
         record_metrics: List[_MetricName],
         compare_metrics: List[_MetricName],
-        manager: Manager
+        manager: Manager,
     ):
         super().__init__(daemon=True)
 
@@ -129,6 +129,7 @@ class MetricEvaluatorProxy(Process):
 # TODO: We hope that the MetricEvaluator class can be inherited through composition
 #  (or at least subcls can extend defs), however, using meta class makes this tough
 
+
 class MetricEvaluatorMetaClass(ABCMeta):
     def __new__(
         cls,
@@ -137,7 +138,7 @@ class MetricEvaluatorMetaClass(ABCMeta):
         attrs,
         *,
         metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
-        cls_description: str = None
+        cls_description: str = None,
     ):
         # create proxy class on the fly
         evaluator_proxy_class = new_class(
@@ -146,14 +147,14 @@ class MetricEvaluatorMetaClass(ABCMeta):
             kwds={
                 "_init_evaluator": attrs["_init_evaluator"],
                 "_record": attrs["_record"],
-                "_compare": attrs["_compare"]
-            }
+                "_compare": attrs["_compare"],
+            },
         )
         evaluator_proxy_class.__module__ = _getframe(1).f_globals["__name__"]
         setattr(
             importlib.import_module(evaluator_proxy_class.__module__),
             evaluator_proxy_class.__name__,
-            evaluator_proxy_class
+            evaluator_proxy_class,
         )
 
         attrs["metric_definitions"] = Immutable(metric_definitions or getattr(bases[0], "metric_definitions", None))
@@ -177,7 +178,7 @@ class MetricEvaluatorMetaClass(ABCMeta):
         if not validate_type(attrs["evaluator_proxy_class"], Immutable[Optional[MetricEvaluatorProxy]]):
             raise TypeError(
                 f"class [{name}]'s class attribute [evaluator_proxy_class] should be a subclass of "
-                f"[MetricEvaluatorProxy]"
+                "[MetricEvaluatorProxy]"
             )
 
         if ABC not in bases:
@@ -192,13 +193,13 @@ class MetricEvaluatorMetaClass(ABCMeta):
                 raise AttributeError(
                     f"class [{name}] missing class attribute [cls_description], please specify it by "
                     f"doing like: `class {name}(cls_description=your_cls_desc)`, where 'your_cls_desc' "
-                    f"is a string that introduces your evaluator class"
+                    "is a string that introduces your evaluator class"
                 )
             if not new_cls.evaluator_proxy_class:
                 raise AttributeError(
                     f"class [{name}] missing class attribute [cls_description], please specify it by "
                     f"doing like: `class {name}(evaluator_proxy_class=your_evaluator_proxy_class)`, where "
-                    f"'your_evaluator_proxy_class' is the proxy class(a Process) of your evaluator class"
+                    "'your_evaluator_proxy_class' is the proxy class(a Process) of your evaluator class"
                 )
 
         return new_cls
@@ -210,7 +211,7 @@ class MetricEvaluatorMetaClass(ABCMeta):
         attrs,
         *,
         metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
-        cls_description: str = None
+        cls_description: str = None,
     ):
         super().__init__(name, bases, attrs)
 
@@ -263,7 +264,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         config: config_cls,
         scene_config: SceneConfig,
         logger: Logger,
-        reporter: "leaf_playground.core.workers.MetricReporter"
+        reporter: "leaf_playground.core.workers.MetricReporter",
     ):
         super().__init__(config=config)
 
@@ -275,7 +276,8 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             for metric_def in self.metric_definitions
         }
         self.metric_name2metric_defs = {
-            metric_name: metric_def for metric_name, metric_def in metric_name2def.items()
+            metric_name: metric_def
+            for metric_name, metric_def in metric_name2def.items()
             if metric_name2conf[metric_name].enable
         }
         self.resp_msg_type2metric_defs = defaultdict(list)
@@ -283,11 +285,13 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             self.resp_msg_type2metric_defs[metric.expect_resp_msg_type].append(metric)
 
         self.metrics_for_record = [
-            metric_def.belonged_chain for metric_def in self.metric_name2metric_defs.values()
+            metric_def.belonged_chain
+            for metric_def in self.metric_name2metric_defs.values()
             if not metric_def.is_comparison
         ]
         self.metrics_for_compare = [
-            metric_def.belonged_chain for metric_def in self.metric_name2metric_defs.values()
+            metric_def.belonged_chain
+            for metric_def in self.metric_name2metric_defs.values()
             if metric_def.is_comparison
         ]
 
@@ -299,15 +303,13 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             config_data=self.config_data,
             record_metrics=self.metrics_for_record,
             compare_metrics=self.metrics_for_compare,
-            manager=Manager()
+            manager=Manager(),
         )
 
     @staticmethod
     @abstractmethod
     def _init_evaluator(
-        config: MetricEvaluatorConfig,
-        record_metrics: List[_MetricName],
-        compare_metrics: List[_MetricName]
+        config: MetricEvaluatorConfig, record_metrics: List[_MetricName], compare_metrics: List[_MetricName]
     ) -> Any:
         pass
 
@@ -345,7 +347,8 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         while id_ not in self.proxy.result_cache:
             time.sleep(0.1)  # sleep longer to let scene's main process have more CPU time slice
         return {
-            k: (CompareOutput if is_compare else RecordOutput)(**v) for k, v in self.proxy.result_cache.pop(id_).items()
+            k: (CompareOutput if is_compare else RecordOutput)(**v)
+            for k, v in self.proxy.result_cache.pop(id_).items()
         }
 
     def record(self, log: ActionLogBody) -> None:
@@ -377,7 +380,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                 reason=reason,
                 misc=misc,
                 target_agent=target_agent,
-                evaluator=self.__class__.__name__
+                evaluator=self.__class__.__name__,
             )
             self.reporter.put_record(record_data, metric_def.belonged_chain)
             records[metric_name] = record_data.model_dump(mode="json")
@@ -407,10 +410,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             # save record data
             _, record_data_model = metric_def.create_data_models()
             record_data = record_data_model(
-                value=compare_result,
-                reason=reason,
-                misc=misc,
-                evaluator=self.__class__.__name__
+                value=compare_result, reason=reason, misc=misc, evaluator=self.__class__.__name__
             )
             self.reporter.put_record(record_data, metric_def.belonged_chain)
             records[metric_name] = record_data.model_dump(mode="json")
@@ -423,7 +423,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             description=cls.cls_description,
             config_schema=cls.config_cls.get_json_schema(by_alias=True),
             obj_for_import=cls.obj_for_import,
-            metrics=[metric_def.belonged_chain for metric_def in cls.metric_definitions]
+            metrics=[metric_def.belonged_chain for metric_def in cls.metric_definitions],
         )
 
     @classmethod
@@ -444,5 +444,5 @@ __all__ = [
     "MetricEvaluatorConfig",
     "MetricEvaluatorProxy",
     "MetricEvaluator",
-    "MetricEvaluatorMetadata"
+    "MetricEvaluatorMetadata",
 ]

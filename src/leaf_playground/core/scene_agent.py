@@ -21,13 +21,7 @@ from ..utils.type_util import validate_type
 
 
 class _ActionHandler:
-    def __init__(
-        self,
-        action_fn: callable,
-        action_name: str,
-        exec_timeout: int,
-        executable: asyncio.Event
-    ):
+    def __init__(self, action_fn: callable, action_name: str, exec_timeout: int, executable: asyncio.Event):
         self.action_fn = action_fn
         self.action_name = action_name
         self.exec_timeout = exec_timeout
@@ -66,8 +60,7 @@ class _ActionHandler:
                     self._clock = asyncio.ensure_future(self._record_executed_seconds())
                 self._task = asyncio.ensure_future(
                     asyncio.wait_for(
-                        self.action_fn(*args, **kwargs),
-                        timeout=self.exec_timeout - self._executed_seconds
+                        self.action_fn(*args, **kwargs), timeout=self.exec_timeout - self._executed_seconds
                     )
                 )
                 await self._task
@@ -83,9 +76,7 @@ class _ActionHandler:
                 raise
         except asyncio.TimeoutError as e:
             self._reset()
-            raise TimeoutError(
-                f"action [{self.action_name}] execution exceeded the time limit: {self.exec_timeout}s."
-            )
+            raise TimeoutError(f"action [{self.action_name}] execution exceeded the time limit: {self.exec_timeout}s.")
         except Exception as e:
             self._reset()
             raise
@@ -102,7 +93,7 @@ class _HumanActionHandler(_ActionHandler):
         action_fn: callable,
         action_name: str,
         exec_timeout: int,
-        executable: asyncio.Event
+        executable: asyncio.Event,
     ):
         super().__init__(action_fn, action_name, exec_timeout, executable)
         self.human_agent = human_agent
@@ -129,14 +120,14 @@ class SceneAgentMetadata(BaseModel):
 
 class SceneAgentMetaClass(ABCMeta):
     def __new__(
-            cls,
-            name,
-            bases,
-            attrs,
-            *,
-            role_definition: RoleDefinition = None,
-            cls_description: str = None,
-            action_exec_timeout: int = 30,
+        cls,
+        name,
+        bases,
+        attrs,
+        *,
+        role_definition: RoleDefinition = None,
+        cls_description: str = None,
+        action_exec_timeout: int = 30,
     ):
         attrs["role_definition"] = Immutable(role_definition or getattr(bases[0], "role_definition", None))
         attrs["cls_description"] = Immutable(cls_description)
@@ -175,7 +166,7 @@ class SceneAgentMetaClass(ABCMeta):
                 raise AttributeError(
                     f"class [{name}] missing class attribute [cls_description], please specify it by "
                     f"doing like: `class {name}(cls_description=your_cls_desc)`, where 'your_cls_desc' "
-                    f"is a string that introduces your agent class"
+                    "is a string that introduces your agent class"
                 )
             # bind the agent class to its role definition
             new_cls.role_definition._agents_cls.append(new_cls)
@@ -200,14 +191,14 @@ class SceneAgentMetaClass(ABCMeta):
         return new_cls
 
     def __init__(
-            cls,
-            name,
-            bases,
-            attrs,
-            *,
-            role_definition: RoleDefinition = None,
-            cls_description: str = None,
-            action_exec_timeout: int = 30,
+        cls,
+        name,
+        bases,
+        attrs,
+        *,
+        role_definition: RoleDefinition = None,
+        cls_description: str = None,
+        action_exec_timeout: int = 30,
     ):
         super().__init__(name, bases, attrs)
 
@@ -254,10 +245,7 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
             for action in self.role_definition.actions:
                 action_name = action.name
                 action_handler = _ActionHandler(
-                    getattr(self, action_name),
-                    action_name,
-                    self.action_exec_timeout,
-                    self._not_paused
+                    getattr(self, action_name), action_name, self.action_exec_timeout, self._not_paused
                 )
                 setattr(self, action_name, action_handler.execute)
                 self._action2handler[action_name] = action_handler
@@ -315,12 +303,11 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
             config_schema=cls.config_cls.get_json_schema(by_alias=True) if not cls.role_definition.is_static else None,
             obj_for_import=cls.obj_for_import,
             is_human=False,
-            action_timeout_seconds=cls.action_exec_timeout
+            action_timeout_seconds=cls.action_exec_timeout,
         )
 
 
 class SceneDynamicAgentConfig(SceneAgentConfig):
-
     def model_post_init(self, __context) -> None:
         pass
 
@@ -405,14 +392,10 @@ class HumanConnection:
         self.state = WebSocketState.DISCONNECTED
 
     def notify_human_to_input(self):
-        self.events.put_nowait(
-            SocketEvent(event="wait_human_input")
-        )
+        self.events.put_nowait(SocketEvent(event="wait_human_input"))
 
     def notify_human_to_not_input(self):
-        self.events.put_nowait(
-            SocketEvent(event="disable_human_input")
-        )
+        self.events.put_nowait(SocketEvent(event="disable_human_input"))
 
     def notify_to_cancel(self):
         self.cancel_event.set()
@@ -458,14 +441,12 @@ class HumanConnection:
                 continue
 
     async def run(self):
-        await asyncio.gather(
-            *[
-                self.socket_handler.stream_sockets(self.socket),
-                self._send_socket_event(),
-                self._receive_human_input(),
-                self._keep_alive()
-            ]
-        )
+        await asyncio.gather(*[
+            self.socket_handler.stream_sockets(self.socket),
+            self._send_socket_event(),
+            self._receive_human_input(),
+            self._keep_alive(),
+        ])
 
 
 class SceneHumanAgentConfig(SceneDynamicAgentConfig):
@@ -491,7 +472,7 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
                     self._action2handler[action_name].action_fn,
                     action_name,
                     self.action_exec_timeout,
-                    self._not_paused
+                    self._not_paused,
                 )
                 setattr(self, action_name, action_handler.execute)
                 self._action2handler[action_name] = action_handler
@@ -540,14 +521,9 @@ class SceneStaticAgentConfig(SceneAgentConfig):
         module = _getframe(1).f_code.co_filename
         fields = {
             "profile": (Profile, Field(default=Profile(name=role_definition.name), frozen=True, exclude=True)),
-            "chart_major_color": (Optional[str], Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$", exclude=True))
+            "chart_major_color": (Optional[str], Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$", exclude=True)),
         }
-        return create_model(
-            __model_name=model_name,
-            __module__=module,
-            __base__=cls,
-            **fields
-        )
+        return create_model(__model_name=model_name, __module__=module, __base__=cls, **fields)
 
 
 class SceneStaticAgent(SceneAgent, ABC):

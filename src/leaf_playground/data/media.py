@@ -39,9 +39,9 @@ class Json(Media):
     type: Literal["json"] = Field(default="json")
 
     def _generate_display_text(self) -> str:
-        if isinstance(self.data, dict) and self.data.get('text') is not None:
-            return self.data['text'][:256]
-        return 'Json Object' if isinstance(self.data, dict) else 'Json Array'
+        if isinstance(self.data, dict) and self.data.get("text") is not None:
+            return self.data["text"][:256]
+        return "Json Object" if isinstance(self.data, dict) else "Json Array"
 
     def __repr__(self):
         return f"<Json {json.dumps(self.data, ensure_ascii=False, indent=2)}>"
@@ -66,18 +66,7 @@ class Video(Media):
     type: Literal["video"] = Field(default="video")
 
 
-MediaType = Annotated[
-    Union[Text, Json, Audio, Image, Video],
-    Field(discriminator="type")
-]
+MediaType = Annotated[Union[Text, Json, Audio, Image, Video], Field(discriminator="type")]
 
 
-__all__ = [
-    "Media",
-    "Text",
-    "Json",
-    "Image",
-    "Audio",
-    "Video",
-    "MediaType",
-]
+__all__ = ["Media", "Text", "Json", "Image", "Audio", "Video", "MediaType"]

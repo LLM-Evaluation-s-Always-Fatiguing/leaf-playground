@@ -81,8 +81,7 @@ class OpenAIBackendConfig(AIBackendConfig):
             self.api_key = os.environ.get("AZURE_OPENAI_API_KEY" if self.is_azure else "OPENAI_API_KEY", None)
         if not self.api_key and not self.is_azure:
             raise ValueError(
-                "Must provide the `api_key` argument, or the `OPENAI_API_KEY` environment variable "
-                "when is_azure=False"
+                "Must provide the `api_key` argument, or the `OPENAI_API_KEY` environment variable when is_azure=False"
             )
         if not self.organization and not self.is_azure:
             self.organization = os.environ.get("OPENAI_ORG_ID", None)
@@ -110,7 +109,7 @@ class OpenAIBackendConfig(AIBackendConfig):
             payload.update(
                 azure_endpoint=self.azure_endpoint,
                 azure_deployment=self.azure_deployment,
-                api_version=self.api_version
+                api_version=self.api_version,
             )
         return payload
 
@@ -133,9 +132,4 @@ class OpenAIBackend(AIBackend):
         self.async_client = self.config.creat_async_client()
 
 
-__all__ = [
-    "COMPLETION_MODELS",
-    "CHAT_MODELS",
-    "OpenAIBackendConfig",
-    "OpenAIBackend"
-]
+__all__ = ["COMPLETION_MODELS", "CHAT_MODELS", "OpenAIBackendConfig", "OpenAIBackend"]

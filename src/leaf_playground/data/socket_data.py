@@ -22,8 +22,4 @@ class SocketEvent(Data):
     type: Literal["socket_event"] = Field(default="event")
 
 
-__all__ = [
-    "SocketData",
-    "SocketEvent",
-    "SocketOperation"
-]
+__all__ = ["SocketData", "SocketEvent", "SocketOperation"]

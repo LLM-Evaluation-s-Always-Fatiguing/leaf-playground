@@ -7,7 +7,6 @@ from .base_vega_chart import BaseVegaChart
 
 
 class SimpleBar(BaseVegaChart):
-
     def __init__(self, mode: Literal["percent", "value"] = "value", max_value=1.0):
         self.mode = mode
         self.max_value = max_value
@@ -17,15 +16,17 @@ class SimpleBar(BaseVegaChart):
 
         fmt = ".2f" if self.mode == "value" else ".1%"
 
-        chart = alt.Chart(data).mark_bar(cornerRadius=5, height={"band": 0.6}).encode(
-            y=alt.X("agent:N").axis(labelAngle=0, title=None),
-            x=alt.Y("value:Q").axis(title=None, format=fmt).scale(domain=(0, self.max_value)),
-            color=alt.Color("color:N").scale(None).legend(None),
+        chart = (
+            alt.Chart(data)
+            .mark_bar(cornerRadius=5, height={"band": 0.6})
+            .encode(
+                y=alt.X("agent:N").axis(labelAngle=0, title=None),
+                x=alt.Y("value:Q").axis(title=None, format=fmt).scale(domain=(0, self.max_value)),
+                color=alt.Color("color:N").scale(None).legend(None),
+            )
         )
 
-        text = chart.mark_text(align='left', dx=3).encode(
-            text=alt.Text("value:Q", format=fmt)
-        )
+        text = chart.mark_text(align="left", dx=3).encode(text=alt.Text("value:Q", format=fmt))
 
         return (chart + text).to_dict()
 
