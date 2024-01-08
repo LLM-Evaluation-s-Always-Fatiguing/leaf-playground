@@ -3,9 +3,9 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
 from pydantic import create_model, BaseModel, Field, PositiveInt
 
+from . import MetricDefinition
 from .definitions import EnvVarDefinition, EnvVarConfig, MetricConfig, RoleDefinition, RoleConfig
 from ..._config import _Config
-
 
 _EnvVarName = str
 _RoleName = str
@@ -40,6 +40,10 @@ class SceneDefinition(BaseModel):
             if env_var.name == env_var_name:
                 return env_var
         raise ValueError(f"env_var [{env_var_name}] not found")
+
+    def get_metric_definition(self, metric_belonged_chain: str) -> MetricDefinition:
+        role_name, action_name, metric_name = metric_belonged_chain.split(".")
+        return self.get_role_definition(role_name).get_action_definition(action_name).get_metric_definition(metric_name)
 
 
 class SceneEnvVarsConfig(_Config):
