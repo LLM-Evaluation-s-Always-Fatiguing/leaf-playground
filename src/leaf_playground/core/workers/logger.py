@@ -4,9 +4,10 @@ import os
 from typing import Dict, Literal, Any
 from uuid import UUID
 
+import pandas as pd
 from pydantic import BaseModel, Field
 
-from ...data.log_body import LogBody
+from ...data.log_body import LogBody, ActionLogBody
 
 
 class Logger:
@@ -72,7 +73,14 @@ class LogExporter(BaseModel):
                 f.write(log.model_dump_json(exclude={"id"}) + "\n")
 
     def _export_to_csv(self, logger: Logger, save_path: str):
-        raise NotImplementedError()
+        data = {"log_id": [], "sender": [], "receivers": [], "message": []}
+        for log in [log for log in logger.logs if isinstance(log, ActionLogBody)]:
+            response = log.response
+            data["log_id"].append(log.id.hex)
+            data["sender"].append(response.sender_name)
+            data["receivers"].append([receiver.name for receiver in response.receivers])
+            data["message"].append(response.content.display_text)
+        pd.DataFrame(data).to_csv(save_path, encoding="utf-8", index=False)
 
     def export(self, logger: Logger, save_dir: str):
         save_path = os.path.join(save_dir, f"{self.file_name}.{self.extension}")
