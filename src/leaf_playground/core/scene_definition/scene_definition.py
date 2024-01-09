@@ -5,7 +5,7 @@ from pydantic import create_model, BaseModel, Field, PositiveInt, PrivateAttr
 
 from . import MetricDefinition
 from .definitions import EnvVarDefinition, EnvVarConfig, MetricConfig, RoleDefinition, RoleConfig
-from ..workers.logger import LogExporter, _KEPT_LOG_FILE_NAME
+from ..workers.logger import LogExporter, _KeptLogExporter
 from ..._config import _Config
 
 _EnvVarName = str
@@ -19,7 +19,7 @@ class SceneDefinition(BaseModel):
     roles: List[RoleDefinition] = Field(default=...)
 
     _log_exporters: List[LogExporter] = PrivateAttr(
-        default=[LogExporter(file_name=_KEPT_LOG_FILE_NAME, extension=ext) for ext in ["json", "jsonl", "csv"]]
+        default=[_KeptLogExporter(extension=ext) for ext in ["json", "jsonl", "csv"]]
     )
 
     @property
