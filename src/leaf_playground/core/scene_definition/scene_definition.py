@@ -1,10 +1,11 @@
 from sys import _getframe
 from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
 
-from pydantic import create_model, BaseModel, Field, PositiveInt
+from pydantic import create_model, BaseModel, Field, PositiveInt, PrivateAttr
 
 from . import MetricDefinition
 from .definitions import EnvVarDefinition, EnvVarConfig, MetricConfig, RoleDefinition, RoleConfig
+from ..workers.logger import LogExporter, _KeptLogExporter
 from ..._config import _Config
 
 _EnvVarName = str
@@ -17,9 +18,17 @@ class SceneDefinition(BaseModel):
     env_vars: List[EnvVarDefinition] = Field(default=...)
     roles: List[RoleDefinition] = Field(default=...)
 
+    _log_exporters: List[LogExporter] = PrivateAttr(
+        default=[_KeptLogExporter(extension=ext) for ext in ["json", "jsonl", "csv"]]
+    )
+
     @property
     def roles_agent_num_range(self) -> Dict[str, Tuple[PositiveInt, Union[PositiveInt, Literal[-1]]]]:
         return {role.name: role.num_agents_range for role in self.roles}
+
+    @property
+    def log_exporters(self):
+        return self._log_exporters
 
     def model_post_init(self, __context: Any) -> None:
         if len(set([r.name for r in self.roles])) != len(self.roles):
@@ -44,6 +53,14 @@ class SceneDefinition(BaseModel):
         return (
             self.get_role_definition(role_name).get_action_definition(action_name).get_metric_definition(metric_name)
         )
+
+    def registry_log_exporters(self, log_exporters: List[LogExporter]):
+        name2exporter = {f"{exporter.file_name}.{exporter.extension}": exporter for exporter in self.log_exporters}
+        for exporter in log_exporters:
+            name = f"{exporter.file_name}:{exporter.extension}"
+            name2exporter[name] = exporter
+
+        self._log_exporters = list(name2exporter.values())
 
 
 class SceneEnvVarsConfig(_Config):
