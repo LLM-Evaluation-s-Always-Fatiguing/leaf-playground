@@ -53,7 +53,7 @@ _KEPT_LOG_FILE_NAME = ".log"
 
 
 class LogExporter(BaseModel):
-    file_name: str = Field(default="logs")
+    file_name: str = Field(default="log")
     extension: Literal["json", "jsonl", "csv"] = Field(default="jsonl")
 
     def model_post_init(self, __context: Any) -> None:
@@ -91,6 +91,13 @@ class LogExporter(BaseModel):
             if os.path.exists(save_path):
                 os.remove(save_path)
             warnings.warn(f"{self.__class__.__name__}.{func_name} export log failed.")
+
+
+class _KeptLogExporter(LogExporter):
+    file_name: str = Field(default=_KEPT_LOG_FILE_NAME)
+
+    def model_post_init(self, __context: Any) -> None:
+        pass
 
 
 __all__ = ["Logger", "LogExporter"]
