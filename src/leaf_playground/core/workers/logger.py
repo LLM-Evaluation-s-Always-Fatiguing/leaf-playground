@@ -1,9 +1,12 @@
-import asyncio
-from typing import Any, Callable, Dict, Literal
+import json
+import warnings
+import os
+from typing import Dict, Literal, Any
 from uuid import UUID
 
+from pydantic import BaseModel, Field
+
 from ...data.log_body import LogBody
-from ...utils.thread_util import run_asynchronously
 
 
 class Logger:
@@ -45,4 +48,41 @@ class Logger:
         return self._logs
 
 
-__all__ = ["Logger"]
+_KEPT_LOG_FILE_NAME = ".log"
+
+
+class LogExporter(BaseModel):
+    file_name: str = Field(default="logs")
+    extension: Literal["json", "jsonl", "csv"] = Field(default="jsonl")
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.file_name in _KEPT_LOG_FILE_NAME:
+            raise ValueError(f"can't set file_name to {_KEPT_LOG_FILE_NAME}")
+        if self.extension not in ["json", "jsonl", "csv"]:
+            raise NotImplementedError(f"file extension {self.extension} isn't support yet.")
+
+    def _export_to_json(self, logger: Logger, save_path: str):
+        logs = [log.model_dump(mode="json") for log in logger.logs]
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(logs, f, indent=4, ensure_ascii=False)
+
+    def _export_to_jsonl(self, logger: Logger, save_path: str):
+        with open(save_path, "w", encoding="utf-8") as f:
+            for log in logger.logs:
+                f.write(log.model_dump_json(exclude={"id"}) + "\n")
+
+    def _export_to_csv(self, logger: Logger, save_path: str):
+        raise NotImplementedError()
+
+    def export(self, logger: Logger, save_dir: str):
+        save_path = os.path.join(save_dir, f"{self.file_name}.{self.extension}")
+        func_name = f"_export_to_{self.extension}"
+        try:
+            getattr(self, func_name)(logger, save_path)
+        except:
+            if os.path.exists(save_path):
+                os.remove(save_path)
+            warnings.warn(f"{self.__class__.__name__}.{func_name} export log failed.")
+
+
+__all__ = ["Logger", "LogExporter"]
