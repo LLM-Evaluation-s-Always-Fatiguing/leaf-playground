@@ -22,7 +22,6 @@ class EnvVarDefinition(BaseModel):
 
 
 class EnvVarConfig(_Config):
-
     _env_var_definition: EnvVarDefinition = PrivateAttr(default=None)
 
     def __init_subclass__(cls, _env_var_definition: EnvVarDefinition, **kwargs):

@@ -36,12 +36,14 @@ if __name__ == "__main__":
     from pandas import DataFrame
     import json
 
-    data = DataFrame([
-        {"agent": "gpt4", "color": "#7D3C98", "value": 4},
-        {"agent": "gpt3", "color": "#F39C12", "value": 3},
-        {"agent": "gpt2", "color": "#3498DB", "value": 2},
-        {"agent": "gpt1", "color": "#E74C3C", "value": 1},
-    ])
+    data = DataFrame(
+        [
+            {"agent": "gpt4", "color": "#7D3C98", "value": 4},
+            {"agent": "gpt3", "color": "#F39C12", "value": 3},
+            {"agent": "gpt2", "color": "#3498DB", "value": 2},
+            {"agent": "gpt1", "color": "#E74C3C", "value": 1},
+        ]
+    )
 
     chart = SimpleBar(mode="value", max_value=5)
     print(json.dumps(chart.generate(data)))

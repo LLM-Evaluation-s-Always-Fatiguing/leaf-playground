@@ -70,7 +70,7 @@ class LogExporter(BaseModel):
     def _export_to_jsonl(self, logger: Logger, save_path: str):
         with open(save_path, "w", encoding="utf-8") as f:
             for log in logger.logs:
-                f.write(log.model_dump_json(exclude={"id"}) + "\n")
+                f.write(log.model_dump_json() + "\n")
 
     def _export_to_csv(self, logger: Logger, save_path: str):
         data = {"log_id": [], "sender": [], "receivers": [], "message": []}
