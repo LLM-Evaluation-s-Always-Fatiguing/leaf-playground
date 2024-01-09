@@ -209,9 +209,8 @@ class SceneEngine:
         with open(join(self.save_dir, "evaluator_configs.json"), "w", encoding="utf-8") as f:
             json.dump(evaluator_configs, f, indent=4, ensure_ascii=False)
 
-        with open(join(self.save_dir, "logs.jsonl"), "w", encoding="utf-8") as f:
-            for log in self.logger.logs:
-                f.write(json.dumps(log.model_dump(mode="json"), ensure_ascii=False) + "\n")
+        for exporter in self.scene.scene_definition.log_exporters:
+            exporter.export(self.logger, self.save_dir)
 
         metrics_data, charts = self.reporter.generate_reports(
             scene_config=self.get_scene_config(mode="pydantic"),
