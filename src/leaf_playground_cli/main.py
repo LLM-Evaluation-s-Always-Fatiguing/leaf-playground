@@ -1,6 +1,8 @@
 import json
 import os
 import re
+
+import click
 import requests
 import shutil
 import subprocess
@@ -79,12 +81,12 @@ def _replace_version_in_dockerfile(file_path, new_version):
     if not os.path.exists(file_path):
         return
 
-    version_pattern = r"(leaf-playground==)\d+\.\d+\.\d+([.-]\w+\-\d+)?"
+    version_pattern = r"(leaf-playground==)(\d+\.\d+\.\d+[^\s]*)"
 
     with open(file_path, "r") as file:
         content = file.read()
 
-    new_content = re.sub(version_pattern, r"\1" + new_version, content)
+    new_content = re.sub(version_pattern, r"\g<1>" + new_version, content)
 
     with open(file_path, "w") as file:
         file.write(new_content)
@@ -99,7 +101,6 @@ def publish_project(
     version_str: Annotated[str, typer.Option("--version", "-v")] = "0.1.0",
 ):
     dot_leaf_dir = os.path.join(target, ".leaf")
-    src_dir = os.path.join(target, "{{cookiecutter.project_name}}")
 
     if not os.path.exists(dot_leaf_dir):
         raise typer.BadParameter("not a leaf playground project.")
@@ -170,7 +171,7 @@ def publish_project(
     app_py_file_path = os.path.join(template_dir, "{{cookiecutter.project_name}}", ".leaf", "app.py")
     shutil.copy(app_py_file_path, os.path.join(dot_leaf_dir, "app.py"))
 
-    _replace_version_in_dockerfile(os.path.join(src_dir, "Dockerfile"), version_str)
+    _replace_version_in_dockerfile(os.path.join(target, "Dockerfile"), leaf_version)
 
     print(f"publish new version [{version_str}]")
     raise typer.Exit()
@@ -241,7 +242,7 @@ def start_server(
     dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
     web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None,
     no_web_ui: Annotated[Optional[bool], typer.Option("--no_web_ui")] = False,
-    runtime_env: Annotated[str, typer.Option("--runtime_env")] = "local",
+    runtime_env: Annotated[str, typer.Option("--runtime_env", click_type=click.Choice(["local", "docker"]))] = "local",
 ):
     if not no_web_ui:
         if web_ui_dir and not os.path.isdir(web_ui_dir):
