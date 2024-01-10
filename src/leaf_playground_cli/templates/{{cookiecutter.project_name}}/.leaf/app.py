@@ -58,6 +58,7 @@ class AppManager:
 
     async def maybe_shutdown(self):
         await self.shutdown_event.wait()
+        await asyncio.sleep(3)
         os.kill(os.getpid(), signal.SIGTERM)
 
 
