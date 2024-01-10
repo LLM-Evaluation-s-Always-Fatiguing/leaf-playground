@@ -1,5 +1,8 @@
 import json
 import os
+import re
+
+import click
 import requests
 import shutil
 import subprocess
@@ -10,7 +13,7 @@ from collections import defaultdict
 from glob import glob1
 from packaging import version
 from pathlib import Path
-from typing import List, Optional, Type
+from typing import List, Optional, Type, Literal
 from typing_extensions import Annotated
 from urllib.request import urlopen
 
@@ -48,57 +51,45 @@ def create_new_project(name: Annotated[str, typer.Argument(metavar="project_name
 
 @app.command(name="update-project-structure", help="sync project structure to the template.")
 def update_project_structure(target: Annotated[str, typer.Argument(metavar="target_dir")]):
-    template_project_dir = os.path.join(template_dir, "{{cookiecutter.project_name}}")
-    template_dot_leaf_dir = os.path.join(template_project_dir, ".leaf")
-    template_package_dir = os.path.join(template_project_dir, "{{cookiecutter.project_name}}")
-
+    target = os.path.abspath(target)
     dot_leaf_dir = os.path.join(target, ".leaf")
     if not os.path.exists(dot_leaf_dir):
         raise typer.BadParameter("not a leaf playground project.")
     with open(os.path.join(dot_leaf_dir, "project_config.json"), "r", encoding="utf-8") as f:
         project_config = json.load(f)
-    package_dir = os.path.join(target, project_config["name"])
+    project_name = project_config["name"]
+    cookiecutter(
+        output_dir=os.path.dirname(target),
+        template=template_dir,
+        extra_context={
+            "project_name": project_name,
+            "project_name_camel_case": "".join([each.capitalize() for each in project_name.split("_")]),
+            "leaf_version": leaf_version,
+        },
+        no_input=True,
+        overwrite_if_exists=True,
+        skip_if_file_exists=True,
+    )
 
-    # update files in project dir (not its sub directories)
+    publish_project(target, project_config["version"])
 
-    for fname in glob1(template_project_dir, "*.*"):
-        fpath = os.path.join(template_project_dir, fname)
-        target_fpath = os.path.join(target, fname)
-        if not os.path.isdir(fpath) and not os.path.exists(target_fpath):
-            shutil.copy(fpath, target_fpath)
+    print(f"project [{project_name}] updated.")
+    raise typer.Exit()
 
-    # update .leaf dir
 
-    # replace .leaf/app.py
-    shutil.copy(os.path.join(template_dot_leaf_dir, "app.py"), os.path.join(dot_leaf_dir, "app.py"))
+def _replace_version_in_dockerfile(file_path, new_version):
+    if not os.path.exists(file_path):
+        return
 
-    # add new fields to .leaf/project_config.json
-    with open(os.path.join(template_dot_leaf_dir, "project_config.json"), "r", encoding="utf-8") as f:
-        template_project_config = json.load(f)
-    removed_fields = []
-    for k, v in project_config.items():
-        if k not in template_project_config:
-            removed_fields.append(k)
-    for field in removed_fields:
-        project_config.pop(field)
-    for k, v in template_project_config.items():
-        if k not in project_config:
-            project_config[k] = v
+    version_pattern = r"(leaf-playground==)(\d+\.\d+\.\d+[^\s]*)"
 
-    # update package
-    for dir_path, dir_names, file_names in os.walk(template_package_dir):
-        # Calculate the relative path to the source directory
-        rel_path = os.path.relpath(dir_path, template_package_dir)
-        # Ensure the corresponding directory exists in the target directory
-        target_path = os.path.join(package_dir, rel_path)
-        if not os.path.exists(target_path):
-            os.makedirs(target_path)
-        for file in file_names:
-            source_file = os.path.join(dir_path, file)
-            target_file = os.path.join(target_path, file)
-            # Copy the file if it does not exist in the target directory
-            if not os.path.exists(target_file):
-                shutil.copy2(source_file, target_file)
+    with open(file_path, "r") as file:
+        content = file.read()
+
+    new_content = re.sub(version_pattern, r"\g<1>" + new_version, content)
+
+    with open(file_path, "w") as file:
+        file.write(new_content)
 
 
 @app.command(
@@ -180,6 +171,8 @@ def publish_project(
     app_py_file_path = os.path.join(template_dir, "{{cookiecutter.project_name}}", ".leaf", "app.py")
     shutil.copy(app_py_file_path, os.path.join(dot_leaf_dir, "app.py"))
 
+    _replace_version_in_dockerfile(os.path.join(target, "Dockerfile"), leaf_version)
+
     print(f"publish new version [{version_str}]")
     raise typer.Exit()
 
@@ -249,6 +242,7 @@ def start_server(
     dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
     web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None,
     no_web_ui: Annotated[Optional[bool], typer.Option("--no_web_ui")] = False,
+    runtime_env: Annotated[str, typer.Option("--runtime_env", click_type=click.Choice(["local", "docker"]))] = "local",
 ):
     if not no_web_ui:
         if web_ui_dir and not os.path.isdir(web_ui_dir):
@@ -267,12 +261,12 @@ def start_server(
     if not os.path.exists(zoo_dir):
         raise typer.BadParameter(f"zoo [{zoo_dir}] not exist.")
 
-    init_service(config=ServiceConfig(zoo_dir=zoo_dir, port=port))
+    init_service(config=ServiceConfig(zoo_dir=zoo_dir, port=port, runtime_env=runtime_env))
 
     import uvicorn
 
     uvicorn.run(
-        "leaf_playground_cli.service:app", port=port, host="127.0.0.1", reload=bool(dev_dir), reload_dirs=dev_dir
+        "leaf_playground_cli.service:app", port=port, host="0.0.0.0", reload=bool(dev_dir), reload_dirs=dev_dir
     )
 
 

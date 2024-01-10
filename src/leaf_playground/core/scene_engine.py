@@ -72,6 +72,7 @@ class SceneEngineState(Enum):
     PENDING = "pending"
     RUNNING = "running"
     FINISHED = "finished"
+    RESULT_SAVED = "result_saved"
     INTERRUPTED = "interrupted"
     PAUSED = "paused"
     FAILED = "failed"
@@ -158,19 +159,34 @@ class SceneEngine:
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE))
 
     def pause(self):
-        if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
+        if self.state not in [
+            SceneEngineState.FINISHED,
+            SceneEngineState.INTERRUPTED,
+            SceneEngineState.FAILED,
+            SceneEngineState.RESULT_SAVED,
+        ]:
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_PAUSED))
             self.state = SceneEngineState.PAUSED
             self.scene.pause()
 
     def resume(self):
-        if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
+        if self.state not in [
+            SceneEngineState.FINISHED,
+            SceneEngineState.INTERRUPTED,
+            SceneEngineState.FAILED,
+            SceneEngineState.RESULT_SAVED,
+        ]:
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_RESUME))
             self.state = SceneEngineState.RUNNING
             self.scene.resume()
 
     def interrupt(self):
-        if self.state not in [SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED, SceneEngineState.FAILED]:
+        if self.state not in [
+            SceneEngineState.FINISHED,
+            SceneEngineState.INTERRUPTED,
+            SceneEngineState.FAILED,
+            SceneEngineState.RESULT_SAVED,
+        ]:
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_INTERRUPTED))
             self.state = SceneEngineState.INTERRUPTED
             self.scene.interrupt()
@@ -240,6 +256,8 @@ class SceneEngine:
 
         with open(join(self.save_dir, "charts.json"), "w", encoding="utf-8") as f:
             json.dump(charts, f, indent=4, ensure_ascii=False)
+
+        self.state = SceneEngineState.RESULT_SAVED
 
 
 __all__ = [
