@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import random
@@ -8,7 +9,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Literal, Union, Any
 from uuid import uuid4
 
 from fastapi import FastAPI
@@ -29,6 +30,7 @@ service_config: "ServiceConfig" = None
 class ServiceConfig(BaseModel):
     zoo_dir: DirectoryPath = Field(default=...)
     port: int = Field(default=...)
+    runtime_env: Literal["docker", "local"] = Field(default=...)
 
 
 class SceneFull(BaseModel):
@@ -90,17 +92,46 @@ class Task(BaseModel):
     port: int = Field(default=...)
     host: str = Field(default="http://127.0.0.1")
     status: str = Field(default=SceneEngineState.PENDING.value)
+    runtime_env: Literal["docker", "local"] = Field(default="local")
     payload_path: str = Field(default=...)
 
-    _pid: int = PrivateAttr(default=None)
+    _shutdown_event: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
+
+    _runtime_id: Union[int, str] = PrivateAttr(default=None)  # pid or docker container name
+
+    def model_post_init(self, __context: Any) -> None:
+        asyncio.create_task(self.maybe_shutdown(), name=f"{self.id}_shutdown")
+
+    async def maybe_shutdown(self):
+        await self._shutdown_event.wait()
+        await asyncio.sleep(3)
+
+        pid = self.runtime_id
+        if os.path.exists(self.payload_path):
+            os.remove(self.payload_path)
+
+        if self.runtime_env == "docker":
+            subprocess.run(f"docker stop {pid}".split())
+        else:
+            is_windows = os.name == "nt"
+            if is_windows:
+                import ctypes
+
+                ctypes.windll.kernel32.GenerateConsoleCtrlEvent(0, pid)  # TODO: truly kill
+            else:
+                os.kill(pid, signal.SIGINT)
 
     @property
-    def pid(self) -> int:
-        return self._pid
+    def shutdown_event(self) -> asyncio.Event:
+        return self._shutdown_event
 
-    @pid.setter
-    def pid(self, pid: int):
-        self._pid = pid
+    @property
+    def runtime_id(self) -> int:
+        return self._runtime_id
+
+    @runtime_id.setter
+    def runtime_id(self, pid: int):
+        self._runtime_id = pid
 
 
 class TaskManager:
@@ -128,13 +159,31 @@ class TaskManager:
     def create_task(self, payload: TaskCreationPayload):
         task_id = "task_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
         payload_tmp_path = os.path.join(self.tmp_dir, f"task_payload_{task_id}.json")
+        scene_name = Path(payload.work_dir).name
+        origin_work_dir = payload.work_dir
+
         port = self.acquire_port()
         host = get_local_ip()
         task = Task(id=task_id, port=port, host=host, payload_path=payload_tmp_path)
         self._tasks[task_id] = task
 
+        if service_config.runtime_env == "docker":
+            # TODO: temp workaround
+            payload.work_dir = "/app"
+
         with open(payload_tmp_path, "w", encoding="utf-8") as f:
             json.dump(payload.model_dump(mode="json"), f, indent=4, ensure_ascii=False)
+
+        task.runtime_env = service_config.runtime_env
+
+        if task.runtime_env == "docker":
+            task.runtime_id = self._run_in_docker(host, scene_name, origin_work_dir, payload_tmp_path, port, task_id)
+        else:
+            task.runtime_id = self._run_local(host, payload, payload_tmp_path, port, task_id)
+
+        return task
+
+    def _run_local(self, host, payload, payload_tmp_path, port, task_id):
         process = subprocess.Popen(
             (
                 f"{sys.executable} {os.path.join(payload.work_dir.as_posix(), '.leaf', 'app.py')} "
@@ -142,30 +191,47 @@ class TaskManager:
                 f"--port {port} "
                 f"--host {host} "
                 f"--save_dir {self.result_dir} "
-                f"--callback http://127.0.0.1:{service_config.port}/task/status/update "
+                f"--callback http://{host}:{service_config.port}/task/status/update "
                 f"--id {task_id}"
             ).split()
         )
-        task.pid = process.pid
+        return process.pid
 
-        return task
+    def _run_in_docker(self, host, scene_name, work_dir, payload_tmp_path, port, task_id):
+        container_name = f"leaf-scene-{task_id}"
+        image_name = f"leaf-scene-{scene_name}"
+
+        image_check = subprocess.run(f"docker images -q {image_name}", shell=True, capture_output=True, text=True)
+
+        if not image_check.stdout.strip():
+            print("Image not found, building Docker image...")
+            subprocess.run(f"cd {work_dir} && docker build . -t {image_name}", shell=True)
+        subprocess.Popen(
+            (
+                f"docker run --rm "
+                f"-p {port}:{port} "
+                f"-v {payload_tmp_path}:/tmp/payload.json "
+                f"-v {self.result_dir}:/tmp/result "
+                f"--name {container_name} "
+                f"{image_name} .leaf/app.py "
+                f"--payload /tmp/payload.json "
+                f"--port {port} "
+                f"--host 0.0.0.0 "
+                f"--save_dir /tmp/result "
+                f"--callback http://{host}:{service_config.port}/task/status/update "
+                f"--id {task_id}"
+            ).split()
+        )
+        return container_name
 
     def update_task_status(self, task_id: str, task_status: str):
         self._tasks[task_id].status = task_status
 
+    def shutdown_task(self, task_id: str):
+        self._tasks[task_id].shutdown_event.set()
+
     def get_task_states(self, task_id: str):
         return self._tasks[task_id].status
-
-    def destroy_task(self, task_id: str):
-        pid = self._tasks[task_id].pid
-
-        is_windows = os.name == "nt"
-        if is_windows:
-            import ctypes
-
-            ctypes.windll.kernel32.GenerateConsoleCtrlEvent(0, pid)  # TODO: truly kill
-        else:
-            os.kill(pid, signal.SIGINT)
 
 
 task_manager: TaskManager = None
@@ -199,6 +265,12 @@ class TaskStatusUpdatePayload(BaseModel):
 @app.post("/task/status/update")
 async def update_task_status(payload: TaskStatusUpdatePayload):
     task_manager.update_task_status(task_id=payload.id, task_status=payload.status)
+    if payload.status in [
+        SceneEngineState.RESULT_SAVED.value,
+        SceneEngineState.FAILED.value,
+        SceneEngineState.INTERRUPTED.value,
+    ]:
+        task_manager.shutdown_task(task_id=payload.id)
 
 
 @app.post("/task/create", response_model=Task)

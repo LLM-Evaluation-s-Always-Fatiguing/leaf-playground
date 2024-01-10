@@ -441,12 +441,14 @@ class HumanConnection:
                 continue
 
     async def run(self):
-        await asyncio.gather(*[
-            self.socket_handler.stream_sockets(self.socket),
-            self._send_socket_event(),
-            self._receive_human_input(),
-            self._keep_alive(),
-        ])
+        await asyncio.gather(
+            *[
+                self.socket_handler.stream_sockets(self.socket),
+                self._send_socket_event(),
+                self._receive_human_input(),
+                self._keep_alive(),
+            ]
+        )
 
 
 class SceneHumanAgentConfig(SceneDynamicAgentConfig):

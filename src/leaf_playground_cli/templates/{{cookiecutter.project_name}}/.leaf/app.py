@@ -7,14 +7,13 @@ import requests
 import sys
 from argparse import ArgumentParser
 from contextlib import asynccontextmanager
-from threading import Thread
 from typing import Any, List, Optional
 from uuid import UUID
 
 from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from leaf_playground.core.scene_agent import HumanConnection
-from leaf_playground.core.scene_engine import SceneEngine
+from leaf_playground.core.scene_engine import SceneEngine, SceneEngineState
 from leaf_playground.core.scene_definition.definitions.metric import DisplayType
 from leaf_playground_cli.service import TaskCreationPayload
 from pydantic import BaseModel, Field
@@ -45,8 +44,9 @@ def create_engine(payload: TaskCreationPayload):
 
 
 def update_scene_engine_status():
+    status = scene_engine.state.value if scene_engine is not None else SceneEngineState.PENDING.value
     try:
-        requests.post(args.callback, json={"id": args.id, "status": scene_engine.state.value})
+        requests.post(args.callback, json={"id": args.id, "status": status})
     except:
         pass
 
@@ -66,7 +66,6 @@ class AppManager:
 async def lifespan(application: FastAPI):
     with open(args.payload, "r", encoding="utf-8") as f:
         create_engine(TaskCreationPayload(**json.load(f)))
-    os.remove(args.payload)
 
     global app_manager
     app_manager = AppManager()
