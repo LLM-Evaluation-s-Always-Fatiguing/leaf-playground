@@ -159,6 +159,8 @@ class TaskManager:
     def create_task(self, payload: TaskCreationPayload):
         task_id = "task_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
         payload_tmp_path = os.path.join(self.tmp_dir, f"task_payload_{task_id}.json")
+        scene_name = Path(payload.work_dir).name
+        origin_work_dir = payload.work_dir
 
         port = self.acquire_port()
         host = get_local_ip()
@@ -175,7 +177,7 @@ class TaskManager:
         task.runtime_env = service_config.runtime_env
 
         if task.runtime_env == "docker":
-            task.runtime_id = self._run_in_docker(host, payload_tmp_path, port, task_id)
+            task.runtime_id = self._run_in_docker(host, scene_name, origin_work_dir, payload_tmp_path, port, task_id)
         else:
             task.runtime_id = self._run_local(host, payload, payload_tmp_path, port, task_id)
 
@@ -195,23 +197,23 @@ class TaskManager:
         )
         return process.pid
 
-    def _run_in_docker(self, host, payload_tmp_path, port, task_id):
-        container_name = f"leaf-playground-app-{task_id}"
-        image_name = "leaf-playground-app"
+    def _run_in_docker(self, host, scene_name, work_dir, payload_tmp_path, port, task_id):
+        container_name = f"leaf-scene-{task_id}"
+        image_name = f"leaf-scene-{scene_name}"
 
         image_check = subprocess.run(f"docker images -q {image_name}", shell=True, capture_output=True, text=True)
 
         if not image_check.stdout.strip():
             print("Image not found, building Docker image...")
-            subprocess.run(f"docker build . -t {image_name}", shell=True)
-        subprocess.run(
+            subprocess.run(f"cd {work_dir} && docker build . -t {image_name}", shell=True)
+        subprocess.Popen(
             (
-                f"docker run -d --rm "
+                f"docker run --rm "
                 f"-p {port}:{port} "
                 f"-v {payload_tmp_path}:/tmp/payload.json "
                 f"-v {self.result_dir}:/tmp/result "
                 f"--name {container_name} "
-                f"leaf-playground-app .leaf/app.py "
+                f"{image_name} .leaf/app.py "
                 f"--payload /tmp/payload.json "
                 f"--port {port} "
                 f"--host 0.0.0.0 "

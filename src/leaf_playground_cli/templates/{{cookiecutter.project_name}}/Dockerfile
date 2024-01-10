@@ -10,6 +10,4 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-ENTRYPOINT ["leaf-out"]
-
-CMD ["version"]
+ENTRYPOINT ["python"]
