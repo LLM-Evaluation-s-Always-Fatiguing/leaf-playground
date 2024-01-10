@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import random
@@ -5,11 +6,10 @@ import signal
 import socket
 import sys
 import subprocess
-from asyncio import sleep
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Dict, List, Optional, Literal, Union
+from typing import Dict, List, Optional, Literal, Union, Any
 from uuid import uuid4
 
 from fastapi import FastAPI
@@ -95,7 +95,35 @@ class Task(BaseModel):
     runtime_env: Literal["docker", "local"] = Field(default="local")
     payload_path: str = Field(default=...)
 
+    _shutdown_event = PrivateAttr(default=asyncio.Event())
+
     _runtime_id: Union[int, str] = PrivateAttr(default=None)  # pid or docker container name
+
+    def model_post_init(self, __context: Any) -> None:
+        asyncio.create_task(self.maybe_shutdown(), name=f"{self.id}_shutdown")
+
+    async def maybe_shutdown(self):
+        await self._shutdown_event.wait()
+        await asyncio.sleep(3)
+
+        pid = self.runtime_id
+        if os.path.exists(self.payload_path):
+            os.remove(self.payload_path)
+
+        if self.runtime_env == "docker":
+            subprocess.run(f"docker stop {pid}".split())
+        else:
+            is_windows = os.name == "nt"
+            if is_windows:
+                import ctypes
+
+                ctypes.windll.kernel32.GenerateConsoleCtrlEvent(0, pid)  # TODO: truly kill
+            else:
+                os.kill(pid, signal.SIGINT)
+
+    @property
+    def shutdown_event(self) -> asyncio.Event:
+        return self._shutdown_event
 
     @property
     def runtime_id(self) -> int:
@@ -197,27 +225,11 @@ class TaskManager:
     def update_task_status(self, task_id: str, task_status: str):
         self._tasks[task_id].status = task_status
 
+    def shutdown_task(self, task_id: str):
+        self._tasks[task_id].shutdown_event.set()
+
     def get_task_states(self, task_id: str):
         return self._tasks[task_id].status
-
-    async def destroy_task(self, task_id: str):
-        pid = self._tasks[task_id].runtime_id
-        if os.path.exists(self._tasks[task_id].payload_path):
-            os.remove(self._tasks[task_id].payload_path)
-
-        # TODO: temp workaround
-        await sleep(1)
-
-        if self._tasks[task_id].runtime_env == "docker":
-            subprocess.run(f"docker rm -f {pid}".split())
-        else:
-            is_windows = os.name == "nt"
-            if is_windows:
-                import ctypes
-
-                ctypes.windll.kernel32.GenerateConsoleCtrlEvent(0, pid)  # TODO: truly kill
-            else:
-                os.kill(pid, signal.SIGINT)
 
 
 task_manager: TaskManager = None
@@ -256,7 +268,7 @@ async def update_task_status(payload: TaskStatusUpdatePayload):
         SceneEngineState.FAILED.value,
         SceneEngineState.INTERRUPTED.value,
     ]:
-        await task_manager.destroy_task(task_id=payload.id)
+        task_manager.shutdown_task(task_id=payload.id)
 
 
 @app.post("/task/create", response_model=Task)
