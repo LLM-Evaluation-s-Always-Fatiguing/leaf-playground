@@ -95,7 +95,7 @@ class Task(BaseModel):
     runtime_env: Literal["docker", "local"] = Field(default="local")
     payload_path: str = Field(default=...)
 
-    _shutdown_event = PrivateAttr(default=asyncio.Event())
+    _shutdown_event: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
 
     _runtime_id: Union[int, str] = PrivateAttr(default=None)  # pid or docker container name
 
