@@ -3,6 +3,15 @@
     <strong>leaf-playground</strong>
   </p>
 </h1>
+<p align="center">
+    <a href="https://pypi.org/project/leaf-playground/0.3.0/">
+        <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/leaf-playground.svg">
+    </a>
+    <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/w/LLM-Evaluation-s-Always-Fatiguing/leaf-playground">
+    <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dd/leaf-playground">
+    <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/leaf-playground">
+    <img alt="Static Badge" src="https://img.shields.io/badge/node.js-%E2%89%A518.19.0-brightgreen">
+</p>
 
 ## Introduction
 
