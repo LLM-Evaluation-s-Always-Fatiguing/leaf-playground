@@ -10,12 +10,13 @@ import sys
 import zipfile
 from abc import ABC
 from collections import defaultdict
-from glob import glob1
+from datetime import datetime
 from packaging import version
 from pathlib import Path
-from typing import List, Optional, Type, Literal
+from typing import List, Optional, Type
 from typing_extensions import Annotated
 from urllib.request import urlopen
+from uuid import uuid4
 
 import typer
 from cookiecutter.main import cookiecutter
@@ -35,12 +36,17 @@ template_dir = os.path.join(os.path.dirname(__file__), "templates")
 @app.command(name="new-project", help="initialize a new leaf-playground scenario simulation project from template.")
 def create_new_project(name: Annotated[str, typer.Argument(metavar="project_name")]):
     project_name = name.lower().replace(" ", "_").replace("-", "_")
+    project_id = project_name + "_" + uuid4().hex[:8]
+    created = datetime.utcnow().strftime("%Y-%m-%d-%H-%M-%S")
     cookiecutter(
         template=template_dir,
         extra_context={
             "project_name": project_name,
+            "project_id": project_id,
             "project_name_camel_case": "".join([each.capitalize() for each in project_name.split("_")]),
             "leaf_version": leaf_version,
+            "created_at": created,
+            "last_update": created
         },
         no_input=True,
     )
@@ -58,18 +64,27 @@ def update_project_structure(target: Annotated[str, typer.Argument(metavar="targ
     with open(os.path.join(dot_leaf_dir, "project_config.json"), "r", encoding="utf-8") as f:
         project_config = json.load(f)
     project_name = project_config["name"]
+    project_id = project_config.get("id", project_name + "_" + uuid4().hex[:8])
+    created_at = project_config.get("created_at", "unknown")
+    last_update = datetime.utcnow().strftime("%Y-%m-%d-%H-%M-%S")
     cookiecutter(
         output_dir=os.path.dirname(target),
         template=template_dir,
         extra_context={
             "project_name": project_name,
+            "project_id": project_id,
             "project_name_camel_case": "".join([each.capitalize() for each in project_name.split("_")]),
             "leaf_version": leaf_version,
+            "created_at": created_at,
+            "last_update": last_update
         },
         no_input=True,
         overwrite_if_exists=True,
         skip_if_file_exists=True,
+        keep_project_on_failure=True
     )
+
+    # TODO: update project_config if there is update on field level
 
     publish_project(target, project_config["version"])
 
@@ -118,8 +133,11 @@ def publish_project(
         raise typer.BadParameter(f"expect version string greater or equal to {old_version_str}, got {version_str}")
 
     # set new version
+    project_config["id"] = project_config.get("id", project_name + "_" + uuid4().hex[:8])
     project_config["version"] = version_str
     project_config["leaf_version"] = leaf_version
+    project_config["created_at"] = project_config.get("created_at", "unknown")
+    project_config["last_update"] = datetime.utcnow().strftime("%Y-%m-%d-%H-%M-%S")
 
     # get and set metadata
     pkg_root = Path(os.path.join(target, project_name))
@@ -236,7 +254,7 @@ def download_web_ui() -> str:
 
 @app.command(name="start-server", help="start a leaf-playground server, will firstly download WEB UI if necessary.")
 def start_server(
-    zoo_dir: Annotated[str, typer.Option("--zoo")] = os.getcwd(),
+    hub_dir: Annotated[str, typer.Option("--hub")] = os.getcwd(),
     port: Annotated[int, typer.Option("--port")] = 8000,
     ui_port: Annotated[int, typer.Option(default="--ui_port")] = 3000,
     dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
@@ -256,17 +274,25 @@ def start_server(
         dev_dir = os.path.abspath(dev_dir)
         sys.path.insert(0, dev_dir)
 
-    from .service import init_service, ServiceConfig
+    from .server.app import config_server, AppConfig
+    from .server.task import get_local_ip, TaskRunTimeEnv
 
-    if not os.path.exists(zoo_dir):
-        raise typer.BadParameter(f"zoo [{zoo_dir}] not exist.")
+    if not os.path.exists(hub_dir):
+        raise typer.BadParameter(f"zoo [{hub_dir}] not exist.")
 
-    init_service(config=ServiceConfig(zoo_dir=zoo_dir, port=port, runtime_env=runtime_env))
+    config_server(
+        config=AppConfig(
+            hub_dir=Path(hub_dir),
+            server_port=port,
+            server_host=get_local_ip(),
+            runtime_env=TaskRunTimeEnv[runtime_env.upper()]
+        )
+    )
 
     import uvicorn
 
     uvicorn.run(
-        "leaf_playground_cli.service:app", port=port, host="0.0.0.0", reload=bool(dev_dir), reload_dirs=dev_dir
+        "leaf_playground_cli.server.app:app", port=port, host="0.0.0.0", reload=bool(dev_dir), reload_dirs=dev_dir
     )
 
 

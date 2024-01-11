@@ -1,6 +1,14 @@
 {
   "name": "{{ cookiecutter.project_name }}",
+  "id": "{{ cookiecutter.project_id }}",
   "version": "0.1.0",
-  "metadata": {},
-  "leaf_version": "{{ cookiecutter.leaf_version }}"
+  "leaf_version": "{{ cookiecutter.leaf_version }}",
+  "created_at": "{{ cookiecutter.created_at }}",
+  "last_update": "{{ cookiecutter.last_update }}",
+  "metadata": {
+    "scene_metadata": {},
+    "agents_metadata": {},
+    "evaluators_metadata": {},
+    "charts_metadata": {}
+  }
 }
