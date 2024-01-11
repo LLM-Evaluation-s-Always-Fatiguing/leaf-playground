@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import signal
 
@@ -15,40 +14,53 @@ from fastapi.responses import JSONResponse
 from leaf_playground.core.scene_agent import HumanConnection
 from leaf_playground.core.scene_engine import SceneEngine, SceneEngineState
 from leaf_playground.core.scene_definition.definitions.metric import DisplayType
-from leaf_playground_cli.service import TaskCreationPayload
+from leaf_playground_cli.server.task import TaskCreationPayload
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 parser = ArgumentParser()
-parser.add_argument("--payload", type=str)
+parser.add_argument("--id", type=str)
 parser.add_argument("--port", type=int)
 parser.add_argument("--host", type=str)
+parser.add_argument("--secret_key", type=str)
 parser.add_argument("--save_dir", type=str)
-parser.add_argument("--callback", type=str)
-parser.add_argument("--id", type=str)
+parser.add_argument("--server_url", type=str)
 args = parser.parse_args()
 
 
-def create_engine(payload: TaskCreationPayload):
+def create_engine():
     global scene_engine
 
-    scene_engine = SceneEngine(
-        scene_config=payload.scene_obj_config,
-        evaluators_config=payload.metric_evaluator_objs_config,
-        reporter_config=payload.reporter_obj_config,
-        state_change_callbacks=[update_scene_engine_status]
-    )
-    scene_engine.save_dir = os.path.join(args.save_dir, args.id)
-    asyncio.create_task(scene_engine.run())
-
-
-def update_scene_engine_status():
-    status = scene_engine.state.value if scene_engine is not None else SceneEngineState.PENDING.value
     try:
-        requests.post(args.callback, json={"id": args.id, "status": status})
+        resp = requests.get(f"{args.server_url}/task/{args.id}/payload")
+        payload = TaskCreationPayload(**resp.json())
+
+        scene_engine = SceneEngine(
+            scene_config=payload.scene_obj_config,
+            evaluators_config=payload.metric_evaluator_objs_config,
+            reporter_config=payload.reporter_obj_config,
+            state_change_callbacks=[scene_engine_state_change_callback]
+        )
+        scene_engine.save_dir = os.path.join(args.save_dir, args.id)
+        asyncio.create_task(scene_engine.run())
+    except:
+        update_task_status(SceneEngineState.FAILED.value)
+
+
+def update_task_status(task_status: str):
+    try:
+        requests.post(
+            f"{args.server_url}/task/{args.id}/status",
+            data={"status": task_status, "secret_key": args.secret_key}
+        )
     except:
         pass
+
+
+def scene_engine_state_change_callback():
+    task_status = scene_engine.state.value if scene_engine is not None else SceneEngineState.PENDING.value
+    update_task_status(task_status)
 
 
 class AppManager:
@@ -64,8 +76,7 @@ class AppManager:
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    with open(args.payload, "r", encoding="utf-8") as f:
-        create_engine(TaskCreationPayload(**json.load(f)))
+    create_engine()
 
     global app_manager
     app_manager = AppManager()
