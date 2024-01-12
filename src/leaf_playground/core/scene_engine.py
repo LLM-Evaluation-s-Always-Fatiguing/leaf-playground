@@ -120,8 +120,6 @@ class SceneEngine:
         for evaluator in self.evaluators:
             self.scene.registry_metric_evaluator(evaluator)
 
-        self.save_dir = None
-
     @property
     def id(self) -> str:
         return self._id
@@ -213,20 +211,20 @@ class SceneEngine:
         else:
             raise ValueError(f"invalid mode {mode}")
 
-    def save(self):
-        makedirs(self.save_dir, exist_ok=True)
+    def save(self, save_dir: str):
+        makedirs(save_dir, exist_ok=True)
 
         scene_config = self.get_scene_config(mode="dict")
         evaluator_configs = self.get_evaluator_configs(mode="dict")
 
-        with open(join(self.save_dir, "scene_config.json"), "w", encoding="utf-8") as f:
+        with open(join(save_dir, "scene_config.json"), "w", encoding="utf-8") as f:
             json.dump(scene_config, f, indent=4, ensure_ascii=False)
 
-        with open(join(self.save_dir, "evaluator_configs.json"), "w", encoding="utf-8") as f:
+        with open(join(save_dir, "evaluator_configs.json"), "w", encoding="utf-8") as f:
             json.dump(evaluator_configs, f, indent=4, ensure_ascii=False)
 
         for exporter in self.scene.scene_definition.log_exporters:
-            exporter.export(self.logger, self.save_dir)
+            exporter.export(self.logger, save_dir)
 
         metrics_data, charts = self.reporter.generate_reports(
             scene_config=self.get_scene_config(mode="pydantic"),
@@ -251,10 +249,10 @@ class SceneEngine:
                 for name, data in metrics_data["human_metrics"].items()
             },
         }
-        with open(join(self.save_dir, "metrics.json"), "w", encoding="utf-8") as f:
+        with open(join(save_dir, "metrics.json"), "w", encoding="utf-8") as f:
             json.dump(metrics_data, f, indent=4, ensure_ascii=False)
 
-        with open(join(self.save_dir, "charts.json"), "w", encoding="utf-8") as f:
+        with open(join(save_dir, "charts.json"), "w", encoding="utf-8") as f:
             json.dump(charts, f, indent=4, ensure_ascii=False)
 
         self.state = SceneEngineState.RESULT_SAVED

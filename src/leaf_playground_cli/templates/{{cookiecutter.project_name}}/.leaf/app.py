@@ -42,7 +42,6 @@ def create_engine():
             reporter_config=payload.reporter_obj_config,
             state_change_callbacks=[scene_engine_state_change_callback]
         )
-        scene_engine.save_dir = os.path.join(args.save_dir, args.id)
         asyncio.create_task(scene_engine.run())
     except:
         update_task_status(SceneEngineState.FAILED.value)
@@ -157,7 +156,7 @@ async def interrupt_engine():
 
 @app.post("/save")
 async def save_task():
-    scene_engine.save()
+    scene_engine.save(str(os.path.join(args.save_dir, args.id)))
     app_manager.shutdown_event.set()
 
 
