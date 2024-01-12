@@ -51,6 +51,7 @@ class Task(BaseModel):
     payload: TaskCreationPayload = Field(default=...)
     status: str = Field(default=SceneEngineState.PENDING.value)
     runtime_env: TaskRunTimeEnv = Field(default=TaskRunTimeEnv.LOCAL)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
     _secret_key: str = PrivateAttr(default_factory=lambda: uuid4().hex)
     _shutdown_event: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
@@ -119,7 +120,7 @@ class TaskManager(SingletonClass):
 
     def create_task(self, payload: TaskCreationPayload) -> Task:
         task = Task(
-            id=f"task_{payload.project_id}" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + uuid4().hex[:8],
+            id=f"task_{payload.project_id}_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8],
             port=self.acquire_port(),
             host=get_local_ip(),
             payload=payload,
