@@ -4,7 +4,7 @@ import os
 import traceback
 import warnings
 from datetime import datetime
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union, Any
 from typing_extensions import Annotated
 
 import aiohttp
@@ -26,6 +26,7 @@ class ProjectMetadata(BaseModel):
 
 
 class Project(BaseModel):
+    # fields load from project config
     name: str = Field(default=...)
     id: str = Field(default=...)
     version: str = Field(default=...)
@@ -34,39 +35,28 @@ class Project(BaseModel):
     last_update: str = Field(default=...)
     metadata: ProjectMetadata = Field(default=...)
 
-    _work_dir: str = PrivateAttr(default="")
+    # fields set in run time
+    work_dir: str = Field(default=...)
+    readme: str = Field(default="")
+    requirements: str = Field(default="")
+    dockerfile: str = Field(default="")
 
-    @property
-    def work_dir(self):
-        return self._work_dir
-
-    @work_dir.setter
-    def work_dir(self, work_dir: str):
-        self._work_dir = work_dir
-
-    @property
-    def readme_fpath(self) -> str:
-        return os.path.join(self.work_dir, "README.md")
-
-    @property
-    def requirements_fpath(self) -> str:
-        return os.path.join(self.work_dir, "requirements.txt")
-
-    @property
-    def dockerfile_fpath(self) -> str:
-        return os.path.join(self.work_dir, "Dockerfile")
+    def model_post_init(self, __context: Any) -> None:
+        self.readme = self._get_readme()
+        self.requirements = self._get_requirements()
+        self.dockerfile = self._get_dockerfile()
 
     @property
     def has_readme(self) -> bool:
-        return os.path.exists(self.readme_fpath)
+        return bool(self.readme)
 
     @property
     def has_requirements(self) -> bool:
-        return os.path.exists(self.requirements_fpath)
+        return bool(self.requirements)
 
     @property
     def has_dockerfile(self) -> bool:
-        return os.path.exists(self.dockerfile_fpath)
+        return bool(self.dockerfile)
 
     @staticmethod
     def _read_file(fpath) -> str:
@@ -76,14 +66,38 @@ class Project(BaseModel):
             content = f.read()
         return content
 
-    def get_readme(self) -> str:
-        return self._read_file(self.readme_fpath)
+    def _get_readme(self) -> str:
+        return self._read_file(os.path.join(self.work_dir, "README.md"))
 
-    def get_requirements(self) -> str:
-        return self._read_file(self.requirements_fpath)
+    def _get_requirements(self) -> str:
+        return self._read_file(os.path.join(self.work_dir, "requirements.txt"))
 
-    def get_dockerfile(self) -> str:
-        return self._read_file(self.dockerfile_fpath)
+    def _get_dockerfile(self) -> str:
+        return self._read_file(os.path.join(self.work_dir, "Dockerfile"))
+
+    def update_readme(self):
+        self.readme = self._get_readme()
+
+    def update_requirements(self):
+        self.requirements = self._get_requirements()
+
+    def update_dockerfile(self):
+        self.dockerfile = self._get_dockerfile()
+
+    def update_config(self):
+        with open(
+            os.path.join(self.work_dir, ".leaf", "project_config.json"), "r", encoding="utf-8"
+        ) as f:
+            proj_config = json.load(f)
+        for k, v in proj_config.items():
+            if k in self.model_fields_set:
+                self.__setattr__(k, v)
+
+    def update(self):
+        self.update_config()
+        self.update_readme()
+        self.update_requirements()
+        self.update_dockerfile()
 
 
 class Hub(SingletonClass):
@@ -114,7 +128,7 @@ class Hub(SingletonClass):
                     os.path.join(work_dir, ".leaf", "project_config.json"), "r", encoding="utf-8"
                 ) as f:
                     try:
-                        project = Project(**json.load(f))
+                        project = Project(**json.load(f), work_dir=work_dir)
                     except:
                         traceback.print_exc()
                         warnings.warn(
@@ -155,31 +169,40 @@ class Hub(SingletonClass):
         return project
 
 
+@hub_router.get("/refresh", response_class=JSONResponse)
+async def refresh_projects(hub: Hub = Depends(Hub.get_instance)) -> JSONResponse:
+    """refresh projects, this will re-scan projects under the hub dir, respond a list of updated project id"""
+
+    hub.scan_projects()
+    return JSONResponse(content=list(hub.projects.keys()))
+
+
+@hub_router.get("/{project_id}/info", response_model=Project)
+async def get_project_info(project: Project = Depends(Hub.http_get_project_by_id)) -> Project:
+    """retrieve a project's information by giving its id, this will reload local files to update first."""
+    project.update()
+    return project
+
+
 @hub_router.get("/{project_id}/readme.md", response_class=PlainTextResponse)
 async def get_project_readme(project: Project = Depends(Hub.http_get_project_by_id)) -> PlainTextResponse:
-    if not project.has_readme:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"README.md for project [{project.id}] not found."
-        )
-    return PlainTextResponse(content=project.get_readme())
+    """retrieve a project's README.md by giving its id, this will reload local file to update first"""
+    project.update_readme()
+    return PlainTextResponse(content=project.readme)
 
 
 @hub_router.get("/{project_id}/requirements.txt", response_class=PlainTextResponse)
 async def get_project_requirements(project: Project = Depends(Hub.http_get_project_by_id)) -> PlainTextResponse:
-    if not project.has_requirements:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"requirements.txt for project [{project.id}] not found."
-        )
-    return PlainTextResponse(content=project.get_requirements())
+    """retrieve a project's requirements.txt by giving its id, this will reload local file to update first"""
+    project.update_requirements()
+    return PlainTextResponse(content=project.requirements)
 
 
 @hub_router.get("/{project_id}/dockerfile", response_class=PlainTextResponse)
 async def get_project_dockerfile(project: Project = Depends(Hub.http_get_project_by_id)) -> PlainTextResponse:
-    if not project.has_dockerfile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"Dockerfile for project [{project.id}] not found."
-        )
-    return PlainTextResponse(content=project.get_dockerfile())
+    """retrieve a project's Dockerfile by giving its id, this will reload local file to update first"""
+    project.update_dockerfile()
+    return PlainTextResponse(content=project.dockerfile)
 
 
 def validate_file_path(file_path: str):
@@ -192,10 +215,14 @@ def validate_file_path(file_path: str):
 
 
 @hub_router.get("/{project_id}/assets/download_image", response_class=JSONResponse)
-async def get_image(
+async def get_project_image_asset(
     project: Project = Depends(Hub.http_get_project_by_id),
     file_path: str = Depends(validate_file_path),
 ) -> JSONResponse:
+    """
+    retrieve a project's image asset by giving project_id and file_path, support both local path and http url,
+    if given local path is a relevant path, it must start with './', otherwise responds with 422 status code
+    """
     if file_path.startswith(("http://", "https://")):
         async with aiohttp.ClientSession() as session:
             async with session.get(file_path) as response:
