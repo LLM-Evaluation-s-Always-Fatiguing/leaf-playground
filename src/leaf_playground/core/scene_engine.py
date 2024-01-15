@@ -4,14 +4,14 @@ import traceback
 from enum import Enum
 from os import makedirs
 from os.path import join
-from typing import Callable, List, Literal, Type, Union
+from typing import Callable, List, Literal, Optional, Type, Union
 from uuid import uuid4
 
 from pydantic import Field
 
 from .scene import Scene
 from .scene_definition import SceneConfig, SceneDefinition
-from .workers import MetricEvaluator, MetricEvaluatorConfig, MetricReporter, Logger, SocketHandler
+from .workers import MetricEvaluator, MetricEvaluatorConfig, MetricReporter, Logger, LogHandler
 from .workers.chart import Chart
 from .._config import _Config
 from ..data.log_body import SystemLogBody, SystemEvent
@@ -102,6 +102,7 @@ class SceneEngine:
         evaluators_config: MetricEvaluatorObjsConfig,
         reporter_config: ReporterObjConfig,
         state_change_callbacks: List[Callable] = [],
+        log_handlers: Optional[List[LogHandler]] = None
     ):
         self._state_change_callbacks = state_change_callbacks
         self.state = SceneEngineState.PENDING
@@ -109,9 +110,10 @@ class SceneEngine:
 
         self.message_pool = MessagePool()
         self.logger = Logger()
-        self.socket_handler = SocketHandler()
 
-        self.logger.registry_handler(self.socket_handler)
+        if log_handlers:
+            for log_handler in log_handlers:
+                self.logger.registry_handler(log_handler)
 
         self.scene = scene_config.initialize_scene()
         self.reporter = reporter_config.initialize_reporter(scene_definition=self.scene.scene_definition)
