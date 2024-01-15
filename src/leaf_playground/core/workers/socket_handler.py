@@ -1,26 +1,34 @@
 import asyncio
 
-from fastapi import WebSocket, WebSocketDisconnect
-from websockets.exceptions import ConnectionClosed, ConnectionClosedError, ConnectionClosedOK
+from fastapi import WebSocket
 
-from ...data.log_body import LogBody
+from .logger import LogHandler
+from ...data.log_body import LogBody, ActionLogBody
+from ...data.message import MessagePool
 from ...data.socket_data import SocketData, SocketOperation
 
 
-class SocketHandler:
+class SocketHandler(LogHandler):
     def __init__(self):
         self._stopped = False
 
+        self._message_pool: MessagePool = MessagePool.get_instance()
         self._socket_cache = []
 
     def notify_create(self, log_body: LogBody):
+        log_dict = log_body.model_dump(mode="json")
+        if isinstance(log_body, ActionLogBody):
+            log_dict["response"] = self._message_pool.get_message_by_id(log_body.response).model_dump(mode="json")
         self._socket_cache.append(
-            SocketData(data=log_body.model_dump(mode="json", by_alias=True), operation=SocketOperation.CREATE)
+            SocketData(data=log_dict, operation=SocketOperation.CREATE)
         )
 
     def notify_update(self, log_body: LogBody):
+        log_dict = log_body.model_dump(mode="json")
+        if isinstance(log_body, ActionLogBody):
+            log_dict["response"] = self._message_pool.get_message_by_id(log_body.response).model_dump(mode="json")
         self._socket_cache.append(
-            SocketData(data=log_body.model_dump(mode="json", by_alias=True), operation=SocketOperation.UPDATE)
+            SocketData(data=log_dict, operation=SocketOperation.UPDATE)
         )
 
     async def stream_sockets(self, websocket: WebSocket) -> bool:

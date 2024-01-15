@@ -15,6 +15,7 @@ from .workers import MetricEvaluator, MetricEvaluatorConfig, MetricReporter, Log
 from .workers.chart import Chart
 from .._config import _Config
 from ..data.log_body import SystemLogBody, SystemEvent
+from ..data.message import MessagePool
 from ..utils.import_util import dynamically_import_obj, DynamicObject
 
 
@@ -22,10 +23,10 @@ class SceneObjConfig(_Config):
     scene_config_data: dict = Field(default=...)
     scene_obj: DynamicObject = Field(default=...)
 
-    def initialize_scene(self, logger: Logger) -> Scene:
+    def initialize_scene(self) -> Scene:
         scene_cls: Type[Scene] = dynamically_import_obj(self.scene_obj)
         scene_config_cls: Type[SceneConfig] = scene_cls.config_cls
-        return scene_cls(config=scene_config_cls(**self.scene_config_data), logger=logger)
+        return scene_cls(config=scene_config_cls(**self.scene_config_data))
 
 
 class ReporterObjConfig(_Config):
@@ -106,12 +107,13 @@ class SceneEngine:
         self.state = SceneEngineState.PENDING
         self._id = "engine_" + uuid4().hex[:8]
 
+        self.message_pool = MessagePool()
         self.logger = Logger()
         self.socket_handler = SocketHandler()
 
         self.logger.registry_handler(self.socket_handler)
 
-        self.scene = scene_config.initialize_scene(logger=self.logger)
+        self.scene = scene_config.initialize_scene()
         self.reporter = reporter_config.initialize_reporter(scene_definition=self.scene.scene_definition)
         self.evaluators = evaluators_config.initialize_evaluators(
             scene_config=self.scene.config, logger=self.logger, reporter=self.reporter

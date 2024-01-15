@@ -15,14 +15,15 @@ from uuid import uuid4
 from fastapi import status, APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, PrivateAttr
+from sqlmodel import create_engine, SQLModel, Field as SQLField, Session, JSON
 
 from leaf_playground.core.scene_engine import (
     SceneEngineState, SceneObjConfig, MetricEvaluatorObjsConfig, ReporterObjConfig
 )
+from leaf_playground._type import Singleton
 
 from .hub import Hub
 from .utils import get_local_ip
-from ._type import SingletonClass
 
 
 task_router = APIRouter(prefix="/task")
@@ -44,14 +45,15 @@ class TaskRunTimeEnv(Enum):
     DOCKER = "docker"
 
 
-class Task(BaseModel):
-    id: str = Field(default=...)
-    port: int = Field(default=...)
-    host: str = Field(default="http://127.0.0.1")
-    payload: TaskCreationPayload = Field(default=...)
-    status: str = Field(default=SceneEngineState.PENDING.value)
-    runtime_env: TaskRunTimeEnv = Field(default=TaskRunTimeEnv.LOCAL)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+class Task(SQLModel, table=True):
+    id: str = SQLField(default=..., primary_key=True)
+    project_id: str = SQLField(default=...)
+    port: int = SQLField(default=...)
+    host: str = SQLField(default="http://127.0.0.1")
+    payload: str = SQLField(default=...)
+    status: str = SQLField(default=SceneEngineState.PENDING.value, index=True)
+    runtime_env: TaskRunTimeEnv = SQLField(default=TaskRunTimeEnv.LOCAL, index=True)
+    created_at: datetime = SQLField(default_factory=datetime.utcnow, index=True)
 
     _secret_key: str = PrivateAttr(default_factory=lambda: uuid4().hex)
     _shutdown_event: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
@@ -85,7 +87,7 @@ class Task(BaseModel):
         self._runtime_id = pid
 
 
-class TaskManager(SingletonClass):
+class TaskManager(Singleton):
     def __init__(
         self,
         hub: Hub,
@@ -121,9 +123,10 @@ class TaskManager(SingletonClass):
     def create_task(self, payload: TaskCreationPayload) -> Task:
         task = Task(
             id=f"task_{payload.project_id}_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8],
+            project_id=payload.project_id,
             port=self.acquire_port(),
             host=get_local_ip(),
-            payload=payload,
+            payload=payload.model_dump_json(by_alias=True),
             runtime_env=self.runtime_env
         )
         self._tasks[task.id] = task
@@ -212,7 +215,7 @@ async def create_task(
 
 @task_router.get("/{task_id}/payload", response_model=TaskCreationPayload)
 async def get_task_payload(task: Task = Depends(TaskManager.http_get_task_by_id)) -> TaskCreationPayload:
-    return task.payload
+    return TaskCreationPayload(**json.loads(task.payload))
 
 
 @task_router.get("/{task_id}/status", response_class=JSONResponse)
