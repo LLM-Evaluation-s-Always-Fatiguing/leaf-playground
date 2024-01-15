@@ -14,6 +14,7 @@ from .scene_definition import SceneConfig, SceneDefinition
 from .workers import MetricEvaluator, MetricEvaluatorConfig, MetricReporter, Logger, LogHandler
 from .workers.chart import Chart
 from .._config import _Config
+from .._type import Singleton
 from ..data.log_body import SystemLogBody, SystemEvent
 from ..data.message import MessagePool
 from ..utils.import_util import dynamically_import_obj, DynamicObject
@@ -93,7 +94,7 @@ class SceneEngineStateProxy:
             cb()
 
 
-class SceneEngine:
+class SceneEngine(Singleton):
     state = SceneEngineStateProxy()
 
     def __init__(
