@@ -58,6 +58,15 @@ app.include_router(task_router)
 @app.get("/", response_class=JSONResponse)
 async def main_page() -> JSONResponse:
     """response is a json dict with two fields: projects(a list of project id), app_info(metadata of the server)"""
+    projects = []
+    for proj in hub.projects.values():
+        projects.append(
+            {
+                "name": proj.name,
+                "id": proj.id,
+                "description": proj.metadata.scene_metadata["scene_definition"]["description"]
+            }
+        )
     return JSONResponse(
         content={
             "projects": list(hub.projects.keys()),
