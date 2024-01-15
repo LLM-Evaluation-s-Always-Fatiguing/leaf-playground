@@ -20,7 +20,7 @@ class Logger(Singleton):
         self.message_pool: MessagePool = MessagePool.get_instance()
 
         self._logs: List[LogBody] = []
-        self._id2log: Dict[UUID, LogBody] = {}
+        self._id2log: Dict[str, LogBody] = {}
         self._stopped: bool = False
         self._handlers: List["LogHandler"] = []
 
@@ -36,7 +36,7 @@ class Logger(Singleton):
 
     def add_action_log_record(
         self,
-        log_id: UUID,
+        log_id: str,
         records: Dict[str, dict],
         field_name: Literal["eval_records", "compare_records", "human_eval_records", "human_compare_records"],
     ):
@@ -109,7 +109,7 @@ class LogExporter(BaseModel):
         data = {"log_id": [], "sender": [], "receivers": [], "message": []}
         for log in [log for log in logger.logs if isinstance(log, ActionLogBody)]:
             response = logger.message_pool.get_message_by_id(log.response)
-            data["log_id"].append(log.id.hex)
+            data["log_id"].append(log.id)
             data["sender"].append(response.sender_name)
             data["receivers"].append([receiver.name for receiver in response.receivers])
             data["message"].append(response.content.display_text)
