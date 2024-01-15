@@ -23,10 +23,15 @@ class LogType(Enum):
 
 
 class LogBody(Data):
-    id: UUID = Field(default_factory=uuid4)
+    id: str = Field(default_factory=lambda: "log_" + uuid4().hex[:8])
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_update: datetime = Field(default=None)
     log_type: LogType = Field(default=...)
     log_msg: str = Field(default=...)
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.last_update is None:
+            self.last_update = self.created_at
 
     @model_validator(mode="before")
     def set_log_type(cls, values):
