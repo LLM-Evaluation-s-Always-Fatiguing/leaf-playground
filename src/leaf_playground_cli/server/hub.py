@@ -3,16 +3,14 @@ import json
 import os
 import traceback
 import warnings
-from datetime import datetime
-from typing import Dict, List, Literal, Optional, Union, Any
-from typing_extensions import Annotated
+from typing import Dict, List, Optional, Any
 
 import aiohttp
 from fastapi import status, APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field, PrivateAttr
 
-from ._type import SingletonClass
+from leaf_playground._type import Singleton
 
 
 hub_router = APIRouter(prefix="/hub")
@@ -100,7 +98,7 @@ class Project(BaseModel):
         self.update_dockerfile()
 
 
-class Hub(SingletonClass):
+class Hub(Singleton):
     def __init__(self, hub_dir: str):
         self._hub_dir = hub_dir
 
