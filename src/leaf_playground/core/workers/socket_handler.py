@@ -10,7 +10,6 @@ from ...data.message import MessagePool
 class SocketHandler(LogHandler):
     def __init__(self):
         self._stopped = False
-        self._message_pool: MessagePool = MessagePool.get_instance()
 
     @abstractmethod
     async def notify_create(self, log_body: LogBody):
