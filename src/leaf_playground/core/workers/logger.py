@@ -88,9 +88,9 @@ class LogExporter(BaseModel):
             if isinstance(log, ActionLogBody):
                 if log.references is not None:
                     log_dict["references"] = [
-                        logger.message_pool.get_message_by_id(ref).model_dump(mode="dict") for ref in log.references
-                    ]
-                log_dict["response"] = logger.message_pool.get_message_by_id(log.response).model_dump(mode="dict")
+                        logger.message_pool.get_message_by_id(ref).model_dump(mode="json") for ref in log.references
+                    ] if log.references else None
+                log_dict["response"] = logger.message_pool.get_message_by_id(log.response).model_dump(mode="json")
             logs.append(log_dict)
 
         with open(save_path, "w", encoding="utf-8") as f:
@@ -103,9 +103,9 @@ class LogExporter(BaseModel):
                 if isinstance(log, ActionLogBody):
                     if log.references is not None:
                         log_dict["references"] = [
-                            logger.message_pool.get_message_by_id(ref).model_dump(mode="dict") for ref in log.references
-                        ]
-                    log_dict["response"] = logger.message_pool.get_message_by_id(log.response).model_dump(mode="dict")
+                            logger.message_pool.get_message_by_id(ref).model_dump(mode="json") for ref in log.references
+                        ] if log.references else None
+                    log_dict["response"] = logger.message_pool.get_message_by_id(log.response).model_dump(mode="json")
                 f.write(json.dumps(log_dict) + "\n")
 
     def _export_to_csv(self, logger: Logger, save_path: str):
