@@ -53,7 +53,7 @@ class Immutable(Generic[T]):
         return self.__hash__()
 
 
-class SingletonMeta(type):
+class SingletonMetaClass(type):
     _instances: dict = {}
 
     def __call__(cls, *args, **kwargs):
@@ -62,7 +62,7 @@ class SingletonMeta(type):
         return cls._instances[cls]
 
 
-class Singleton(metaclass=SingletonMeta):
+class Singleton(metaclass=SingletonMetaClass):
     @classmethod
     def get_instance(cls):
         try:
@@ -73,7 +73,7 @@ class Singleton(metaclass=SingletonMeta):
             )
 
 
-class SingletonModelMetaclass(ModelMetaclass):
+class SingletonBaseModelMetaclass(ModelMetaclass):
     _instances: dict = {}
 
     def __call__(cls, *args, **kwargs):
@@ -82,7 +82,7 @@ class SingletonModelMetaclass(ModelMetaclass):
         return cls._instances[cls]
 
 
-class SingletonBaseModel(BaseModel, metaclass=SingletonModelMetaclass):
+class SingletonBaseModel(BaseModel, metaclass=SingletonBaseModelMetaclass):
     @classmethod
     def get_instance(cls):
         try:
