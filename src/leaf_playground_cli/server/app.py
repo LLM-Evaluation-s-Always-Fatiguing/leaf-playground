@@ -1,15 +1,16 @@
+import os.path
 from contextlib import asynccontextmanager
-from typing import List, Literal
+from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, DirectoryPath
 
 from leaf_playground import __version__ as leaf_version
-from leaf_playground.core.scene_engine import SceneEngineState
 
 from .hub import *
 from .task import *
+from .task.model import TaskRunTimeEnv
 
 
 class AppConfig(BaseModel):
@@ -25,8 +26,6 @@ class AppInfo(BaseModel):
     hub_dir: str = Field(default=...)
 
 
-hub: Hub = None
-task_manager: TaskManager = None
 app_config: AppConfig = None
 app_info: AppInfo = None
 
@@ -39,10 +38,9 @@ def config_server(config: AppConfig):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global hub, task_manager
-
-    hub = Hub(hub_dir=app_config.hub_dir.as_posix())
-    task_manager = TaskManager(hub=hub, server_port=app_config.server_port, runtime_env=app_config.runtime_env)
+    DB(f"sqlite+aiosqlite:///{os.path.join(app_config.hub_dir, '.leaf_workspace', '.leaf_playground.db')}")
+    Hub(hub_dir=app_config.hub_dir.as_posix())
+    TaskManager(server_port=app_config.server_port, runtime_env=app_config.runtime_env)
 
     try:
         yield
@@ -56,8 +54,11 @@ app.include_router(task_router)
 
 
 @app.get("/", response_class=JSONResponse)
-async def main_page() -> JSONResponse:
-    """response is a json dict with two fields: projects(a list of project id), app_info(metadata of the server)"""
+async def main_page(
+    hub: Hub = Depends(Hub.get_instance)
+) -> JSONResponse:
+    """response is a json dict with two fields: projects(simple information for projects),
+    app_info(metadata of the server)"""
     projects = []
     for proj in hub.projects.values():
         projects.append(

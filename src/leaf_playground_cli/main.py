@@ -275,7 +275,8 @@ def start_server(
         sys.path.insert(0, dev_dir)
 
     from .server.app import config_server, AppConfig
-    from .server.task import get_local_ip, TaskRunTimeEnv
+    from .server.utils import get_local_ip
+    from .server.task.model import TaskRunTimeEnv
 
     if not os.path.exists(hub_dir):
         raise typer.BadParameter(f"zoo [{hub_dir}] not exist.")
