@@ -147,6 +147,7 @@ class SceneEngine(Singleton):
             for evaluator in self.evaluators:
                 evaluator.terminate()
         except:
+            traceback.print_exc()
             self.state = SceneEngineState.FAILED
             self.logger.add_log(
                 SystemLogBody(system_event=SystemEvent.SIMULATION_FAILED, log_msg=traceback.format_exc())
