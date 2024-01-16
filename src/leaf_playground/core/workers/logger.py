@@ -2,12 +2,11 @@ import asyncio
 import json
 import warnings
 import os
-from abc import abstractmethod, ABC
+from abc import abstractmethod
 from typing import Dict, List, Literal, Any
-from uuid import UUID
 
 import pandas as pd
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field
 
 from ...data.log_body import LogBody, ActionLogBody
 from ...data.message import MessagePool
@@ -55,7 +54,7 @@ class Logger(Singleton):
         return self._logs
 
 
-class LogHandler(ABC):
+class LogHandler:
     @abstractmethod
     async def notify_create(self, log: LogBody):
         pass
