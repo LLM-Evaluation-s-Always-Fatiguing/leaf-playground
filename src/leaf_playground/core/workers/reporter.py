@@ -1,5 +1,4 @@
 from collections import defaultdict
-from uuid import UUID
 from typing import Any, Dict, List, Type
 
 from .chart import Chart
@@ -40,12 +39,12 @@ class MetricReporter:
         self.metric_definitions: Dict[str, MetricDefinition] = metric_definitions
         self.records: Dict[str, List[_RecordData]] = defaultdict(list)
         self.charts = [chart_cls() for chart_cls in chart_classes]
-        self.human_records: Dict[str, Dict[UUID, _RecordData]] = defaultdict(dict)
+        self.human_records: Dict[str, Dict[str, _RecordData]] = defaultdict(dict)
 
     def put_record(self, record: _RecordData, metric_belonged_chain: str):
         self.records[metric_belonged_chain].append(record)
 
-    def put_human_record(self, record: _RecordData, metric_belonged_chain: str, log_id: UUID):
+    def put_human_record(self, record: _RecordData, metric_belonged_chain: str, log_id: str):
         self.human_records[metric_belonged_chain][log_id] = record
 
     def _cal_record_metric(self, records: List[_RecordData], metric_def: MetricDefinition) -> List[_MetricData]:
