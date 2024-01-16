@@ -8,7 +8,6 @@ from pydantic import model_validator, Field
 
 from .base import Data
 from .media import Media
-from .message import BasicMessageType
 
 
 _MetricName = str
@@ -75,6 +74,7 @@ class SystemLogBody(LogBody):
     system_event: SystemEvent = Field(default=...)
 
     def model_post_init(self, __context: Any) -> None:
+        super().model_post_init(__context)
         if not self.log_msg:
             self.log_msg = self.system_event.value
 
