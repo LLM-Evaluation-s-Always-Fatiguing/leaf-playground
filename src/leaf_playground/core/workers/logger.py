@@ -18,8 +18,7 @@ class Logger(Singleton):
     def __init__(self):
         self.message_pool: MessagePool = MessagePool.get_instance()
 
-        self._logs: List[LogBody] = []
-        self._id2log: Dict[str, LogBody] = {}
+        self._logs: Dict[str, LogBody] = {}
         self._stopped: bool = False
         self._handlers: List["LogHandler"] = []
 
@@ -27,8 +26,7 @@ class Logger(Singleton):
         self._handlers.append(handler)
 
     def add_log(self, log_body: LogBody):
-        self._logs.append(log_body)
-        self._id2log[log_body.id] = log_body
+        self._logs[log_body.id] = log_body
 
         for handler in self._handlers:
             asyncio.ensure_future(run_asynchronously(handler.notify_create, log_body))
@@ -39,7 +37,7 @@ class Logger(Singleton):
         records: Dict[str, dict],
         field_name: Literal["eval_records", "compare_records", "human_eval_records", "human_compare_records"],
     ):
-        log_body = self._id2log[log_id]
+        log_body = self._logs[log_id]
         for name, record in records.items():
             if "human" not in field_name:
                 getattr(log_body, field_name)[name].append(record)
@@ -51,7 +49,13 @@ class Logger(Singleton):
 
     @property
     def logs(self) -> List[LogBody]:
-        return self._logs
+        return list(self._logs.values())
+
+    def is_log_exists(self, log_id: str) -> bool:
+        return log_id in self._logs
+
+    def get_log_by_id(self, log_id: str) -> LogBody:
+        return self._logs[log_id]
 
 
 class LogHandler:
