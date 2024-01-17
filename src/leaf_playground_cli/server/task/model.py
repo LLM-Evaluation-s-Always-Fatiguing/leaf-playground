@@ -71,6 +71,7 @@ class Log(SQLModel):
     log_msg: str = Field(default=...)
     created_at: datetime = Field(default=...)
     last_update: datetime = Field(default=...)
+    db_last_update: datetime = Field(default_factory=datetime.utcnow)
     tid: str = Field(default=...)
     data: dict = Field(default=...)
 
@@ -90,6 +91,7 @@ class Log(SQLModel):
             log_type=self.log_type,
             log_msg=self.log_msg,
             created_at=self.created_at,
+            last_update=self.last_update,
             **self.data
         )
 
@@ -98,6 +100,7 @@ class LogTable(Log, table=True):
     id: str = Field(default=..., primary_key=True, index=True)
     created_at: datetime = Field(default=..., sa_column=Column(DateTime, index=True))
     last_update: datetime = Field(default=..., sa_column=Column(DateTime, index=True))
+    db_last_update: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, index=True))
     tid: str = Field(default=..., foreign_key="task.id", index=True)
     data: dict = Field(default=..., sa_column=Column(JSON))
 

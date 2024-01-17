@@ -307,5 +307,8 @@ def get_web_ui_version():
     print(__web_ui_version__)
 
 
+# TODO: add command to migrate database using Alembic
+
+
 if __name__ == "__main__":
     app()
