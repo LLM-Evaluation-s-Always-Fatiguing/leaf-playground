@@ -71,7 +71,7 @@ class DBLogHandler(Singleton, LogHandler):
                         print(await resp.text())
             else:
                 async with self._http_session.patch(
-                    f"/task/{args.id}/logs/insert?update={args.secret_key}",
+                    f"/task/{args.id}/logs/update?secret_key={args.secret_key}",
                     headers={'Content-Type': 'application/json'},
                     json=Log.init_from_log_body(log_body, args.id).model_dump(mode="json", by_alias=True)
                 ) as resp:
