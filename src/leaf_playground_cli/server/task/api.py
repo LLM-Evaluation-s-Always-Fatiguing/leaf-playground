@@ -4,6 +4,7 @@ import os
 import random
 import subprocess
 import sys
+import traceback
 from datetime import datetime
 from threading import Lock
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -18,6 +19,7 @@ from leaf_playground._type import Singleton
 from leaf_playground.core.scene_engine import (
     SceneEngineState, SceneObjConfig, MetricEvaluatorObjsConfig, ReporterObjConfig
 )
+from leaf_playground.data.log_body import LogType
 from leaf_playground.data.socket_data import SocketData, SocketOperation
 
 from .db import *
@@ -255,40 +257,52 @@ class TaskManager(Singleton):
 
             logs = await self.db.get_logs_by_tid_with_update_time_constraint(task_id, last_checked_dt=last_check_time)
             for log in logs:
+                log_data = log.to_leaf_log().model_dump(mode="json")
+                if log.log_type == LogType.ACTION:
+                    if log_data["references"]:
+                        references = []
+                        for ref in log_data["references"]:
+                            references.append(await self.db.get_message_by_id(ref))
+                        log_data["references"] = [ref.data for ref in references]
+                    response = await self.db.get_message_by_id(log_data["response"])
+                    log_data["response"] = response.data
                 await websocket.send_json(
                     SocketData(
-                        data=log.to_leaf_log().model_dump(mode="json"),
+                        data=log_data,
                         operation=(
-                                SocketOperation.CREATE if log.created_at == log.last_update else SocketOperation.UPDATE
-                            )
+                            SocketOperation.CREATE if log.created_at == log.last_update else SocketOperation.UPDATE
+                        )
                     ).model_dump(mode="json")
                 )
 
             if logs:
-                last_check_time = logs[-1].last_update
+                last_check_time = logs[-1].db_last_update
+
+        async def _stream():
+            while True:
+                try:
+                    await _get_and_send_logs()
+                    await asyncio.sleep(0.001)
+                except (WebSocketDisconnect, asyncio.CancelledError):
+                    break
+                except:
+                    traceback.print_exc()
+                    await websocket.close(code=500, reason=traceback.format_exc())
 
         last_check_time = None
+        await self.get_task(task_id)
         await websocket.accept()
 
-        try:
-            await _get_and_send_logs()
-            while True:
-                await _get_and_send_logs()
-                task_status = (await self.db.get_task(task_id)).status
-                if task_status in [SceneEngineState.FAILED, SceneEngineState.FINISHED, SceneEngineState.INTERRUPTED]:
-                    break
-                await asyncio.sleep(0.01)
-            if task_status == SceneEngineState.FINISHED:
-                await _get_and_send_logs()
-        except WebSocketDisconnect:
-            pass
+        task = asyncio.ensure_future(_stream())
+
         # wait client to notify close
         while True:
             try:
                 text = await websocket.receive_text()
                 if text == "disconnect":
-                    return
+                    raise WebSocketDisconnect()
             except WebSocketDisconnect:
+                task.cancel()
                 return
 
     async def update_task_log_metric_record(
