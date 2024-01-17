@@ -8,7 +8,6 @@ from pydantic import create_model, BaseModel, Field
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 
-from .workers.socket_handler import SocketHandler
 from .scene_definition import RoleDefinition
 from .._config import _Config, _Configurable
 from .._type import Immutable
@@ -368,12 +367,11 @@ class SceneAIAgent(SceneDynamicAgent, ABC):
 
 
 class HumanConnection:
-    def __init__(self, agent: "SceneHumanAgent", socket: WebSocket, socket_handler: SocketHandler):
+    def __init__(self, agent: "SceneHumanAgent", socket: WebSocket):
         self.agent = agent
         self.socket = socket
 
         self.events = asyncio.Queue()
-        self.socket_handler = socket_handler
         self.state = WebSocketState.CONNECTING
 
         self.cancel_event = asyncio.Event()
@@ -443,7 +441,6 @@ class HumanConnection:
     async def run(self):
         await asyncio.gather(
             *[
-                self.socket_handler.stream_sockets(self.socket),
                 self._send_socket_event(),
                 self._receive_human_input(),
                 self._keep_alive(),
