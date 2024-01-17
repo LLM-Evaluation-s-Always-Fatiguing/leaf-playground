@@ -71,7 +71,7 @@ async def main_page(
         )
     return JSONResponse(
         content={
-            "projects": list(hub.projects.keys()),
+            "projects": projects,
             "app_info": app_info.model_dump(mode="json")
         }
     )
