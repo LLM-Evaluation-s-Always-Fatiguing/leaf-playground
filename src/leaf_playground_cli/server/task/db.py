@@ -216,7 +216,7 @@ class DB(Singleton):
             statement: Select = select(LogTable).where(
                 LogTable.tid == tid, LogTable.db_last_update > last_checked_dt
             )
-        statement = statement.order_by(LogTable.created_at)
+        statement = statement.order_by(LogTable.db_last_update)
         async with AsyncSession(self.engine) as session:
             logs = (await session.execute(statement)).scalars().all()
         if not logs:
