@@ -40,47 +40,51 @@ class DBLogHandler(Singleton, LogHandler):
         self._submitted_messages = set()
         self._http_session = aiohttp.ClientSession(base_url=args.server_url)
 
-    async def notify_create(self, log_body: LogBody):
-        if isinstance(log_body, ActionLogBody):
-            message = self._message_pool.get_message_by_id(log_body.response)
-            if message.id not in self._submitted_messages:
-                self._submitted_messages.add(message.id)
+        self._queue = asyncio.Queue()
+
+        asyncio.ensure_future(self.db_write_loop())
+
+    async def db_write_loop(self):
+        while True:
+            log_body: LogBody = await self._queue.get()
+            is_update = log_body.created_at != log_body.last_update
+            if not is_update:
+                if isinstance(log_body, ActionLogBody):
+                    message = self._message_pool.get_message_by_id(log_body.response)
+                    if message.id not in self._submitted_messages:
+                        self._submitted_messages.add(message.id)
+                        async with self._http_session.post(
+                            f"/task/{args.id}/messages/insert?secret_key={args.secret_key}",
+                            headers={'Content-Type': 'application/json'},
+                            json=Message.init_from_message(message, args.id).model_dump(mode="json", by_alias=True)
+                        ) as resp:
+                            if resp.status != 200:
+                                print(f"task [{args.id}] insert message [{message.id}] to database failed.")
+                                print(await resp.text())
                 async with self._http_session.post(
-                    f"/task/{args.id}/messages/insert?secret_key={args.secret_key}",
+                    f"/task/{args.id}/logs/insert?secret_key={args.secret_key}",
                     headers={'Content-Type': 'application/json'},
-                    json=Message.init_from_message(message, args.id).model_dump(mode="json", by_alias=True)
+                    json=Log.init_from_log_body(log_body, args.id).model_dump(mode="json", by_alias=True)
                 ) as resp:
                     if resp.status != 200:
-                        print(f"task [{args.id}] insert message [{message.id}] to database failed.")
+                        print(f"task [{args.id}] insert log [{log_body.id}] to database failed.")
                         print(await resp.text())
-        async with self._http_session.post(
-            f"/task/{args.id}/logs/insert?secret_key={args.secret_key}",
-            headers={'Content-Type': 'application/json'},
-            json=Log.init_from_log_body(log_body, args.id).model_dump(mode="json", by_alias=True)
-        ) as resp:
-            if resp.status != 200:
-                print(f"task [{args.id}] insert log [{log_body.id}] to database failed.")
-                print(await resp.text())
+            else:
+                async with self._http_session.patch(
+                    f"/task/{args.id}/logs/insert?update={args.secret_key}",
+                    headers={'Content-Type': 'application/json'},
+                    json=Log.init_from_log_body(log_body, args.id).model_dump(mode="json", by_alias=True)
+                ) as resp:
+                    if resp.status != 200:
+                        print(f"task [{args.id}] update log [{log_body.id}] to database failed.")
+                        print(await resp.text())
+
+    async def notify_create(self, log_body: LogBody):
+        self._queue.put_nowait(log_body)
 
     async def notify_update(self, log_body: LogBody):
         log_body.last_update = datetime.utcnow()
-        async with self._http_session.patch(
-            f"/task/{args.id}/logs/insert?secret_key={args.secret_key}",
-            headers={'Content-Type': 'application/json'},
-            json=Log.init_from_log_body(log_body, args.id).model_dump(mode="json", by_alias=True)
-        ) as resp:
-            if resp.status != 200:
-                print(f"task [{args.id}] update log [{log_body.id}] to database failed.")
-                print(await resp.text())
-
-    async def stream_sockets(self, websocket: WebSocket) -> bool:
-        closed = False
-        try:
-            while not self._stopped:
-                pass  # TODO: read db to stream log with Socket wrapped
-        except:
-            closed = True
-        return closed
+        self._queue.put_nowait(log_body)
 
 
 def create_engine():
@@ -163,12 +167,10 @@ async def agents_connected(scene_engine: SceneEngine = Depends(SceneEngine.get_i
     )
 
 
-# TODO: refactor
 # @app.websocket("/ws/human/{agent_id}")
 # async def human_input(
 #     websocket: WebSocket,
 #     agent_id: str,
-#     socket_handler: DBLogHandler = Depends(DBLogHandler.get_instance),
 #     scene_engine: SceneEngine = Depends(SceneEngine.get_instance)
 # ):
 #     try:
@@ -181,8 +183,7 @@ async def agents_connected(scene_engine: SceneEngine = Depends(SceneEngine.get_i
 #         return
 #     connection = HumanConnection(
 #         agent=agent,
-#         socket=websocket,
-#         socket_handler=socket_handler
+#         socket=websocket
 #     )
 #     await connection.connect()
 #     await connection.run()
