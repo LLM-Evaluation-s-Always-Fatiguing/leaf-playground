@@ -257,7 +257,8 @@ class TaskManager(Singleton):
 
             logs = await self.db.get_logs_by_tid_with_update_time_constraint(task_id, last_checked_dt=last_check_time)
             for log in logs:
-                log_data = log.to_leaf_log().model_dump(mode="json")
+                log_data = log.model_dump(mode="json")
+                log_data.update(**log_data.pop("data"))
                 if log.log_type == LogType.ACTION:
                     if log_data["references"]:
                         references = []
