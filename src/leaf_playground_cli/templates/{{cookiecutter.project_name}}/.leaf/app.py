@@ -167,26 +167,26 @@ async def agents_connected(scene_engine: SceneEngine = Depends(SceneEngine.get_i
     )
 
 
-# @app.websocket("/ws/human/{agent_id}")
-# async def human_input(
-#     websocket: WebSocket,
-#     agent_id: str,
-#     scene_engine: SceneEngine = Depends(SceneEngine.get_instance)
-# ):
-#     try:
-#         agent = scene_engine.scene.get_dynamic_agent(agent_id)
-#     except KeyError:
-#         await websocket.close(reason=f"agent [{agent_id}] not exists.")
-#         return
-#     if agent.connected:
-#         await websocket.close(reason=f"agent [{agent_id}] already connected.")
-#         return
-#     connection = HumanConnection(
-#         agent=agent,
-#         socket=websocket
-#     )
-#     await connection.connect()
-#     await connection.run()
+@app.websocket("/ws/human/{agent_id}")
+async def human_input(
+    websocket: WebSocket,
+    agent_id: str,
+    scene_engine: SceneEngine = Depends(SceneEngine.get_instance)
+):
+    try:
+        agent = scene_engine.scene.get_dynamic_agent(agent_id)
+    except KeyError:
+        await websocket.close(code=403, reason=f"agent [{agent_id}] not exists.")
+        return
+    if agent.connected:
+        await websocket.close(code=403, reason=f"agent [{agent_id}] already connected.")
+        return
+    connection = HumanConnection(
+        agent=agent,
+        socket=websocket
+    )
+    await connection.connect()
+    await connection.run()
 
 
 @app.post("/pause")

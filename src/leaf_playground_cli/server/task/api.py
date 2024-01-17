@@ -5,6 +5,7 @@ import random
 import subprocess
 import sys
 import traceback
+import websockets
 from datetime import datetime
 from threading import Lock
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -306,6 +307,19 @@ class TaskManager(Singleton):
                 task.cancel()
                 return
 
+    async def communicate_with_human_agent(self, task_id: str, agent_id: str, websocket: WebSocket):
+        task = await self.get_task(task_id)
+        try:
+            async with websockets.connect(f"{task.base_ws_url}/ws/human/{agent_id}") as connection:
+                while True:
+                    event = json.loads(await connection.recv())
+                    await websocket.send_json(event)
+                    if event["event"] == "wait_human_input":
+                        human_input = await websocket.receive_text()
+                        await connection.send(human_input)
+        except:
+            return
+
     async def update_task_log_metric_record(
         self,
         task_id: str,
@@ -463,6 +477,21 @@ async def stream_logs(
     task_manager: TaskManager = Depends(TaskManager.get_instance),
 ):
     await task_manager.stream_task_logs(task_id, websocket)
+
+
+@task_router.websocket("/{task_id}/human/{agent_id}/ws")
+async def human_connection(
+    task_id: str,
+    agent_id: str,
+    websocket: WebSocket,
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
+):
+    await asyncio.gather(
+        *[
+            task_manager.stream_task_logs(task_id, websocket),
+            task_manager.communicate_with_human_agent(task_id, agent_id, websocket)
+        ]
+    )
 
 
 # TODO: support updating log records after task finished and task service closed.
