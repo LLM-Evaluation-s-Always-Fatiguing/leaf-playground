@@ -85,16 +85,6 @@ class Log(SQLModel):
                 log_dict["data"][k] = v
         return cls(**log_dict)
 
-    def to_leaf_log(self) -> LogBody:
-        return (ActionLogBody if self.log_type == LogType.ACTION else SystemLogBody)(
-            id=self.id,
-            log_type=self.log_type,
-            log_msg=self.log_msg,
-            created_at=self.created_at,
-            last_update=self.last_update,
-            **self.data
-        )
-
 
 class LogTable(Log, table=True):
     id: str = Field(default=..., primary_key=True, index=True)
@@ -132,9 +122,6 @@ class Message(SQLModel):
         }
 
         return cls(**msg_dict)
-
-    def to_leaf_message(self) -> LEAFMessage:
-        return dynamically_import_obj(DynamicObject(**self.obj))(**self.data)
 
 
 class MessageTable(Message, table=True):
