@@ -5,7 +5,6 @@ from pydantic import create_model, BaseModel, Field, PositiveInt, PrivateAttr
 
 from . import MetricDefinition
 from .definitions import EnvVarDefinition, EnvVarConfig, MetricConfig, RoleDefinition, RoleConfig
-from ..workers.logger import LogExporter, _KeptLogExporter
 from ..._config import _Config
 
 _EnvVarName = str
@@ -18,9 +17,7 @@ class SceneDefinition(BaseModel):
     env_vars: List[EnvVarDefinition] = Field(default=...)
     roles: List[RoleDefinition] = Field(default=...)
 
-    _log_exporters: List[LogExporter] = PrivateAttr(
-        default=[_KeptLogExporter(extension=ext) for ext in ["json", "jsonl", "csv"]]
-    )
+    _log_exporters: List["leaf_playground.core.workers.logger.Logger"] = PrivateAttr(default=[])
 
     @property
     def roles_agent_num_range(self) -> Dict[str, Tuple[PositiveInt, Union[PositiveInt, Literal[-1]]]]:
@@ -31,10 +28,15 @@ class SceneDefinition(BaseModel):
         return self._log_exporters
 
     def model_post_init(self, __context: Any) -> None:
+        from leaf_playground.core.workers.logger import _KeptLogExporter
+
         if len(set([r.name for r in self.roles])) != len(self.roles):
             raise ValueError(f"roles should have unique names")
         if len(set([e.name for e in self.env_vars])) != len(self.env_vars):
             raise ValueError(f"env_vars should have unique names")
+
+        for ext in ["json", "jsonl", "csv"]:
+            self._log_exporters.append(_KeptLogExporter(extension=ext))
 
     def get_role_definition(self, role_name: str) -> RoleDefinition:
         for role in self.roles:
@@ -54,7 +56,7 @@ class SceneDefinition(BaseModel):
             self.get_role_definition(role_name).get_action_definition(action_name).get_metric_definition(metric_name)
         )
 
-    def registry_log_exporters(self, log_exporters: List[LogExporter]):
+    def registry_log_exporters(self, log_exporters: List["leaf_playground.core.workers.logger.Logger"]):
         name2exporter = {f"{exporter.file_name}.{exporter.extension}": exporter for exporter in self.log_exporters}
         for exporter in log_exporters:
             name = f"{exporter.file_name}:{exporter.extension}"
