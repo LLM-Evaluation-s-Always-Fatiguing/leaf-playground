@@ -38,7 +38,8 @@ def config_server(config: AppConfig):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    DB(f"sqlite+aiosqlite:///{os.path.join(app_config.hub_dir, '.leaf_workspace', '.leaf_playground.db')}")
+    db = DB(f"sqlite+aiosqlite:///{os.path.join(app_config.hub_dir, '.leaf_workspace', '.leaf_playground.db')}")
+    await db.wait_db_startup()
     Hub(hub_dir=app_config.hub_dir.as_posix())
     TaskManager(server_port=app_config.server_port, runtime_env=app_config.runtime_env)
 
