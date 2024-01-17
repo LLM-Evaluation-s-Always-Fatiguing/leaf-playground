@@ -163,8 +163,7 @@ class SceneEngine(Singleton):
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.EVALUATION_FINISHED))
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE))
         finally:
-            if self.state != SceneEngineState.INTERRUPTED:
-                self.save(self._results_dir)
+            self.save(self._results_dir)
 
     def pause(self):
         if self.state not in [
