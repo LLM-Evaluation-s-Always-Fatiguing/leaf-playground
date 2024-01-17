@@ -19,12 +19,22 @@ class DB(Singleton):
     def __init__(self, db_url: str):
         self.url = db_url
         self.engine = create_async_engine(db_url)
-        asyncio.ensure_future(self._startup_job())
+        asyncio.ensure_future(self._on_startup())
+        asyncio.ensure_future(self._background_job())
 
-    async def _startup_job(self):
+        self._run = asyncio.Event()
+
+    async def wait_db_startup(self):
+        await self._run.wait()
+
+    async def _on_startup(self):
         async with self.engine.begin() as conn:
             # 创建所有表结构
             await conn.run_sync(SQLModel.metadata.create_all)
+        self._run.set()
+
+    async def _background_job(self):
+        await self._run.wait()
 
         deleting_tasks = await self.get_task_by_life_cycle(TaskDBLifeCycle.DELETING)
         for task in deleting_tasks:
@@ -204,7 +214,7 @@ class DB(Singleton):
             statement: Select = select(LogTable).where(LogTable.tid == tid)
         else:
             statement: Select = select(LogTable).where(
-                LogTable.tid == tid, LogTable.last_update > last_checked_dt
+                LogTable.tid == tid, LogTable.db_last_update > last_checked_dt
             )
         statement = statement.order_by(LogTable.created_at)
         async with AsyncSession(self.engine) as session:
