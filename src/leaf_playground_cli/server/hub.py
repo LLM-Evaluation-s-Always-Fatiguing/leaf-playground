@@ -89,7 +89,10 @@ class Project(BaseModel):
             proj_config = json.load(f)
         for k, v in proj_config.items():
             if k in self.model_fields_set:
-                self.__setattr__(k, v)
+                if k != "metadata":
+                    setattr(self, k, v)
+                else:
+                    setattr(self, k, ProjectMetadata(**v))
 
     def update(self):
         self.update_config()
