@@ -185,7 +185,7 @@ class DB(Singleton):
         log_id = new_log.id
 
         async def obj_getter(session: AsyncSession):
-            return session.get(LogTable, log_id)
+            return await session.get(LogTable, log_id)
 
         status_code = await self._update(obj_getter, **new_log.model_dump())
         if status_code == 404:
