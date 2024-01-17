@@ -34,11 +34,11 @@ task_router = APIRouter(prefix="/task")
 
 class LogEvalMetricRecord(BaseModel):
     value: Any = Field(default=...)
-    reason: Optional[str] = Field(default=...)
+    reason: Optional[str] = Field(default=None)
     metric_name: str = Field(default=...)
 
 
-class LogEvalCompareRecord(BaseModel):
+class LogEvalCompareRecord(LogEvalMetricRecord):
     value: List[str] = Field(default=...)
 
 
