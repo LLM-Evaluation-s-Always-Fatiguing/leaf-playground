@@ -268,12 +268,15 @@ class TaskManager(Singleton):
                         log_data["references"] = [ref.data for ref in references]
                     response = await self.db.get_message_by_id(log_data["response"])
                     log_data["response"] = response.data
+                socket_operation = (
+                    SocketOperation.CREATE if log.created_at == log.last_update else SocketOperation.UPDATE
+                )
+                if last_check_time is None:
+                    socket_operation = SocketOperation.CREATE
                 await websocket.send_json(
                     SocketData(
                         data=log_data,
-                        operation=(
-                            SocketOperation.CREATE if log.created_at == log.last_update else SocketOperation.UPDATE
-                        )
+                        operation=socket_operation
                     ).model_dump(mode="json")
                 )
 
