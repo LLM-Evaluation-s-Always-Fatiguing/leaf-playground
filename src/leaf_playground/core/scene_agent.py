@@ -403,7 +403,7 @@ class HumanConnection:
     async def _keep_alive(self):
         try:
             while True:
-                await self.socket.send_json(SocketEvent(event="heart_beat").model_dump_json())
+                await self.socket.send_json(SocketEvent(event="heart_beat").model_dump(mode="json"))
                 await asyncio.sleep(0.1)
         except:
             self.disconnect()
@@ -415,7 +415,7 @@ class HumanConnection:
                 break
             try:
                 event: SocketEvent = await self.events.get()
-                await self.socket.send_json(event.model_dump_json())
+                await self.socket.send_json(event.model_dump(mode="json"))
             except:
                 continue
 
