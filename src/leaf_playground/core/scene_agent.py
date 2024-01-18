@@ -126,10 +126,12 @@ class SceneAgentMetaClass(ABCMeta):
         *,
         role_definition: RoleDefinition = None,
         cls_description: str = None,
-        action_exec_timeout: int = 30,
+        action_exec_timeout: int = None,
     ):
         attrs["role_definition"] = Immutable(role_definition or getattr(bases[0], "role_definition", None))
         attrs["cls_description"] = Immutable(cls_description)
+        if action_exec_timeout is None:
+            action_exec_timeout = getattr(bases[0], "action_exec_timeout", 30)
         attrs["action_exec_timeout"] = Immutable(action_exec_timeout)
         attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, module=_getframe(1).f_globals["__name__"]))
 
