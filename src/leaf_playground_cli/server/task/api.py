@@ -252,7 +252,12 @@ class TaskManager(Singleton):
         await self.get_and_validate_task(task_id, secret_key)
         await self.db.update_log(log)
 
-    async def stream_task_logs(self, task_id: str, websocket: WebSocket):
+    async def websocket_connection(
+        self,
+        task_id: str,
+        websocket: WebSocket,
+        human_id: Optional[str] = None
+    ):
         async def _get_and_send_logs():
             nonlocal last_check_time
 
@@ -283,7 +288,7 @@ class TaskManager(Singleton):
             if logs:
                 last_check_time = logs[-1].db_last_update
 
-        async def _stream():
+        async def _stream_log():
             while True:
                 try:
                     await _get_and_send_logs()
@@ -296,32 +301,34 @@ class TaskManager(Singleton):
 
         last_check_time = None
         await self.get_task(task_id)
-        await websocket.accept()
 
-        task = asyncio.ensure_future(_stream())
-
-        # wait client to notify close
-        while True:
-            try:
-                text = await websocket.receive_text()
-                if text == "disconnect":
-                    raise WebSocketDisconnect()
-            except WebSocketDisconnect:
-                task.cancel()
-                return
-
-    async def communicate_with_human_agent(self, task_id: str, agent_id: str, websocket: WebSocket):
         task = await self.get_task(task_id)
-        try:
-            async with websockets.connect(f"{task.base_ws_url}/ws/human/{agent_id}") as connection:
+        stream_log_task = asyncio.ensure_future(_stream_log())
+
+        if not human_id:
+            while True:
+                try:
+                    text = await websocket.receive_text()
+                    if text == "disconnect":
+                        raise WebSocketDisconnect()
+                except WebSocketDisconnect:
+                    stream_log_task.cancel()
+                    return
+        else:
+            async with websockets.connect(f"{task.base_ws_url}/ws/human/{human_id}") as connection:
                 while True:
-                    event = json.loads(await connection.recv())
-                    await websocket.send_json(event)
-                    if event["event"] == "wait_human_input":
-                        human_input = await websocket.receive_text()
-                        await connection.send(human_input)
-        except:
-            return
+                    try:
+                        event = json.loads(await connection.recv())
+                        await websocket.send_json(event)
+                        if event["event"] == "wait_human_input":
+                            human_input = await websocket.receive_text()
+                            await connection.send(human_input)
+                    except WebSocketDisconnect:
+                        stream_log_task.cancel()
+                        return
+                    except:
+                        traceback.print_exc()
+                        return
 
     async def update_task_log_metric_record(
         self,
@@ -479,7 +486,8 @@ async def stream_logs(
     websocket: WebSocket,
     task_manager: TaskManager = Depends(TaskManager.get_instance),
 ):
-    await task_manager.stream_task_logs(task_id, websocket)
+    await websocket.accept()
+    await task_manager.websocket_connection(task_id, websocket)
 
 
 @task_router.websocket("/{task_id}/human/{agent_id}/ws")
@@ -489,12 +497,8 @@ async def human_connection(
     websocket: WebSocket,
     task_manager: TaskManager = Depends(TaskManager.get_instance),
 ):
-    await asyncio.gather(
-        *[
-            task_manager.stream_task_logs(task_id, websocket),
-            task_manager.communicate_with_human_agent(task_id, agent_id, websocket)
-        ]
-    )
+    await websocket.accept()
+    await task_manager.websocket_connection(task_id, websocket, agent_id)
 
 
 # TODO: support updating log records after task finished and task service closed.
