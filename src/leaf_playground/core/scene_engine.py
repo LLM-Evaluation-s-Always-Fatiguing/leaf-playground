@@ -157,8 +157,7 @@ class SceneEngine(Singleton):
                 evaluator.terminate()
         else:
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_FINISHED))
-            for evaluator in self.evaluators:
-                evaluator.join()
+            await asyncio.gather(*[evaluator.join() for evaluator in self.evaluators])
             self.state = SceneEngineState.FINISHED
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.EVALUATION_FINISHED))
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE))
