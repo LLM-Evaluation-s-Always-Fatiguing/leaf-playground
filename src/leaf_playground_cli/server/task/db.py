@@ -1,7 +1,7 @@
 import asyncio
 import traceback
 from datetime import datetime
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Literal, Optional
 
 from fastapi import HTTPException
 from sqlmodel import SQLModel
@@ -216,7 +216,9 @@ class DB(Singleton):
             statement: Select = select(LogTable).where(
                 LogTable.tid == tid, LogTable.db_last_update > last_checked_dt
             )
-        statement = statement.order_by(LogTable.db_last_update)
+        statement = statement.order_by(
+            LogTable.db_last_update if last_checked_dt is not None else LogTable.created_at
+        )
         async with AsyncSession(self.engine) as session:
             logs = (await session.execute(statement)).scalars().all()
         if not logs:
