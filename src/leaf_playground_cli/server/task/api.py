@@ -228,6 +228,15 @@ class TaskManager(Singleton):
             if resp.status != 200:
                 raise HTTPException(status_code=resp.status, detail=await resp.text())
 
+    async def ping_task_service(self, task_id: str) -> str:
+        task = await self.get_task(task_id)
+        url = f"{task.base_http_url}/hello"
+
+        async with self.http_session.get(url=url) as resp:
+            if resp.status != 200:
+                raise HTTPException(status_code=resp.status, detail=await resp.text())
+            return await resp.text()
+
     async def pause_task(self, task_id: str):
         await self._control_task_status(task_id, "pause")
 
@@ -243,6 +252,14 @@ class TaskManager(Singleton):
 
     async def delete_task(self, task_id: str):
         await self.db.delete_task(task_id)
+
+    async def save_task_results(self, task_id: str):
+        task = await self.get_task(task_id)
+        url = f"{task.base_http_url}/save"
+
+        async with self.http_session.post(url=url) as resp:
+            if resp.status != 200:
+                raise HTTPException(status_code=resp.status, detail=await resp.text())
 
     async def insert_task_log(self, task_id: str, secret_key: str, log: Log):
         await self.get_and_validate_task(task_id, secret_key)
@@ -387,6 +404,11 @@ async def create_task(
     return await task_manager.create_task(payload)
 
 
+@task_router.get("/{task_id}/hello")
+async def ping_task_service(task_id: str, task_manager: TaskManager = Depends(TaskManager.get_instance)):
+    return await task_manager.ping_task_service(task_id)
+
+
 @task_router.post("/{task_id}/pause")
 async def pause_task(task_id: str, task_manager: TaskManager = Depends(TaskManager.get_instance)):
     await task_manager.pause_task(task_id)
@@ -447,6 +469,11 @@ async def update_task_status(
     task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     await task_manager.update_task_status(task_id=task_id, task_status=task_status, secret_key=secret_key)
+
+
+@task_router.post("/{task_id}/save")
+async def save_task_results(task_id: str, task_manager: TaskManager = Depends(TaskManager.get_instance)):
+    await task_manager.save_task_results(task_id)
 
 
 @task_router.get("/history", response_class=JSONResponse)

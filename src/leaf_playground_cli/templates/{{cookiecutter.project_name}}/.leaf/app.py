@@ -158,6 +158,11 @@ async def lifespan(application: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+@app.get("/hello")
+async def hello() -> str:
+    return "hello world!"
+
+
 @app.get("/agents_connected")
 async def agents_connected(scene_engine: SceneEngine = Depends(SceneEngine.get_instance)) -> JSONResponse:
     return JSONResponse(
@@ -215,7 +220,15 @@ async def close_engine(
 ):
     if scene_engine.state not in [SceneEngineState.INTERRUPTED, SceneEngineState.FAILED, SceneEngineState.FINISHED]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="task not done!")
+    scene_engine.save(scene_engine._results_dir)
     app_manager.shutdown_event.set()
+
+
+@app.post("/save")
+async def save_engine(
+    scene_engine: SceneEngine = Depends(SceneEngine.get_instance)
+):
+    scene_engine.save(scene_engine._results_dir)
 
 
 @app.post("/logs/{log_id}/record/metric/update")
