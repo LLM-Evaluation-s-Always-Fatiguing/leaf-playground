@@ -115,7 +115,6 @@ class SceneAgentMetadata(BaseModel):
     config_schema: Optional[dict] = Field(default=...)
     obj_for_import: DynamicObject = Field(default=...)
     is_human: bool = Field(default=...)
-    action_timeout_seconds: int = Field(default=...)
 
 
 class SceneAgentMetaClass(ABCMeta):
@@ -126,14 +125,10 @@ class SceneAgentMetaClass(ABCMeta):
         attrs,
         *,
         role_definition: RoleDefinition = None,
-        cls_description: str = None,
-        action_exec_timeout: int = None,
+        cls_description: str = None
     ):
         attrs["role_definition"] = Immutable(role_definition or getattr(bases[0], "role_definition", None))
         attrs["cls_description"] = Immutable(cls_description)
-        if action_exec_timeout is None:
-            action_exec_timeout = getattr(bases[0], "action_exec_timeout", 30)
-        attrs["action_exec_timeout"] = Immutable(action_exec_timeout)
         attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, module=_getframe(1).f_globals["__name__"]))
 
         new_cls = super().__new__(cls, name, bases, attrs)
@@ -149,11 +144,6 @@ class SceneAgentMetaClass(ABCMeta):
             raise TypeError(
                 f"class [{name}]'s class attribute [cls_description] should be a [str] instance, "
                 f"got [{type(attrs['cls_description']).__name__}] type"
-            )
-        if not validate_type(attrs["action_exec_timeout"], Immutable[int]):
-            raise TypeError(
-                f"class [{name}]'s class attribute [action_exec_timeout] should be a [int] instance, "
-                f"got [{type(attrs['action_exec_timeout']).__name__}] type"
             )
 
         if ABC not in bases:
@@ -199,8 +189,7 @@ class SceneAgentMetaClass(ABCMeta):
         attrs,
         *,
         role_definition: RoleDefinition = None,
-        cls_description: str = None,
-        action_exec_timeout: int = 30,
+        cls_description: str = None
     ):
         super().__init__(name, bases, attrs)
 
@@ -229,7 +218,6 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
     # class attributes initialized in metaclass
     role_definition: RoleDefinition
     cls_description: str
-    action_exec_timeout: int
     obj_for_import: DynamicObject
 
     def __init__(self, config: config_cls):
@@ -247,7 +235,7 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
             for action in self.role_definition.actions:
                 action_name = action.name
                 action_handler = _ActionHandler(
-                    getattr(self, action_name), action_name, self.action_exec_timeout, self._not_paused
+                    getattr(self, action_name), action_name, action.exec_timeout, self._not_paused
                 )
                 setattr(self, action_name, action_handler.execute)
                 self._action2handler[action_name] = action_handler
@@ -304,8 +292,7 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
             description=cls.cls_description,
             config_schema=cls.config_cls.get_json_schema(by_alias=True) if not cls.role_definition.is_static else None,
             obj_for_import=cls.obj_for_import,
-            is_human=False,
-            action_timeout_seconds=cls.action_exec_timeout,
+            is_human=False
         )
 
 
@@ -475,7 +462,7 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
                     self,
                     self._action2handler[action_name].action_fn,
                     action_name,
-                    self.action_exec_timeout,
+                    action.exec_timeout,
                     self._not_paused,
                 )
                 setattr(self, action_name, action_handler.execute)
