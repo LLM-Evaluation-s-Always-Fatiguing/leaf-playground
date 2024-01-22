@@ -1,5 +1,7 @@
 import asyncio
 import importlib
+import multiprocessing
+import os
 import pickle
 import time
 import traceback
@@ -44,17 +46,19 @@ _MetricRecordValue = Any
 
 class MetricEvaluatorProxy(Process):
     def __init__(
-        self,
-        config_cls: Type["MetricEvaluatorConfig"],
-        config_data: dict,
-        record_metrics: List[_MetricName],
-        compare_metrics: List[_MetricName],
-        manager: Manager,
+            self,
+            config_cls: Type["MetricEvaluatorConfig"],
+            config_data: dict,
+            record_metrics: List[_MetricName],
+            compare_metrics: List[_MetricName],
+            manager: Manager,
+            queue: multiprocessing.Queue,
+            result_cache: dict,
     ):
         super().__init__(daemon=True)
 
-        self._queue = manager.Queue()
-        self._result_cache = manager.dict()
+        self._queue = queue
+        self._result_cache = result_cache
         self._can_stop = manager.Value("b", False)
         self._state = manager.Value("c", MetricEvaluatorState.PENDING.value.encode("utf-8"))
 
@@ -103,6 +107,10 @@ class MetricEvaluatorProxy(Process):
         self._state.value = MetricEvaluatorState.RUNNING.value.encode("utf-8")
 
         while self._state.value == MetricEvaluatorState.RUNNING.value.encode("utf-8"):
+            if self._queue.empty() and self._can_stop.value:
+                self._state.value = MetricEvaluatorState.FINISHED.value.encode("utf-8")
+                break
+
             try:
                 response, references, ground_truth, kwargs, is_compare, id_ = self._queue.get_nowait()
             except Empty:
@@ -130,10 +138,6 @@ class MetricEvaluatorProxy(Process):
                 output = {}
             self._result_cache[id_] = {k: v.model_dump(mode="json", by_alias=True) for k, v in output.items()}
 
-            if self._queue.empty() and self._can_stop.value:
-                self._state.value = MetricEvaluatorState.FINISHED.value.encode("utf-8")
-                break
-
     def terminate(self):
         super().terminate()
         self._state.value = MetricEvaluatorState.TERMINATED.value.encode("utf-8")
@@ -145,13 +149,13 @@ class MetricEvaluatorProxy(Process):
 
 class MetricEvaluatorMetaClass(ABCMeta):
     def __new__(
-        cls,
-        name,
-        bases,
-        attrs,
-        *,
-        metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
-        cls_description: str = None,
+            cls,
+            name,
+            bases,
+            attrs,
+            *,
+            metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
+            cls_description: str = None,
     ):
         # create proxy class on the fly
         evaluator_proxy_class = new_class(
@@ -218,13 +222,13 @@ class MetricEvaluatorMetaClass(ABCMeta):
         return new_cls
 
     def __init__(
-        cls,
-        name,
-        bases,
-        attrs,
-        *,
-        metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
-        cls_description: str = None,
+            cls,
+            name,
+            bases,
+            attrs,
+            *,
+            metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
+            cls_description: str = None,
     ):
         super().__init__(name, bases, attrs)
 
@@ -260,6 +264,7 @@ class MetricEvaluatorState(Enum):
 
 
 class MetricEvaluatorConfig(_Config):
+    max_concurrency: int = Field(default=1, gt=0, lt=2 * os.cpu_count())
     non_ignored_message_type: Optional[List[Type[Message]]] = Field(default=None, exclude=True)
 
 
@@ -274,11 +279,11 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     obj_for_import: DynamicObject
 
     def __init__(
-        self,
-        config: config_cls,
-        scene_config: SceneConfig,
-        logger: Logger,
-        reporter: "leaf_playground.core.workers.MetricReporter",
+            self,
+            config: config_cls,
+            scene_config: SceneConfig,
+            logger: Logger,
+            reporter: "leaf_playground.core.workers.MetricReporter",
     ):
         super().__init__(config=config)
 
@@ -312,32 +317,43 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         self.logger = logger
         self.reporter = reporter
 
-        self.proxy = self.evaluator_proxy_class(
-            config_cls=self.config_cls,
-            config_data=self.config_data,
-            record_metrics=self.metrics_for_record,
-            compare_metrics=self.metrics_for_compare,
-            manager=Manager(),
-        )
+        manager = Manager()
+        self.queue = manager.Queue()
+        self.result_cache = manager.dict()
+
+        self.proxys = [
+            self.evaluator_proxy_class(
+                config_cls=self.config_cls,
+                config_data=self.config_data,
+                record_metrics=self.metrics_for_record,
+                compare_metrics=self.metrics_for_compare,
+                manager=manager,
+                queue=self.queue,
+                result_cache=self.result_cache,
+            )
+            for _ in range(self.config.max_concurrency)
+        ]
 
     @staticmethod
     @abstractmethod
     def _init_evaluator(
-        config: MetricEvaluatorConfig, record_metrics: List[_MetricName], compare_metrics: List[_MetricName]
+            config: MetricEvaluatorConfig, record_metrics: List[_MetricName], compare_metrics: List[_MetricName]
     ) -> Any:
         pass
 
     @staticmethod
     @abstractmethod
     async def _record(
-        response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any, **kwargs
+            response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any,
+            **kwargs
     ) -> Dict[_MetricName, RecordOutput]:
         pass
 
     @staticmethod
     @abstractmethod
     async def _compare(
-        response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any, **kwargs
+            response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any,
+            **kwargs
     ) -> Dict[_MetricName, CompareOutput]:
         pass
 
@@ -348,22 +364,28 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         asyncio.ensure_future(self.compare(log))
 
     def notify_can_stop(self):
-        self.proxy.can_stop = True
+        for proxy in self.proxys:
+            proxy.can_stop = True
 
     def start(self):
-        self.proxy.start()
+        for proxy in self.proxys:
+            proxy.start()
 
     def terminate(self):
-        self.proxy.terminate()
+        for proxy in self.proxys:
+            proxy.terminate()
 
     async def join(self):
-        while self.proxy.state not in [
-            MetricEvaluatorState.FINISHED,
-            MetricEvaluatorState.TERMINATED,
-            MetricEvaluatorState.INIT_FAILED,
-            MetricEvaluatorState.RUN_FAILED
-        ]:
-            await asyncio.sleep(0.1)
+        for proxy in self.proxys:
+            while proxy.state not in [
+                MetricEvaluatorState.FINISHED,
+                MetricEvaluatorState.TERMINATED,
+                MetricEvaluatorState.INIT_FAILED,
+                MetricEvaluatorState.RUN_FAILED,
+            ]:
+                await asyncio.sleep(0.1)
+            else:
+                print(f"evaluator {proxy.name} finished")
 
     async def _wait_result(self, log: ActionLogBody, is_compare: bool = False):
         id_ = uuid4()
@@ -372,26 +394,29 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         kwargs = log.model_dump(
             mode="json",
             exclude={
-                "log_type", "response", "references", "ground_truth", "eval_records", "compare_records",
-                "human_eval_records", "human_compare_records"
-            }
+                "log_type",
+                "response",
+                "references",
+                "ground_truth",
+                "eval_records",
+                "compare_records",
+                "human_eval_records",
+                "human_compare_records",
+            },
         )
-        self.proxy.queue.put_nowait(
+        self.queue.put_nowait(
             (
                 pickle.dumps(response),
                 pickle.dumps(references),
                 pickle.dumps(log.ground_truth),
                 pickle.dumps(kwargs),
                 is_compare,
-                id_
+                id_,
             )
         )
-        while id_ not in self.proxy.result_cache:
+        while id_ not in self.result_cache:
             await asyncio.sleep(0.1)  # sleep longer to let scene's main process have more CPU time slice
-        return {
-            k: (CompareOutput if is_compare else RecordOutput)(**v)
-            for k, v in self.proxy.result_cache.pop(id_).items()
-        }
+        return {k: (CompareOutput if is_compare else RecordOutput)(**v) for k, v in self.result_cache.pop(id_).items()}
 
     async def record(self, log: ActionLogBody) -> None:
         response = self.logger.message_pool.get_message_by_id(log.response)
