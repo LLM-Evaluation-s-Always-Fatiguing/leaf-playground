@@ -1,5 +1,4 @@
 import asyncio
-import time
 from abc import abstractmethod, ABC, ABCMeta
 from sys import _getframe
 from typing import Dict, List, Optional, Type
@@ -94,7 +93,7 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
     log_body_class: Type[ActionLogBody]
     obj_for_import: DynamicObject
 
-    def __init__(self, config: config_cls, logger: Logger):
+    def __init__(self, config: config_cls):
         super().__init__(config=config)
 
         static_roles = [role_def.name for role_def in self.scene_definition.roles if role_def.is_static]
@@ -106,8 +105,8 @@ class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
         self._bind_env_vars_to_agents()
         self.evaluators: List[MetricEvaluator] = []
 
-        self.logger = logger
-        self.message_pool: MessagePool = MessagePool()
+        self.logger = Logger.get_instance()
+        self.message_pool = MessagePool.get_instance()
 
         self._dynamic_agents: Dict[str, SceneDynamicAgent] = {}
         self._agent_list: List[SceneAgent] = []

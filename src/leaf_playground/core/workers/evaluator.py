@@ -2,13 +2,13 @@ import asyncio
 import importlib
 import pickle
 import time
+import traceback
 from abc import abstractmethod, ABC, ABCMeta
 from collections import defaultdict
 from enum import Enum
 from multiprocessing import Manager, Process
 from queue import Empty
 from sys import _getframe
-from threading import Thread
 from types import new_class
 from typing import Any, Dict, List, Optional, Type, Union
 from uuid import uuid4
@@ -20,6 +20,7 @@ from ..scene_definition import CompareMetricDefinition, MetricDefinition, VALUE_
 from ..._config import _Config, _Configurable
 from ..._type import Immutable
 from ...data.log_body import ActionLogBody
+from ...data.media import Media
 from ...data.message import Message
 from ...utils.import_util import DynamicObject
 from ...utils.type_util import validate_type
@@ -94,32 +95,44 @@ class MetricEvaluatorProxy(Process):
             evaluator = self._init_evaluator(
                 self._config_cls(**self._config_data), self._record_metrics, self._compare_metrics
             )
-        except Exception as e:
+        except:
+            traceback.print_exc()
             self._state.value = MetricEvaluatorState.INIT_FAILED.value.encode("utf-8")
             return
         loop = asyncio.new_event_loop()
         self._state.value = MetricEvaluatorState.RUNNING.value.encode("utf-8")
 
-        while True:
+        while self._state.value == MetricEvaluatorState.RUNNING.value.encode("utf-8"):
             try:
-                log_data, is_compare, id_ = self._queue.get_nowait()
+                response, references, ground_truth, kwargs, is_compare, id_ = self._queue.get_nowait()
             except Empty:
                 time.sleep(0.001)
                 continue
+            except:
+                traceback.print_exc()
+                self._state.value = MetricEvaluatorState.RUN_FAILED.value.encode("utf-8")
+                break
             try:
-                logs = pickle.loads(log_data)
+                response = pickle.loads(response)
+                references = pickle.loads(references)
+                ground_truth = pickle.loads(ground_truth)
+                kwargs = pickle.loads(kwargs)
                 if not is_compare:
-                    output = loop.run_until_complete(self._record(logs, evaluator))
+                    output = loop.run_until_complete(
+                        self._record(response, references, ground_truth, evaluator, **kwargs)
+                    )
                 else:
-                    output = loop.run_until_complete(self._compare(logs, evaluator))
-            except Exception as e:
+                    output = loop.run_until_complete(
+                        self._compare(response, references, ground_truth, evaluator, **kwargs)
+                    )
+            except:
+                traceback.print_exc()
                 output = {}
             self._result_cache[id_] = {k: v.model_dump(mode="json", by_alias=True) for k, v in output.items()}
 
             if self._queue.empty() and self._can_stop.value:
+                self._state.value = MetricEvaluatorState.FINISHED.value.encode("utf-8")
                 break
-
-        self._state.value = MetricEvaluatorState.FINISHED.value.encode("utf-8")
 
     def terminate(self):
         super().terminate()
@@ -241,6 +254,7 @@ class MetricEvaluatorState(Enum):
     INITIALIZING = "initializing"
     INIT_FAILED = "init failed"
     RUNNING = "running"
+    RUN_FAILED = "run failed"
     FINISHED = "finished"
     TERMINATED = "terminated"
 
@@ -315,19 +329,23 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
 
     @staticmethod
     @abstractmethod
-    async def _record(log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, RecordOutput]:
+    async def _record(
+        response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any, **kwargs
+    ) -> Dict[_MetricName, RecordOutput]:
         pass
 
     @staticmethod
     @abstractmethod
-    async def _compare(log: ActionLogBody, evaluator: Any) -> Dict[_MetricName, CompareOutput]:
+    async def _compare(
+        response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any, **kwargs
+    ) -> Dict[_MetricName, CompareOutput]:
         pass
 
     def notify_to_record(self, log: ActionLogBody):
-        Thread(target=self.record, args=(log,), daemon=True).start()
+        asyncio.ensure_future(self.record(log))
 
     def notify_to_compare(self, log: ActionLogBody):
-        Thread(target=self.compare, args=(log,), daemon=True).start()
+        asyncio.ensure_future(self.compare(log))
 
     def notify_can_stop(self):
         self.proxy.can_stop = True
@@ -338,26 +356,51 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     def terminate(self):
         self.proxy.terminate()
 
-    def join(self):
-        self.proxy.join()
+    async def join(self):
+        while self.proxy.state not in [
+            MetricEvaluatorState.FINISHED,
+            MetricEvaluatorState.TERMINATED,
+            MetricEvaluatorState.INIT_FAILED,
+            MetricEvaluatorState.RUN_FAILED
+        ]:
+            await asyncio.sleep(0.1)
 
-    def _wait_result(self, log: ActionLogBody, is_compare: bool = False):
+    async def _wait_result(self, log: ActionLogBody, is_compare: bool = False):
         id_ = uuid4()
-        self.proxy.queue.put_nowait((pickle.dumps(log), is_compare, id_))
+        response = self.logger.message_pool.get_message_by_id(log.response)
+        references = [self.logger.message_pool.get_message_by_id(ref) for ref in (log.references or [])] or None
+        kwargs = log.model_dump(
+            mode="json",
+            exclude={
+                "log_type", "response", "references", "ground_truth", "eval_records", "compare_records",
+                "human_eval_records", "human_compare_records"
+            }
+        )
+        self.proxy.queue.put_nowait(
+            (
+                pickle.dumps(response),
+                pickle.dumps(references),
+                pickle.dumps(log.ground_truth),
+                pickle.dumps(kwargs),
+                is_compare,
+                id_
+            )
+        )
         while id_ not in self.proxy.result_cache:
-            time.sleep(0.1)  # sleep longer to let scene's main process have more CPU time slice
+            await asyncio.sleep(0.1)  # sleep longer to let scene's main process have more CPU time slice
         return {
             k: (CompareOutput if is_compare else RecordOutput)(**v)
             for k, v in self.proxy.result_cache.pop(id_).items()
         }
 
-    def record(self, log: ActionLogBody) -> None:
-        resp_type = type(log.response)
+    async def record(self, log: ActionLogBody) -> None:
+        response = self.logger.message_pool.get_message_by_id(log.response)
+        resp_type = type(response)
         if resp_type not in list(self.resp_msg_type2metric_defs.keys()) + (self.config.non_ignored_message_type or []):
             return
-        target_agent = log.response.sender_id
+        target_agent = response.sender_id
         # this may very slow
-        record_results = self._wait_result(log)
+        record_results = await self._wait_result(log)
         records = {}
         for metric_name, record_output in record_results.items():
             if metric_name not in self.metrics_for_record:
@@ -386,13 +429,13 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             records[metric_name] = record_data.model_dump(mode="json")
         self.logger.add_action_log_record(log_id=log.id, records=records, field_name="eval_records")
 
-    def compare(self, log: ActionLogBody) -> None:
-        resp_type = type(log.response)
+    async def compare(self, log: ActionLogBody) -> None:
+        resp_type = type(self.logger.message_pool.get_message_by_id(log.response))
         if resp_type not in self.resp_msg_type2metric_defs:
             return
 
         # this may very, very slow
-        compare_results = self._wait_result(log, is_compare=True)
+        compare_results = await self._wait_result(log, is_compare=True)
         records = {}
         for metric_name, compare_output in compare_results.items():
             if metric_name not in self.metrics_for_compare:

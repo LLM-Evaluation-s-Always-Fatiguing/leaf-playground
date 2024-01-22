@@ -8,12 +8,12 @@ from pydantic import model_validator, Field
 
 from .base import Data
 from .media import Media
-from .message import BasicMessageType
 
 
 _MetricName = str
 _MetricRecord = dict
 _MetricRecords = List[_MetricRecord]
+_MessageID = str
 
 
 class LogType(Enum):
@@ -22,10 +22,15 @@ class LogType(Enum):
 
 
 class LogBody(Data):
-    id: UUID = Field(default_factory=lambda: uuid4())
-    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+    id: str = Field(default_factory=lambda: "log_" + uuid4().hex[:8])
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_update: datetime = Field(default=None)
     log_type: LogType = Field(default=...)
     log_msg: str = Field(default=...)
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.last_update is None:
+            self.last_update = self.created_at
 
     @model_validator(mode="before")
     def set_log_type(cls, values):
@@ -42,13 +47,13 @@ class LogBody(Data):
 
 class ActionLogBody(LogBody):
     log_type: Literal[LogType.ACTION] = Field(default=LogType.ACTION)
-    references: Optional[List[BasicMessageType]] = Field(default=None)
-    response: BasicMessageType = Field(default=...)
+    references: Optional[List[_MessageID]] = Field(default=None)
+    response: _MessageID = Field(default=...)
     action_belonged_chain: Optional[str] = Field(default=...)
     ground_truth: Optional[Media] = Field(default=None)
     eval_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
     compare_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
-    human_eval_records: Dict[_MetricName, _MetricRecord] = Field(default={})  # TODO: how to use
+    human_eval_records: Dict[_MetricName, _MetricRecord] = Field(default={})
     human_compare_records: Dict[_MetricName, _MetricRecord] = Field(default={})
 
 
@@ -69,6 +74,7 @@ class SystemLogBody(LogBody):
     system_event: SystemEvent = Field(default=...)
 
     def model_post_init(self, __context: Any) -> None:
+        super().model_post_init(__context)
         if not self.log_msg:
             self.log_msg = self.system_event.value
 
