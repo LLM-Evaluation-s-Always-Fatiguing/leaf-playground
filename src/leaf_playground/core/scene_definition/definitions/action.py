@@ -38,6 +38,7 @@ class ActionDefinition(BaseModel):
     description: str = Field(default=...)
     signature: ActionSignatureDefinition = Field(default=...)
     metrics: Optional[List[MetricDefinition]] = Field(default=None)
+    exec_timeout: int = Field(default=30)
 
     _belonged_role: Optional["leaf_playground.core.scene_info.definitions.role.RoleDefinition"] = PrivateAttr(
         default=None
