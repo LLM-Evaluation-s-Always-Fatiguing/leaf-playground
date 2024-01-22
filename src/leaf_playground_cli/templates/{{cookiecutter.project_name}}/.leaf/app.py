@@ -1,57 +1,137 @@
 import asyncio
-import json
 import os
 import signal
+import traceback
+from datetime import datetime
 
+import aiohttp
 import requests
 import sys
 from argparse import ArgumentParser
 from contextlib import asynccontextmanager
-from typing import Any, List, Optional
-from uuid import UUID
 
-from fastapi import status, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import status, FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
+from leaf_playground._type import Singleton
+from leaf_playground.core.workers import Logger, LogHandler
 from leaf_playground.core.scene_agent import HumanConnection
 from leaf_playground.core.scene_engine import SceneEngine, SceneEngineState
-from leaf_playground.core.scene_definition.definitions.metric import DisplayType
-from leaf_playground_cli.service import TaskCreationPayload
-from pydantic import BaseModel, Field
+from leaf_playground.data.log_body import LogBody, ActionLogBody
+from leaf_playground.data.message import MessagePool
+from leaf_playground_cli.server.task import *
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 parser = ArgumentParser()
-parser.add_argument("--payload", type=str)
+parser.add_argument("--id", type=str)
 parser.add_argument("--port", type=int)
 parser.add_argument("--host", type=str)
-parser.add_argument("--save_dir", type=str)
-parser.add_argument("--callback", type=str)
-parser.add_argument("--id", type=str)
+parser.add_argument("--secret_key", type=str)
+parser.add_argument("--server_url", type=str)
+parser.add_argument("--docker", action="store_true")
 args = parser.parse_args()
 
 
-def create_engine(payload: TaskCreationPayload):
-    global scene_engine
+class DBLogHandler(Singleton, LogHandler):
+    def __init__(self):
+        super().__init__()
 
-    scene_engine = SceneEngine(
-        scene_config=payload.scene_obj_config,
-        evaluators_config=payload.metric_evaluator_objs_config,
-        reporter_config=payload.reporter_obj_config,
-        state_change_callbacks=[update_scene_engine_status]
-    )
-    scene_engine.save_dir = os.path.join(args.save_dir, args.id)
-    asyncio.create_task(scene_engine.run())
+        self._message_pool = MessagePool()
+        self._submitted_messages = set()
+        self._http_session = aiohttp.ClientSession(base_url=args.server_url)
+
+        self._queue = asyncio.Queue()
+
+        asyncio.ensure_future(self.db_write_loop())
+
+    async def db_write_loop(self):
+        while True:
+            log_body: LogBody = await self._queue.get()
+            is_update = log_body.created_at != log_body.last_update
+            if not is_update:
+                if isinstance(log_body, ActionLogBody):
+                    message = self._message_pool.get_message_by_id(log_body.response)
+                    if message.id not in self._submitted_messages:
+                        self._submitted_messages.add(message.id)
+                        async with self._http_session.post(
+                            f"/task/{args.id}/messages/insert?secret_key={args.secret_key}",
+                            headers={'Content-Type': 'application/json'},
+                            json=Message.init_from_message(message, args.id).model_dump(mode="json", by_alias=True)
+                        ) as resp:
+                            if resp.status != 200:
+                                print(f"task [{args.id}] insert message [{message.id}] to database failed.")
+                                print(await resp.text())
+                async with self._http_session.post(
+                    f"/task/{args.id}/logs/insert?secret_key={args.secret_key}",
+                    headers={'Content-Type': 'application/json'},
+                    json=Log.init_from_log_body(log_body, args.id).model_dump(mode="json", by_alias=True)
+                ) as resp:
+                    if resp.status != 200:
+                        print(f"task [{args.id}] insert log [{log_body.id}] to database failed.")
+                        print(await resp.text())
+            else:
+                async with self._http_session.patch(
+                    f"/task/{args.id}/logs/update?secret_key={args.secret_key}",
+                    headers={'Content-Type': 'application/json'},
+                    json=Log.init_from_log_body(log_body, args.id).model_dump(mode="json", by_alias=True)
+                ) as resp:
+                    if resp.status != 200:
+                        print(f"task [{args.id}] update log [{log_body.id}] to database failed.")
+                        print(await resp.text())
+
+    async def notify_create(self, log_body: LogBody):
+        self._queue.put_nowait(log_body)
+
+    async def notify_update(self, log_body: LogBody):
+        log_body.last_update = datetime.utcnow()
+        self._queue.put_nowait(log_body)
 
 
-def update_scene_engine_status():
-    status = scene_engine.state.value if scene_engine is not None else SceneEngineState.PENDING.value
+def create_engine():
+    DBLogHandler()
     try:
-        requests.post(args.callback, json={"id": args.id, "status": status})
+        resp = requests.get(f"{args.server_url}/task/{args.id}/payload")
+        payload = TaskCreationPayload(**resp.json())
+
+        if args.docker:
+            results_dir = "/tmp/result"
+        else:
+            resp = requests.get(f"{args.server_url}/task/{args.id}/results_dir")
+            results_dir = resp.json()["results_dir"]
+
+        scene_engine = SceneEngine(
+            scene_config=payload.scene_obj_config,
+            evaluators_config=payload.metric_evaluator_objs_config,
+            reporter_config=payload.reporter_obj_config,
+            results_dir=results_dir,
+            state_change_callbacks=[scene_engine_state_change_callback],
+            log_handlers=[DBLogHandler.get_instance()]
+        )
+        asyncio.create_task(scene_engine.run())
+    except:
+        traceback.print_exc()
+        update_task_status(SceneEngineState.FAILED.value)
+
+
+def update_task_status(task_status: str):
+    try:
+        requests.patch(
+            f"{args.server_url}/task/{args.id}/status?task_status={task_status}&secret_key={args.secret_key}",
+        )
     except:
         pass
 
 
-class AppManager:
+def scene_engine_state_change_callback():
+    try:
+        scene_engine = SceneEngine.get_instance()
+    except:
+        scene_engine = None
+    task_status = scene_engine.state.value if scene_engine is not None else SceneEngineState.PENDING.value
+    update_task_status(task_status)
+
+
+class AppManager(Singleton):
     def __init__(self):
         self.shutdown_event = asyncio.Event()
         self.shutdown_task = asyncio.create_task(self.maybe_shutdown(), name="shutdown_service")
@@ -64,29 +144,27 @@ class AppManager:
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    with open(args.payload, "r", encoding="utf-8") as f:
-        create_engine(TaskCreationPayload(**json.load(f)))
-
-    global app_manager
+    create_engine()
     app_manager = AppManager()
 
-    yield
+    try:
+        yield
+    except:
+        traceback.print_exc()
 
     app_manager.shutdown_task.cancel()
 
 
 app = FastAPI(lifespan=lifespan)
-app_manager: AppManager = None
-scene_engine: SceneEngine = None
 
 
-@app.get("/status", response_class=JSONResponse)
-async def get_task_status() -> JSONResponse:
-    return JSONResponse(content={"status": scene_engine.state.value})
+@app.get("/hello")
+async def hello() -> str:
+    return "hello world!"
 
 
 @app.get("/agents_connected")
-async def agents_connected() -> JSONResponse:
+async def agents_connected(scene_engine: SceneEngine = Depends(SceneEngine.get_instance)) -> JSONResponse:
     return JSONResponse(
         content={
             agent_id: agent.connected for agent_id, agent in scene_engine.scene.dynamic_agents.items()
@@ -94,86 +172,92 @@ async def agents_connected() -> JSONResponse:
     )
 
 
-@app.websocket("/ws")
-async def stream_task_info(websocket: WebSocket) -> None:
-    await websocket.accept()
-    closed = await scene_engine.socket_handler.stream_sockets(websocket)
-    if closed:
-        return
-    while True:
-        try:
-            text = await websocket.receive_text()
-            if text == "disconnect":
-                scene_engine.socket_handler.stop()
-        except WebSocketDisconnect:
-            return
-
-
 @app.websocket("/ws/human/{agent_id}")
-async def human_input(websocket: WebSocket, agent_id: str):
+async def human_input(
+    websocket: WebSocket,
+    agent_id: str,
+    scene_engine: SceneEngine = Depends(SceneEngine.get_instance)
+):
     try:
         agent = scene_engine.scene.get_dynamic_agent(agent_id)
     except KeyError:
-        await websocket.close(reason=f"agent [{agent_id}] not exists.")
+        await websocket.close(code=403, reason=f"agent [{agent_id}] not exists.")
         return
     if agent.connected:
-        await websocket.close(reason=f"agent [{agent_id}] already connected.")
+        await websocket.close(code=403, reason=f"agent [{agent_id}] already connected.")
         return
     connection = HumanConnection(
         agent=agent,
-        socket=websocket,
-        socket_handler=scene_engine.socket_handler
+        socket=websocket
     )
     await connection.connect()
     await connection.run()
 
 
 @app.post("/pause")
-async def pause_engine():
+async def pause_engine(scene_engine: SceneEngine = Depends(SceneEngine.get_instance)):
     scene_engine.pause()
 
 
 @app.post("/resume")
-async def resume_engine():
+async def resume_engine(scene_engine: SceneEngine = Depends(SceneEngine.get_instance)):
     scene_engine.resume()
 
 
 @app.post("/interrupt")
-async def interrupt_engine():
+async def interrupt_engine(
+    scene_engine: SceneEngine = Depends(SceneEngine.get_instance),
+    app_manager: AppManager = Depends(AppManager.get_instance)
+):
     scene_engine.interrupt()
     app_manager.shutdown_event.set()
 
 
-@app.post("/save")
-async def save_task():
-    scene_engine.save()
+@app.post("/close")
+async def close_engine(
+    scene_engine: SceneEngine = Depends(SceneEngine.get_instance),
+    app_manager: AppManager = Depends(AppManager.get_instance)
+):
+    if scene_engine.state not in [SceneEngineState.INTERRUPTED, SceneEngineState.FAILED, SceneEngineState.FINISHED]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="task not done!")
+    scene_engine.save(scene_engine._results_dir)
     app_manager.shutdown_event.set()
 
 
-class MetricEvalRecordUpdatePayload(BaseModel):
-    log_id: UUID = Field(default=...)
-    metric_name: str = Field(default=...)
-    value: Any = Field(default=...)
-    display_type: DisplayType = Field(default=...)
-    target_agent: str = Field(default=...)
-    reason: Optional[str] = Field(default=None)
+@app.post("/save")
+async def save_engine(
+    scene_engine: SceneEngine = Depends(SceneEngine.get_instance)
+):
+    scene_engine.save(scene_engine._results_dir)
 
 
-@app.post("/record/eval/update")
-async def update_metric_record(payload: MetricEvalRecordUpdatePayload):
-    data = {
-        "value": payload.value,
-        "evaluator": "human",
-        "target_agent": payload.target_agent,
-        "reason": payload.reason
-    }
-    reporter = scene_engine.reporter
-    if payload.metric_name not in reporter.metric_definitions:
+@app.post("/logs/{log_id}/record/metric/update")
+async def update_metric_record(
+    log_id: str,
+    agent_id: str,
+    record: LogEvalMetricRecord,
+    logger: Logger = Depends(Logger.get_instance),
+    scene_engine: SceneEngine = Depends(SceneEngine.get_instance)
+):
+    if not logger.is_log_exists(log_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"expected metrics are [{list(reporter.metric_definitions.keys())}], got [{payload.metric_name}]"
+            detail=f"log [{log_id}] not exist in task [{args.id}]"
         )
-    _, record_model = reporter.metric_definitions[payload.metric_name].create_data_models()
+
+    data = {
+        "value": record.value,
+        "evaluator": "human",
+        "target_agent": agent_id,
+        "reason": record.reason
+    }
+    reporter = scene_engine.reporter
+    if record.metric_name not in reporter.metric_definitions:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"expected metrics are [{list(reporter.metric_definitions.keys())}], got [{record.metric_name}]"
+        )
+    _, record_model = reporter.metric_definitions[record.metric_name].create_data_models()
     try:
         record_data = record_model(**data)
     except:
@@ -182,38 +266,41 @@ async def update_metric_record(payload: MetricEvalRecordUpdatePayload):
             detail="can not parse data properly, this is mainly because the mismatch of value dtype, expected value "
                    f"dtype is {str(record_model.model_fields['value'].annotation)}"
         )
-    data["display_type"] = payload.display_type.value
-    scene_engine.logger.add_action_log_record(
-        log_id=payload.log_id,
+    logger.add_action_log_record(
+        log_id=log_id,
         records={
-            payload.metric_name: data
+            record.metric_name: data
         },
         field_name="human_eval_records"
     )
-    reporter.put_human_record(record=record_data, metric_belonged_chain=payload.metric_name, log_id=payload.log_id)
+    reporter.put_human_record(record=record_data, metric_belonged_chain=record.metric_name, log_id=log_id)
 
 
-class MetricCompareRecordUpdatePayload(BaseModel):
-    log_id: UUID = Field(default=...)
-    metric_name: str = Field(default=...)
-    value: List[str] = Field(default=...)
-    reason: Optional[str] = Field(default=None)
+@app.post("/logs/{log_id}/record/compare/update")
+async def update_compare_record(
+    log_id: str,
+    record: LogEvalCompareRecord,
+    logger: Logger = Depends(Logger.get_instance),
+    scene_engine: SceneEngine = Depends(SceneEngine.get_instance)
+):
+    if not logger.is_log_exists(log_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"log [{log_id}] not exist in task [{args.id}]"
+        )
 
-
-@app.post("/record/compare/update")
-async def update_metric_compare(payload: MetricCompareRecordUpdatePayload):
     data = {
-        "value": payload.value,
-        "reason": payload.reason,
+        "value": record.value,
+        "reason": record.reason,
         "evaluator": "human"
     }
     reporter = scene_engine.reporter
-    if payload.metric_name not in reporter.metric_definitions:
+    if record.metric_name not in reporter.metric_definitions:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"expected metrics are [{list(reporter.metric_definitions.keys())}], got [{payload.metric_name}]"
+            detail=f"expected metrics are [{list(reporter.metric_definitions.keys())}], got [{record.metric_name}]"
         )
-    _, record_model = reporter.metric_definitions[payload.metric_name].create_data_models()
+    _, record_model = reporter.metric_definitions[record.metric_name].create_data_models()
     try:
         record_data = record_model(**data)
     except:
@@ -222,14 +309,14 @@ async def update_metric_compare(payload: MetricCompareRecordUpdatePayload):
             detail="can not parse data properly, this is mainly because the mismatch of value dtype, expected value "
                    f"dtype is {str(record_model.model_fields['value'].annotation)}"
         )
-    scene_engine.logger.add_action_log_record(
-        log_id=payload.log_id,
+    logger.add_action_log_record(
+        log_id=log_id,
         records={
-            payload.metric_name: data
+            record.metric_name: data
         },
         field_name="human_compare_records"
     )
-    reporter.put_human_record(record=record_data, metric_belonged_chain=payload.metric_name, log_id=payload.log_id)
+    reporter.put_human_record(record=record_data, metric_belonged_chain=record.metric_name, log_id=log_id)
 
 
 if __name__ == "__main__":

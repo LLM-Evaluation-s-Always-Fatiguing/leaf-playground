@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import List, Literal, Union
+from typing import Dict, List, Literal, Union
+from uuid import uuid4, UUID
 
 from pydantic import Field
 from typing_extensions import Annotated
@@ -7,14 +8,20 @@ from typing_extensions import Annotated
 from .base import Data
 from .media import Media, Text, Json, Image, Audio, Video
 from .profile import Profile
+from .._type import Singleton
 
 
 class Message(Data):
+    id_: UUID = Field(default_factory=uuid4)
     sender: Profile = Field(default=...)
     content: Media = Field(default=...)
     receivers: List[Profile] = Field(default=...)
     msg_type: Literal["basic"] = Field(default="basic")
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+
+    @property
+    def id(self):
+        return self.sender_id + "_" + self.id_.hex
 
     @property
     def sender_name(self):
@@ -66,23 +73,25 @@ class VideoMessage(Message):
     msg_type: Literal["video"] = Field(default="video")
 
 
-class MessagePool(Data):
+class MessagePool(Singleton):
     """
     A global message pool to cache all agents' messages in one engine run
 
     :param messages: messages that all agents send in one engine run
-    :type messages: List[Message]
+    :type messages: Dict[str, Message]
     """
 
-    messages: List[Message] = Field(default=[])
+    # TODO: fix: design message pool as a singleton and allow get_instance globally may let agents to cheat
+    def __init__(self):
+        self.messages: Dict[str, Message] = {}
 
     def clear(self):
         """Clear cached messages, at the start of each engine run, this method should be called"""
-        self.messages = []
+        self.messages = {}
 
     def put_message(self, message: Message):
         """Put one message into the cache"""
-        self.messages.append(message)
+        self.messages[message.id] = message
 
     def get_messages(self, agent: Profile) -> List[Message]:
         """
@@ -94,11 +103,14 @@ class MessagePool(Data):
         :rtype: List[Message]
         """
         messages = []
-        for message in self.messages:
+        for message in self.messages.values():
             receivers_ids = [receiver.id for receiver in message.receivers]
             if agent.id in receivers_ids:
                 messages.append(message)
         return messages
+
+    def get_message_by_id(self, msg_id: str) -> Message:
+        return self.messages[msg_id]
 
 
 BasicMessageType = Annotated[

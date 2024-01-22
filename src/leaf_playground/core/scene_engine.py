@@ -4,17 +4,19 @@ import traceback
 from enum import Enum
 from os import makedirs
 from os.path import join
-from typing import Callable, List, Literal, Type, Union
+from typing import Callable, List, Literal, Optional, Type, Union
 from uuid import uuid4
 
 from pydantic import Field
 
 from .scene import Scene
 from .scene_definition import SceneConfig, SceneDefinition
-from .workers import MetricEvaluator, MetricEvaluatorConfig, MetricReporter, Logger, SocketHandler
+from .workers import MetricEvaluator, MetricEvaluatorConfig, MetricReporter, Logger, LogHandler
 from .workers.chart import Chart
 from .._config import _Config
+from .._type import Singleton
 from ..data.log_body import SystemLogBody, SystemEvent
+from ..data.message import MessagePool
 from ..utils.import_util import dynamically_import_obj, DynamicObject
 
 
@@ -22,10 +24,10 @@ class SceneObjConfig(_Config):
     scene_config_data: dict = Field(default=...)
     scene_obj: DynamicObject = Field(default=...)
 
-    def initialize_scene(self, logger: Logger) -> Scene:
+    def initialize_scene(self) -> Scene:
         scene_cls: Type[Scene] = dynamically_import_obj(self.scene_obj)
         scene_config_cls: Type[SceneConfig] = scene_cls.config_cls
-        return scene_cls(config=scene_config_cls(**self.scene_config_data), logger=logger)
+        return scene_cls(config=scene_config_cls(**self.scene_config_data))
 
 
 class ReporterObjConfig(_Config):
@@ -72,7 +74,6 @@ class SceneEngineState(Enum):
     PENDING = "pending"
     RUNNING = "running"
     FINISHED = "finished"
-    RESULT_SAVED = "result_saved"
     INTERRUPTED = "interrupted"
     PAUSED = "paused"
     FAILED = "failed"
@@ -92,7 +93,7 @@ class SceneEngineStateProxy:
             cb()
 
 
-class SceneEngine:
+class SceneEngine(Singleton):
     state = SceneEngineStateProxy()
 
     def __init__(
@@ -100,18 +101,23 @@ class SceneEngine:
         scene_config: SceneObjConfig,
         evaluators_config: MetricEvaluatorObjsConfig,
         reporter_config: ReporterObjConfig,
+        results_dir: str,
         state_change_callbacks: List[Callable] = [],
+        log_handlers: Optional[List[LogHandler]] = None
     ):
         self._state_change_callbacks = state_change_callbacks
         self.state = SceneEngineState.PENDING
         self._id = "engine_" + uuid4().hex[:8]
+        self._results_dir = results_dir
 
+        self.message_pool = MessagePool()
         self.logger = Logger()
-        self.socket_handler = SocketHandler()
 
-        self.logger.registry_handler(self.socket_handler)
+        if log_handlers:
+            for log_handler in log_handlers:
+                self.logger.registry_handler(log_handler)
 
-        self.scene = scene_config.initialize_scene(logger=self.logger)
+        self.scene = scene_config.initialize_scene()
         self.reporter = reporter_config.initialize_reporter(scene_definition=self.scene.scene_definition)
         self.evaluators = evaluators_config.initialize_evaluators(
             scene_config=self.scene.config, logger=self.logger, reporter=self.reporter
@@ -119,8 +125,6 @@ class SceneEngine:
 
         for evaluator in self.evaluators:
             self.scene.registry_metric_evaluator(evaluator)
-
-        self.save_dir = None
 
     @property
     def id(self) -> str:
@@ -144,6 +148,7 @@ class SceneEngine:
             for evaluator in self.evaluators:
                 evaluator.terminate()
         except:
+            traceback.print_exc()
             self.state = SceneEngineState.FAILED
             self.logger.add_log(
                 SystemLogBody(system_event=SystemEvent.SIMULATION_FAILED, log_msg=traceback.format_exc())
@@ -152,18 +157,18 @@ class SceneEngine:
                 evaluator.terminate()
         else:
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_FINISHED))
-            for evaluator in self.evaluators:
-                evaluator.join()
+            await asyncio.gather(*[evaluator.join() for evaluator in self.evaluators])
             self.state = SceneEngineState.FINISHED
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.EVALUATION_FINISHED))
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.EVERYTHING_DONE))
+        finally:
+            self.save(self._results_dir)
 
     def pause(self):
         if self.state not in [
             SceneEngineState.FINISHED,
             SceneEngineState.INTERRUPTED,
             SceneEngineState.FAILED,
-            SceneEngineState.RESULT_SAVED,
         ]:
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_PAUSED))
             self.state = SceneEngineState.PAUSED
@@ -173,8 +178,7 @@ class SceneEngine:
         if self.state not in [
             SceneEngineState.FINISHED,
             SceneEngineState.INTERRUPTED,
-            SceneEngineState.FAILED,
-            SceneEngineState.RESULT_SAVED,
+            SceneEngineState.FAILED
         ]:
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_RESUME))
             self.state = SceneEngineState.RUNNING
@@ -184,8 +188,7 @@ class SceneEngine:
         if self.state not in [
             SceneEngineState.FINISHED,
             SceneEngineState.INTERRUPTED,
-            SceneEngineState.FAILED,
-            SceneEngineState.RESULT_SAVED,
+            SceneEngineState.FAILED
         ]:
             self.logger.add_log(SystemLogBody(system_event=SystemEvent.SIMULATION_INTERRUPTED))
             self.state = SceneEngineState.INTERRUPTED
@@ -213,20 +216,20 @@ class SceneEngine:
         else:
             raise ValueError(f"invalid mode {mode}")
 
-    def save(self):
-        makedirs(self.save_dir, exist_ok=True)
+    def save(self, save_dir: str):
+        makedirs(save_dir, exist_ok=True)
 
         scene_config = self.get_scene_config(mode="dict")
         evaluator_configs = self.get_evaluator_configs(mode="dict")
 
-        with open(join(self.save_dir, "scene_config.json"), "w", encoding="utf-8") as f:
+        with open(join(save_dir, "scene_config.json"), "w", encoding="utf-8") as f:
             json.dump(scene_config, f, indent=4, ensure_ascii=False)
 
-        with open(join(self.save_dir, "evaluator_configs.json"), "w", encoding="utf-8") as f:
+        with open(join(save_dir, "evaluator_configs.json"), "w", encoding="utf-8") as f:
             json.dump(evaluator_configs, f, indent=4, ensure_ascii=False)
 
         for exporter in self.scene.scene_definition.log_exporters:
-            exporter.export(self.logger, self.save_dir)
+            exporter.export(self.logger, save_dir)
 
         metrics_data, charts = self.reporter.generate_reports(
             scene_config=self.get_scene_config(mode="pydantic"),
@@ -251,13 +254,11 @@ class SceneEngine:
                 for name, data in metrics_data["human_metrics"].items()
             },
         }
-        with open(join(self.save_dir, "metrics.json"), "w", encoding="utf-8") as f:
+        with open(join(save_dir, "metrics.json"), "w", encoding="utf-8") as f:
             json.dump(metrics_data, f, indent=4, ensure_ascii=False)
 
-        with open(join(self.save_dir, "charts.json"), "w", encoding="utf-8") as f:
+        with open(join(save_dir, "charts.json"), "w", encoding="utf-8") as f:
             json.dump(charts, f, indent=4, ensure_ascii=False)
-
-        self.state = SceneEngineState.RESULT_SAVED
 
 
 __all__ = [
