@@ -65,6 +65,7 @@ async def main_page(
         projects.append(
             {
                 "name": proj.name,
+                "display_name": proj.metadata.scene_metadata["scene_definition"]["name"],
                 "id": proj.id,
                 "description": proj.metadata.scene_metadata["scene_definition"]["description"]
             }
