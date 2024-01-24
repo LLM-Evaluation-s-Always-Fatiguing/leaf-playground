@@ -1,0 +1,139 @@
+以下是 `leaf_playground.core.scene` 模块的部分源码：
+
+```python
+# Scene 的部分源码，来自 leaf_playground.core.scene 模块
+
+# 这里省略导入语句
+
+class SceneMetaClass(ABCMeta):
+    def __new__(
+        cls,
+        name,
+        bases,
+        attrs,
+        *,
+        scene_definition: SceneDefinition = None,
+        log_body_class: Type[ActionLogBody] = ActionLogBody,
+    ):
+        attrs["scene_definition"] = Immutable(scene_definition or getattr(bases[0], "scene_definition", None))
+        attrs["log_body_class"] = Immutable(log_body_class)
+        attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, module=_getframe(1).f_globals["__name__"]))
+
+        new_cls = super().__new__(cls, name, bases, attrs)
+
+        # 这里省略部分具体实现代码
+
+        return new_cls
+
+    def __init__(
+        cls,
+        name,
+        bases,
+        attrs,
+        *,
+        scene_definition: SceneDefinition = None,
+        log_body_class: Type[ActionLogBody] = ActionLogBody,
+    ):
+        super().__init__(name, bases, attrs)
+
+
+class SceneMetadata(BaseModel):
+    ...  # 这里省略具体代码实现，可忽略
+
+
+class Scene(_Configurable, ABC, metaclass=SceneMetaClass):
+    config_cls = SceneConfig
+    config: SceneConfig
+
+    # class attributes initialized in metaclass
+    scene_definition: SceneDefinition
+    log_body_class: Type[ActionLogBody]
+    obj_for_import: DynamicObject
+
+    def __init__(self, config: config_cls):
+        super().__init__(config=config)
+
+        static_roles = [role_def.name for role_def in self.scene_definition.roles if role_def.is_static]
+        dynamic_roles = [role_def.name for role_def in self.scene_definition.roles if not role_def.is_static]
+        agents: Dict[str, List[SceneAgent]] = self.config.init_agents()
+        self.static_agents = {role_name: agents[role_name] for role_name in static_roles}
+        self.agents = {role_name: agents[role_name] for role_name in dynamic_roles}
+        self.env_vars: Dict[str, EnvironmentVariable] = self.config.init_env_vars()
+        self._bind_env_vars_to_agents()
+        self.evaluators: List[MetricEvaluator] = []
+
+        self.logger = Logger.get_instance()
+        self.message_pool = MessagePool.get_instance()
+
+        self._dynamic_agents: Dict[str, SceneDynamicAgent] = {}
+        self._agent_list: List[SceneAgent] = []
+        self._human_agents: List[SceneHumanAgent] = []
+        for agents_ in self.agents.values():
+            self._human_agents += [agent for agent in agents_ if isinstance(agent, SceneHumanAgent)]
+            self._agent_list += agents_
+            self._dynamic_agents.update(**{agent.id: agent for agent in agents_})
+        for agents_ in self.static_agents.values():
+            self._agent_list += agents_
+
+        self._run_task: Optional[asyncio.Task] = None
+
+    @property
+    def dynamic_agents(self) -> Dict[str, SceneDynamicAgent]:
+        return self._dynamic_agents
+
+    @property
+    def human_agents(self) -> List[SceneHumanAgent]:
+        return self._human_agents
+
+    def get_dynamic_agent(self, agent_id: str) -> SceneDynamicAgent:
+        return self._dynamic_agents[agent_id]
+
+    def _bind_env_vars_to_agents(self):
+        ...  # 这里省略具体代码实现，可忽略此方法
+
+    async def wait_agents_ready(self):
+        ...  # 这里省略具体代码实现，可忽略此方法
+
+    def registry_metric_evaluator(self, evaluator: MetricEvaluator):
+        self.evaluators.append(evaluator)
+
+    def notify_evaluators_record(self, log: ActionLogBody):
+        for evaluator in self.evaluators:
+            evaluator.notify_to_record(log)
+
+    def notify_evaluators_compare(self, log: ActionLogBody):
+        for evaluator in self.evaluators:
+            evaluator.notify_to_compare(log)
+
+    def notify_evaluators_can_stop(self):
+        for evaluator in self.evaluators:
+            evaluator.notify_can_stop()
+
+    @abstractmethod
+    async def _run(self):
+        pass  # 所有子类都必须实现这个方法，在其中编排场景运行流程和各角色之间的交互逻辑
+
+    async def run(self):
+        ...  # 这里省略具体代码实现，可忽略此方法
+
+    def pause(self):
+        ...  # 这里省略具体代码实现，可忽略此方法
+
+    def resume(self):
+        ...  # 这里省略具体代码实现，可忽略此方法
+
+    def interrupt(self):
+        ...  # 这里省略具体代码实现，可忽略此方法
+
+    @classmethod
+    def get_metadata(cls) -> SceneMetadata:
+        ...  # 这里省略具体代码实现，可忽略此方法
+
+    @classmethod
+    def from_config(cls, config: config_cls) -> "Scene":
+        ...  # 这里省略具体代码实现，可忽略此方法
+
+    @classmethod
+    def from_config_file(cls, file_path: str) -> "Scene":
+        ...  # 这里省略具体代码实现，可忽略此方法
+```
