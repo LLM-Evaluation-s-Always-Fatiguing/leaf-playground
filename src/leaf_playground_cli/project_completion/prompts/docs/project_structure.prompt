@@ -1,0 +1,20 @@
+# 基于 leaf-playground 框架的项目结构
+
+以下是一个标准的基于 leaf-playground 框架的项目结构：
+─<scene_name>
+    │  scene.py
+    │  scene_definition.py
+    │  __init__.py
+    │
+    ├─agents
+    │  │  <role_1_name>.py
+    │  │  <role_2_name>.py
+    │  │  <role_3_name>.py
+    │  │  ...
+    │  │  __init__.py
+    │
+    ├─charts
+    │  │  __init__.py
+    │
+    ├─metric_evaluators
+    │  │  __init__.py

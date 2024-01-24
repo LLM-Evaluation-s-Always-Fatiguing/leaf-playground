@@ -1,0 +1,23 @@
+# 场景流程实现实践指南
+
+基于给定的 scene_definition.py，你需要：
+1 导入所需模块：
+    1.1 从 scene_definition.py 中导入所有列在 __all__ 中的对象、变量和常量（其中包含各种类型定义、变量和 SCENE_DEFINITION 常量）
+    1.2 从 leaf_playground.core.scene 中导入 Scene 对象
+    1.3 从 leaf_playground.core.scene_definition 中导入 SceneConfig 数据模型
+    1.4 从 leaf_playground.data.log_body 中导入 ActionLogBody 数据模型
+    1.5 从 agents 包下各角色模块中导入各角色对应的智能体基类，这主要是为了方便在代码中加入 annotations
+    1.6 根据实际情况导入其他所需要的第三方库、模块、对象或函数
+2 使用 SceneConfig 类（继承自 pydantic.BaseModel）的 create_config_model 方法创建一个名为 {scene_name.camel}SceneConfig 数据模型，该方法接收 `scene_definition: SceneDefinition` 和 `additional_config_fields: Optional[dict[str, pydantic.Field]] = None` 参数，第一个参数传入在 1.1 步中导入的 SCENE_DEFINITION 常量，第二个参数根据实际情况赋值
+3 实现名为 {scene_name.camel}LogBody 的数据模型，继承自 1.4 步中导入的 ActionLogBody（这是一个 pydantic.BaseModel 的子类），你可以根据具体情况添加新的字段来记录更丰富的信息
+4 实现名为 {scene_name.camel}Scene 的场景类对象，继承自从 1.2 步中导入的 Scene 类对象，并设置以下元类参数：
+    - scene_definition：值为 1.1 步中导入的 SCENE_DEFINITION 常量
+    - log_body_class: 值为 3 步中定义的 {scene_name.camel}LogBody 数据模型
+  并继承父类的抽象方法 `async def _run(self) -> None:`，根据 scene_definition.py 中可知的消息（以及，如果有的话，我在之后提供给你的具体需求描述）实现场景流程，主要是各类角色对应的智能体实例直接的交互逻辑，并对各智能体动作执行的返回结果，使用 `self.log_body_class` 创建具体的 {scene_name.camel}LogBody 实例，使用 `self.logger.add_log` 方法作记录，以及使用 `self.notify_evaluators_record` 方法提交日志给评估器进行评估
+5 在 __all__ 中包含 `{role_name.camel}SceneConfig` 和 `{role_name.camel}Scene`
+
+注意，scene_definition.py 文件存储在你要实现的模块在同一目录，因此你需要使用 `from .scene_definition import *` 来导入其中的内容
+
+{{ core_scene_module_reference }}
+
+{{ data_log_module_reference }}

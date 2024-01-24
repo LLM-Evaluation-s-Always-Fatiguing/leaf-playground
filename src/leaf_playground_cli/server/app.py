@@ -35,6 +35,8 @@ def config_server(config: AppConfig):
     app_config = config
     app_info = AppInfo(hub_dir=app_config.hub_dir.as_posix())
 
+    os.makedirs(os.path.join(app_config.hub_dir, ".leaf_workspace"), exist_ok=True)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

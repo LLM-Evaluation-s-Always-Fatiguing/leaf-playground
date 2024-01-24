@@ -1,0 +1,44 @@
+以下是 `leaf_playground.data.log_body` 模块中各数据类的源码，所有数据结构的都是 `pydantic.BaseModel` 子类：
+
+```python
+# ActionLogBody 的部分源码，来自 leaf_playground.data.log_body 模块
+
+# 这里省略导入语句
+
+_MetricName = str
+_MetricRecord = dict
+_MetricRecords = List[_MetricRecord]
+_MessageID = str
+
+class LogType(Enum):
+    ACTION = "action"
+    SYSTEM = "system"
+
+
+class LogBody(BaseModel):
+    id: str = Field(default_factory=lambda: "log_" + uuid4().hex[:8])
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_update: datetime = Field(default=None)
+    log_type: LogType = Field(default=...)
+    log_msg: str = Field(default=...)
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.last_update is None:
+            self.last_update = self.created_at
+
+    @model_validator(mode="before")
+    def set_log_type(cls, values):
+        ...  # 这里省略具体代码实现，可忽略此方法
+
+
+class ActionLogBody(LogBody):
+    log_type: Literal[LogType.ACTION] = Field(default=LogType.ACTION)
+    references: Optional[List[_MessageID]] = Field(default=None)
+    response: _MessageID = Field(default=...)
+    action_belonged_chain: Optional[str] = Field(default=...)
+    ground_truth: Optional[Media] = Field(default=None)
+    eval_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
+    compare_records: Dict[_MetricName, _MetricRecords] = Field(default=defaultdict(list))
+    human_eval_records: Dict[_MetricName, _MetricRecord] = Field(default={})
+    human_compare_records: Dict[_MetricName, _MetricRecord] = Field(default={})
+```
