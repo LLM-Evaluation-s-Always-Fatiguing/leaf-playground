@@ -37,12 +37,14 @@ class MetricReporter:
                 for metric_def in action.metrics or []:
                     metric_definitions[metric_def.belonged_chain] = metric_def
         self.metric_definitions: Dict[str, MetricDefinition] = metric_definitions
-        self.records: Dict[str, List[_RecordData]] = defaultdict(list)
+        self.records: Dict[str, Dict[str, List[_RecordData]]] = defaultdict(dict)
         self.charts = [chart_cls() for chart_cls in chart_classes]
         self.human_records: Dict[str, Dict[str, _RecordData]] = defaultdict(dict)
 
-    def put_record(self, record: _RecordData, metric_belonged_chain: str):
-        self.records[metric_belonged_chain].append(record)
+    def put_record(self, record: _RecordData, metric_belonged_chain: str, log_id: str):
+        if log_id not in self.records[metric_belonged_chain]:
+            self.records[metric_belonged_chain][log_id] = []
+        self.records[metric_belonged_chain][log_id].append(record)
 
     def put_human_record(self, record: _RecordData, metric_belonged_chain: str, log_id: str):
         self.human_records[metric_belonged_chain][log_id] = record
@@ -80,15 +82,18 @@ class MetricReporter:
     def _cal_metrics(self) -> CombinedMetricsData:
         metrics = {}
         human_metrics = {}
+        merged_metrics = {}
 
         for metric_belonged_chain, records in self.records.items():
             metric_def = self.metric_definitions[metric_belonged_chain]
             is_compare = metric_def.is_comparison
 
+            flatten_records = [record for records_ in records.values() for record in records_]
+
             if not is_compare:
-                metrics[metric_belonged_chain] = self._cal_record_metric(records, metric_def)
+                metrics[metric_belonged_chain] = self._cal_record_metric(flatten_records, metric_def)
             else:
-                metrics[metric_belonged_chain] = self._cal_compare_metric(records, metric_def)
+                metrics[metric_belonged_chain] = self._cal_compare_metric(flatten_records, metric_def)
 
         for metric_belonged_chain, records in self.human_records.items():
             metric_def = self.metric_definitions[metric_belonged_chain]
@@ -99,17 +104,34 @@ class MetricReporter:
             else:
                 human_metrics[metric_belonged_chain] = self._cal_compare_metric(list(records.values()), metric_def)
 
-        return {"metrics": metrics, "human_metrics": human_metrics}
+        for metric_belonged_chain, records in self.records.items():
+            metric_def = self.metric_definitions[metric_belonged_chain]
+            human_records = self.human_records[metric_belonged_chain]
+            is_compare = metric_def.is_comparison
+
+            merged_records = []
+            for log_id, record in records.items():
+                if log_id in human_records:
+                    merged_records.append(human_records[log_id])
+                else:
+                    merged_records.extend(record)
+
+            if not is_compare:
+                merged_metrics[metric_belonged_chain] = self._cal_record_metric(merged_records, metric_def)
+            else:
+                merged_metrics[metric_belonged_chain] = self._cal_compare_metric(merged_records, metric_def)
+
+        return {"metrics": metrics, "human_metrics": human_metrics, "merged_metrics": merged_metrics}
 
     @property
     def metrics_data(self) -> CombinedMetricsData:
         return self._cal_metrics()
 
     def generate_reports(
-        self,
-        scene_config: SceneConfig,
-        evaluator_configs: List["leaf_playground.core.workers.MetricEvaluatorConfig"],
-        logs: List[LogBody],
+            self,
+            scene_config: SceneConfig,
+            evaluator_configs: List["leaf_playground.core.workers.MetricEvaluatorConfig"],
+            logs: List[LogBody],
     ):
         metrics = self.metrics_data
 
