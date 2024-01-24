@@ -450,7 +450,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                 target_agent=target_agent,
                 evaluator=self.__class__.__name__,
             )
-            self.reporter.put_record(record_data, metric_def.belonged_chain)
+            self.reporter.put_record(record_data, metric_def.belonged_chain, log.id)
             records[metric_name] = record_data.model_dump(mode="json")
         self.logger.add_action_log_record(log_id=log.id, records=records, field_name="eval_records")
 
@@ -480,7 +480,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
             record_data = record_data_model(
                 value=compare_result, reason=reason, misc=misc, evaluator=self.__class__.__name__
             )
-            self.reporter.put_record(record_data, metric_def.belonged_chain)
+            self.reporter.put_record(record_data, metric_def.belonged_chain, log.id)
             records[metric_name] = record_data.model_dump(mode="json")
         self.logger.add_action_log_record(log_id=log.id, records=records, field_name="compare_records")
 
