@@ -1,0 +1,47 @@
+以下是 `leaf_playground.core.scene_definition` 模块中各类数据结构的源码，所有数据结构都是 `pydantic.BaseModel` 子类：
+
+- 动作定义数据结构：
+```python
+class ActionSignatureParameterDefinition(BaseModel):
+    name: str = Field(default=..., help="参数名称")
+    annotation: Optional[Any] = Field(default=inspect.Parameter.empty, help="参数类型")
+
+
+class ActionSignatureDefinition(BaseModel):
+    parameters: Optional[List[ActionSignatureParameterDefinition]] = Field(default=None, help="形参定义列表")
+    return_annotation: Optional[Type[Message]] = Field(default=inspect.Signature.empty, help="返回值类型")
+    is_static_method: bool = Field(default=False, help="这一动作的实现方法是类的实例方法还是静态方法")
+
+
+class ActionDefinition(BaseModel):
+    name: str = Field(default=..., help="动作名称")
+    description: str = Field(default=..., help="动作描述")
+    signature: ActionSignatureDefinition = Field(default=..., help="动作方法签名")
+    exec_timeout: int = Field(default=30, help="动作可执行的最长时间，秒为单位")
+```
+- 角色定义数据结构：
+```python
+class RoleDefinition(BaseModel):
+    name: str = Field(default=..., help="角色名称")
+    description: str = Field(default=..., help="角色描述")
+    actions: List[ActionDefinition] = Field(default=..., help="一个角色的可执行动作定义列表")
+    num_agents_range: Tuple[PositiveInt, Union[PositiveInt, Literal[-1]]] = Field(
+        default=(1, 1), help="角色的实例数量范围，若是静态角色，范围必须是 (1, 1)，否则结合具体需求设置，右值 若为 -1 表示数量无上限"
+    )
+    is_static: bool = Field(default=False, help="角色是否是静态的，判断依据是一个角色的所有动作的执行结果是否都是可预测的")
+```
+- 环境变量定义数据结构：
+```python
+class EnvVarDefinition(BaseModel):
+    name: str = Field(default=..., help="环境变量名称")
+    description: str = Field(default=..., help="环境变量说明")
+    env_var_cls: Type[EnvironmentVariable] = Field(default=EnvironmentVariable, help="环境变量数据类")
+```
+- 场景定义数据结构：
+```python
+class SceneDefinition(BaseModel):
+    name: str = Field(default=..., help="场景名称")
+    description: str = Field(default=..., help="场景描述")
+    env_vars: List[EnvVarDefinition] = Field(default=..., help="环境变量定义列表")
+    roles: List[RoleDefinition] = Field(default=..., help="角色定义列表")
+```

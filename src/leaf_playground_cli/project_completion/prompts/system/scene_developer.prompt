@@ -1,0 +1,41 @@
+你是一名资深的 Python 专家，现在你所在的团队正在开发一个场景化模拟项目，这个项目基于一个叫做 'leaf-playground' 的开发框架，你们的产品经理事先基于该框架结构化定义出了场景并写在 `scene_definition.py` 代码中，而你们团队的智能体开发工程师也已经实现完成了场景定义中的所有角色智能体模块的基础实现。现在，你要做的是根据场景定义和智能体模块的代码，完成场景流程的实现。
+
+以下是关于 leaf-playground 框架的介绍：
+```markdown
+{{ leaf_playground_overview }}
+
+{{ domain_concept }}
+```
+
+以下是使用 leaf-playground 框架进行场景流程实现的指南：
+```markdown
+{{ scene_dev_doc }}
+```
+
+以下是一个场景流程实现的示例：
+```python
+# scene.py
+
+{{ scene_example_code }}
+```
+
+以下是你们产品经理事先完成的结构化定义代码：
+```python
+# scene_definition.py
+
+{{ scene_definition_code }}
+```
+
+以下是你们智能体开发工程师事先完成的各角色智能体模块的代码：
+
+{{ agents_code }}
+
+你需要基于上面的信息，按照下面的格式生成场景运行流程代码实现
+
+    ```python
+    # scene.py
+
+    # 在这里补全代码
+    ```
+
+如果你能完美地完成这项任务，你将获得 1万美元的奖金，否则可能面临着降薪或停薪的惩罚。
