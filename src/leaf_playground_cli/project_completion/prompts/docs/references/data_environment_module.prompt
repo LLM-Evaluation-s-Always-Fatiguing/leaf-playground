@@ -1,0 +1,88 @@
+以下是 `leaf_playground.data.environment` 模块中各类环境变量数据类的源码，所有数据结构的都是 `pydantic.BaseModel` 子类：
+
+```python
+class EnvironmentVariable(BaseModel):
+    name: str = Field(default=...)
+    description: str = Field(default=...)
+    current_value: Any = Field(default=..., help="the value that the environment variable holds for current phase")
+
+    @abstractmethod
+    def update(self, *args, **kwargs):
+        return
+
+
+class RandomnessEnvironmentVariable(EnvironmentVariable):
+    random_space: Set[Any] = Field(default=...)
+    current_value: Optional[Any] = Field(default=None)
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.current_value is None:
+            self.update()
+        if self.current_value not in self.random_space:
+            raise ValueError(
+                f"value of 'current_value' must in 'random_space'({self.random_space}), but get {self.current_value}."
+            )
+
+    def update(self, exclude_current: bool = False) -> None:
+        choices = self.random_space
+        if exclude_current:
+            choices -= {self.current_value}
+        self.current_value = random.choice(list(choices))
+
+
+class ChainedEnvironmentVariable(EnvironmentVariable):
+    chain: List[Any] = Field(default=...)
+    current_value: Optional[Any] = Field(default=None)
+    recurrent: bool = Field(default=False)
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.current_value is None:
+            self.current_value = self.chain[0]
+        if self.current_value not in self.chain:
+            raise ValueError(f"value of 'current_value' must in 'chain'({self.chain}), but get {self.current_value}.")
+
+    def update(self) -> None:
+        current_position = self.chain.index(self.current_value)
+        next_position = (current_position + 1) % len(self.chain)
+        if current_position < next_position or self.recurrent:
+            self.current_value = self.chain[next_position]
+
+
+class NumericEnvironmentVariable(EnvironmentVariable):
+    current_value: float = Field(default=...)
+    le: Optional[float] = Field(default=None)
+    ge: Optional[float] = Field(default=None)
+
+    def model_post_init(self, __context: Any) -> None:
+        self._check_value_legality(value=self.current_value, value_name="current_value")
+
+    def _check_value_legality(self, value: float, value_name: str = "value") -> None:
+        legal = True
+        if self.le is not None and value > self.le:
+            legal = False
+        if self.ge is not None and value < self.ge:
+            legal = False
+        if not legal:
+            raise ValueError(f"'{value_name}'({self.current_value}) isn't legal for 'le'={self.le} and 'ge'={self.ge}")
+
+    def update(self, new_value: float) -> None:
+        self._check_value_legality(value=new_value, value_name="new_value")
+        self.current_value = new_value
+
+    def __add__(self, other: float):
+        new_value = self.current_value + other
+        self.update(new_value)
+
+    def __sub__(self, other: float):
+        new_value = self.current_value - other
+        self.update(new_value)
+
+
+class ConstantEnvironmentVariable(EnvironmentVariable):
+    def update(self, *args, **kwargs):
+        raise TypeError(f"{self.__class__.__name__} is unchangeable.")
+
+    def __setattr__(self, key, value):
+        if key in self.__dict__:
+            raise TypeError(f"{self.__class__.__name__}.{key} is unchangeable.")
+```

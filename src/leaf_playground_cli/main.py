@@ -55,6 +55,29 @@ def create_new_project(name: Annotated[str, typer.Argument(metavar="project_name
     raise typer.Exit()
 
 
+@app.command(name="complete-project", help="using gpt-4 to roughly complete project code")
+def complete_project(
+    target: Annotated[str, typer.Option(metavar="target_dir")],
+    reference: Annotated[Optional[str], typer.Option(metavar="reference_dir")] = None,
+    api_key: Annotated[Optional[str], typer.Option(metavar="openai_api_key")] = None,
+    disable_definition_completion: Annotated[bool, typer.Option()] = False,
+    disable_agent_completion: Annotated[bool, typer.Option()] = False,
+    disable_scene_completion: Annotated[bool, typer.Option()] = False,
+):
+    from .project_completion import Pipeline, PipelineConfig
+
+    config = PipelineConfig(
+        target_project=target,
+        reference_project=reference,
+        openai_api_key=api_key,
+        definition_completion=not disable_definition_completion,
+        agent_completion=not disable_agent_completion,
+        scene_completion=not disable_scene_completion
+    )
+    pipeline = Pipeline(config)
+    pipeline.run()
+
+
 @app.command(name="update-project-structure", help="sync project structure to the template.")
 def update_project_structure(target: Annotated[str, typer.Argument(metavar="target_dir")]):
     target = os.path.abspath(target)

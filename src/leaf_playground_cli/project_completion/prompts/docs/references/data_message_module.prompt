@@ -1,0 +1,40 @@
+以下是 `leaf_playground.data.message` 模块中各类消息数据结构的源码，所有数据结构都是 `pydantic.BaseModel` 子类：
+
+```python
+class Message(Data):
+    id_: UUID = Field(default_factory=uuid4)
+    sender: Profile = Field(default=...)
+    content: Media = Field(default=...)
+    receivers: List[Profile] = Field(default=...)
+    msg_type: Literal["basic"] = Field(default="basic")
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+
+class TextMessage(Message):
+    """Base class for messages whose content is a plain text"""
+    content: Text = Field(default=...)
+    msg_type: Literal["text"] = Field(default="text")
+
+
+class JsonMessage(Message):
+    """Base class for messages whose content is a JSON string"""
+    content: Json = Field(default=...)
+    msg_type: Literal["json"] = Field(default="json")
+
+
+class ImageMessage(Message):
+    """Base class messages whose content is an image"""
+    content: Image = Field(default=...)
+    msg_type: Literal["image"] = Field(default="image")
+
+
+class AudioMessage(Message):
+    """Base class messages whose content is an audio"""
+    content: Audio = Field(default=...)
+    msg_type: Literal["audio"] = Field(default="audio")
+
+
+class VideoMessage(Message):
+    """Base class messages whose content is a video"""
+    content: Video = Field(default=...)
+    msg_type: Literal["video"] = Field(default="video")
+```
