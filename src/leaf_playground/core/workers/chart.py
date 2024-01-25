@@ -87,6 +87,7 @@ class Chart(ABC, metaclass=ChartMetaClass):
         filtered_metrics: CombinedMetricsData = {
             "metrics": {k: v for k, v in metrics["metrics"].items() if k in self.supported_metric_names},
             "human_metrics": {k: v for k, v in metrics["human_metrics"].items() if k in self.supported_metric_names},
+            "merged_metrics": {k: v for k, v in metrics["merged_metrics"].items() if k in self.supported_metric_names},
         }
         try:
             return self._generate(filtered_metrics, scene_config, evaluator_configs, logs)
