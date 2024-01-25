@@ -1,0 +1,5 @@
+*
+
+!.leaf
+!{{ cookiecutter.project_name }}
+!dataset
