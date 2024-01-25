@@ -12,7 +12,6 @@ from ....data.base import Data
 from ....data.message import Message
 from ....utils.import_util import DynamicFn
 
-
 _METRIC_MODELS = {}
 
 
@@ -48,7 +47,8 @@ class _MetricData(Data):
     target_agent: Optional[str] = Field(default=None)
 
 
-CombinedMetricsData = Dict[Literal["metrics", "human_metrics"], Dict[str, Union[_MetricData, List[_MetricData]]]]
+CombinedMetricsData = Dict[
+    Literal["metrics", "human_metrics", "merged_metrics"], Dict[str, Union[_MetricData, List[_MetricData]]]]
 
 
 class AggregationMethodOutput(BaseModel):

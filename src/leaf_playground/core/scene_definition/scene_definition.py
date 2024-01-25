@@ -56,7 +56,7 @@ class SceneDefinition(BaseModel):
             self.get_role_definition(role_name).get_action_definition(action_name).get_metric_definition(metric_name)
         )
 
-    def registry_log_exporters(self, log_exporters: List["leaf_playground.core.workers.logger.Logger"]):
+    def registry_log_exporters(self, log_exporters: List["leaf_playground.core.workers.logger.LogExporter"]):
         name2exporter = {f"{exporter.file_name}.{exporter.extension}": exporter for exporter in self.log_exporters}
         for exporter in log_exporters:
             name = f"{exporter.file_name}:{exporter.extension}"
