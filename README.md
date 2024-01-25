@@ -4,7 +4,7 @@
   </p>
 </h1>
 <p align="center">
-    <a href="https://pypi.org/project/leaf-playground/0.3.0/">
+    <a href="https://pypi.org/project/leaf-playground/">
         <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/leaf-playground.svg">
     </a>
     <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/w/LLM-Evaluation-s-Always-Fatiguing/leaf-playground">
