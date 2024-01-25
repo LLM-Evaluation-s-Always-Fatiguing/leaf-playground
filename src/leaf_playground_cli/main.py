@@ -218,7 +218,7 @@ def publish_project(
     raise typer.Exit()
 
 
-__web_ui_version__ = "v0.4.0.dev0"
+__web_ui_version__ = "v0.4.0"
 __web_ui_release_site__ = (
     "https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-webui/releases/download"
 )
