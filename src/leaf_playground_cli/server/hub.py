@@ -146,6 +146,22 @@ class Hub(Singleton):
 
             return projects_list
 
+        def _mount_resource(resource_dir: str, route_path: str, name: str):
+            nonlocal new_mounted_path
+
+            if not os.path.exists(resource_dir):
+                return
+
+            new_mounted_path.append(resource_dir)
+            if route_path in mounted_path:
+                route_idx = root_app.routes.index(mounted_routes[mounted_path.index(route_path)])
+                del root_app.routes[route_idx]
+            root_app.mount(
+                route_path,
+                StaticFiles(directory=os.path.join(proj.work_dir, "static")),
+                name=name,
+            )
+
         self._projects = {proj.id: proj for proj in _scan_projects(self._hub_dir)}
 
         # mount projects' static files
@@ -156,15 +172,11 @@ class Hub(Singleton):
         mounted_path = [route.path for route in mounted_routes]
         new_mounted_path = []
         for proj_id, proj in self._projects.items():
-            route_path = f"/hub/{proj_id}/static"
-            new_mounted_path.append(route_path)
-            if route_path in mounted_path:
-                route_idx = root_app.routes.index(mounted_routes[mounted_path.index(route_path)])
-                del root_app.routes[route_idx]
-            root_app.mount(
-                route_path,
-                StaticFiles(directory=os.path.join(proj.work_dir, "static")),
-                name=f"static_files_{proj_id}",
+            _mount_resource(
+                os.path.join(proj.work_dir, "static"), f"/hub/{proj_id}/static", f"{proj_id}_static"
+            )
+            _mount_resource(
+                os.path.join(proj.work_dir, "dataset"), f"/hub/{proj_id}/dataset", f"{proj_id}_dataset"
             )
         for route_path in [p for p in mounted_path if p not in new_mounted_path]:
             route_idx = root_app.routes.index(mounted_routes[mounted_path.index(route_path)])
