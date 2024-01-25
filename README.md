@@ -23,6 +23,15 @@ Below are sister projects of **leaf-playground**:
 - [**leaf-playground-webui**](https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-webui): the implementation of the leaf-playground's WEB UI.
 - [**leaf-playground-hub**](https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-hub): hosts our officially implemented scenario simulation projects.
 
+## Features
+
+- **"Definition Driven Development"**: advanced syntax for structured scenario definitions and programming conventions.
+- **Human + Multiple Agents**: facilitates human and AI Agents interaction in designated scenarios.
+- **Auto Evaluation**: automated action-level evaluation and report visualization for AI Agents.
+- **Local server support**: one-click local service deployment for scenario simulation tasks management and execution.
+- **Containerization**: containerization support for running scenario simulation tasks.
+- **Auto generate projects**: auto-generate and auto-complete code for scenario simulation projects.
+
 ## Installation
 
 ### Environment Setup
@@ -68,9 +77,19 @@ https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground/assets/7544
 
 - [x] support human participant in the scenario simulation as a dynamic agent
 - [x] running each scenario simulation task in a docker container
-- [ ] refactor `ai_backend` to `llm_backend_tools` to remove some heavy dependencies
 - [x] support manage task status(pause, restart, interrupt, etc.)
 - [ ] support full task data persistence
+  - [x] save task info, logs and message in database
+  - [ ] save task results in database or remote file system
+  - [ ] support for resuming runtime state and information from checkpoint and continuing execution
+- [ ] support complete project automatically
+  - [x] complete scene definition automatically
+  - [ ] complete agents automatically
+    - [x] complete agent base classes automatically
+    - [ ] complete specific agent class automatically
+  - [ ] complete evaluator automatically
+  - [x] complete scene automatically
+- [ ] refactor `ai_backend` to `llm_backend_tools` to remove some heavy dependencies
 - [ ] support streaming agents' responses
 
 ### The Hub
