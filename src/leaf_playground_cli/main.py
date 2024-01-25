@@ -223,20 +223,20 @@ __web_ui_release_site__ = (
 __web_ui_release_list_url__ = (
     "https://api.github.com/repos/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-webui/releases?per_page=100"
 )
-__web_ui_version__ = None
 
 
-def get_latest_webui_releases(cli_version: str):
+def get_latest_webui_releases(cli_version_str: str):
     # cli_version like "0.4.0", try to get the latest web ui version starting with "v0.4."
-    cli_version_prefix = "v" + ".".join(cli_version.split(".")[:2])
+    cli_version = version.parse(cli_version_str)
+    webui_version_prefix = f"v{cli_version.major}.{cli_version.minor}."
 
     response = requests.get(__web_ui_release_list_url__)
     releases = response.json()
     for release in releases:
-        if release["tag_name"].startswith(cli_version_prefix):
+        if release["tag_name"].startswith(webui_version_prefix):
             return release["tag_name"]
 
-    raise ValueError(f"can't find any web ui release version starts with {cli_version_prefix}")
+    raise ValueError(f"can't find any web ui release version starts with {webui_version_prefix}")
 
 
 def download_web_ui(cli_version: str) -> str:
@@ -246,9 +246,7 @@ def download_web_ui(cli_version: str) -> str:
     web_ui_dir = os.path.join(leaf_dir, "web_ui")
     os.makedirs(web_ui_dir, exist_ok=True)
 
-    global __web_ui_version__
     latest_web_ui_version = get_latest_webui_releases(cli_version)
-    __web_ui_version__ = latest_web_ui_version
 
     web_ui_download_url = __web_ui_release_site__ + f"/{latest_web_ui_version}/webui-{latest_web_ui_version}.zip"
     web_ui_hash_url = __web_ui_release_site__ + f"/{latest_web_ui_version}/webui-{latest_web_ui_version}.zip.sha256"
@@ -347,7 +345,7 @@ def get_version():
 
 @app.command(name="web-ui-version", help="bounded web ui version currently installed leaf-playground framework uses")
 def get_web_ui_version():
-    print(__web_ui_version__)
+    print(get_latest_webui_releases(leaf_version))
 
 
 # TODO: add command to migrate database using Alembic
