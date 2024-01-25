@@ -226,8 +226,8 @@ __web_ui_release_list_url__ = (
 __web_ui_version__ = None
 
 
-def get_newest_webui_releases(cli_version: str):
-    # cli_version like "0.4.0", try to get the newest web ui version starting with "v0.4."
+def get_latest_webui_releases(cli_version: str):
+    # cli_version like "0.4.0", try to get the latest web ui version starting with "v0.4."
     cli_version_prefix = "v" + ".".join(cli_version.split(".")[:2])
 
     response = requests.get(__web_ui_release_list_url__)
@@ -247,7 +247,7 @@ def download_web_ui(cli_version: str) -> str:
     os.makedirs(web_ui_dir, exist_ok=True)
 
     global __web_ui_version__
-    latest_web_ui_version = get_newest_webui_releases(cli_version)
+    latest_web_ui_version = get_latest_webui_releases(cli_version)
     __web_ui_version__ = latest_web_ui_version
 
     web_ui_download_url = __web_ui_release_site__ + f"/{latest_web_ui_version}/webui-{latest_web_ui_version}.zip"
