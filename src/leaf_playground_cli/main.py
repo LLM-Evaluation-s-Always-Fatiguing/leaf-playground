@@ -56,12 +56,12 @@ def create_new_project(name: Annotated[str, typer.Argument(metavar="project_name
 
 @app.command(name="complete-project", help="using gpt-4 to roughly complete project code")
 def complete_project(
-        target: Annotated[str, typer.Option(metavar="target_dir")],
-        reference: Annotated[Optional[str], typer.Option(metavar="reference_dir")] = None,
-        api_key: Annotated[Optional[str], typer.Option(metavar="openai_api_key")] = None,
-        disable_definition_completion: Annotated[bool, typer.Option()] = False,
-        disable_agent_completion: Annotated[bool, typer.Option()] = False,
-        disable_scene_completion: Annotated[bool, typer.Option()] = False,
+    target: Annotated[str, typer.Option(metavar="target_dir")],
+    reference: Annotated[Optional[str], typer.Option(metavar="reference_dir")] = None,
+    api_key: Annotated[Optional[str], typer.Option(metavar="openai_api_key")] = None,
+    disable_definition_completion: Annotated[bool, typer.Option()] = False,
+    disable_agent_completion: Annotated[bool, typer.Option()] = False,
+    disable_scene_completion: Annotated[bool, typer.Option()] = False,
 ):
     from .project_completion import Pipeline, PipelineConfig
 
@@ -134,8 +134,8 @@ def _replace_version_in_dockerfile(file_path, new_version):
     help="publish project, at this time, will only copy the newest app.py and update project_config.json",
 )
 def publish_project(
-        target: Annotated[str, typer.Argument(metavar="target_dir")],
-        version_str: Annotated[str, typer.Option("--version", "-v")] = "0.1.0",
+    target: Annotated[str, typer.Argument(metavar="target_dir")],
+    version_str: Annotated[str, typer.Option("--version", "-v")] = "0.1.0",
 ):
     dot_leaf_dir = os.path.join(target, ".leaf")
 
@@ -297,14 +297,13 @@ def download_web_ui(cli_version: str) -> str:
 
 @app.command(name="start-server", help="start a leaf-playground server, will firstly download WEB UI if necessary.")
 def start_server(
-        hub_dir: Annotated[str, typer.Option("--hub")] = os.getcwd(),
-        port: Annotated[int, typer.Option("--port")] = 8000,
-        ui_port: Annotated[int, typer.Option(default="--ui_port")] = 3000,
-        dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
-        web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None,
-        no_web_ui: Annotated[Optional[bool], typer.Option("--no_web_ui")] = False,
-        runtime_env: Annotated[
-            str, typer.Option("--runtime_env", click_type=click.Choice(["local", "docker"]))] = "local",
+    hub_dir: Annotated[str, typer.Option("--hub")] = os.getcwd(),
+    port: Annotated[int, typer.Option("--port")] = 8000,
+    ui_port: Annotated[int, typer.Option(default="--ui_port")] = 3000,
+    dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
+    web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None,
+    no_web_ui: Annotated[Optional[bool], typer.Option("--no_web_ui")] = False,
+    runtime_env: Annotated[str, typer.Option("--runtime_env", click_type=click.Choice(["local", "docker"]))] = "local",
 ):
     if not no_web_ui:
         if web_ui_dir and not os.path.isdir(web_ui_dir):
