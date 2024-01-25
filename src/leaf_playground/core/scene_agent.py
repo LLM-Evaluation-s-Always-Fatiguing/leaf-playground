@@ -117,15 +117,7 @@ class SceneAgentMetadata(BaseModel):
 
 
 class SceneAgentMetaClass(ABCMeta):
-    def __new__(
-        cls,
-        name,
-        bases,
-        attrs,
-        *,
-        role_definition: RoleDefinition = None,
-        cls_description: str = None
-    ):
+    def __new__(cls, name, bases, attrs, *, role_definition: RoleDefinition = None, cls_description: str = None):
         attrs["role_definition"] = Immutable(role_definition or getattr(bases[0], "role_definition", None))
         attrs["cls_description"] = Immutable(cls_description)
         attrs["obj_for_import"] = Immutable(DynamicObject(obj=name, module=_getframe(1).f_globals["__name__"]))
@@ -181,15 +173,7 @@ class SceneAgentMetaClass(ABCMeta):
 
         return new_cls
 
-    def __init__(
-        cls,
-        name,
-        bases,
-        attrs,
-        *,
-        role_definition: RoleDefinition = None,
-        cls_description: str = None
-    ):
+    def __init__(cls, name, bases, attrs, *, role_definition: RoleDefinition = None, cls_description: str = None):
         super().__init__(name, bases, attrs)
 
     def __setattr__(self, key, value):
@@ -291,7 +275,7 @@ class SceneAgent(_Configurable, ABC, metaclass=SceneAgentMetaClass):
             description=cls.cls_description,
             config_schema=cls.config_cls.get_json_schema(by_alias=True) if not cls.role_definition.is_static else None,
             obj_for_import=cls.obj_for_import,
-            is_human=False
+            is_human=False,
         )
 
 
@@ -428,13 +412,7 @@ class HumanConnection:
                 continue
 
     async def run(self):
-        await asyncio.gather(
-            *[
-                self._send_socket_event(),
-                self._receive_human_input(),
-                self._keep_alive(),
-            ]
-        )
+        await asyncio.gather(*[self._send_socket_event(), self._receive_human_input(), self._keep_alive()])
 
 
 class SceneHumanAgentConfig(SceneDynamicAgentConfig):

@@ -48,7 +48,8 @@ class _MetricData(Data):
 
 
 CombinedMetricsData = Dict[
-    Literal["metrics", "human_metrics", "merged_metrics"], Dict[str, Union[_MetricData, List[_MetricData]]]]
+    Literal["metrics", "human_metrics", "merged_metrics"], Dict[str, Union[_MetricData, List[_MetricData]]]
+]
 
 
 class AggregationMethodOutput(BaseModel):

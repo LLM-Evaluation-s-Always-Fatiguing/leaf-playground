@@ -118,7 +118,7 @@ class Message(SQLModel):
             "id": message.id,
             "tid": tid,
             "data": message.model_dump(mode="json", by_alias=True),
-            "obj": DynamicObject.create_dynamic_obj(message.__class__).model_dump(mode="json", by_alias=True)
+            "obj": DynamicObject.create_dynamic_obj(message.__class__).model_dump(mode="json", by_alias=True),
         }
 
         return cls(**msg_dict)
@@ -140,13 +140,4 @@ class MessageTable(Message, table=True):
         return cls(**message.model_dump())
 
 
-__all__ = [
-    "TaskRunTimeEnv",
-    "TaskDBLifeCycle",
-    "Task",
-    "TaskTable",
-    "Log",
-    "LogTable",
-    "Message",
-    "MessageTable"
-]
+__all__ = ["TaskRunTimeEnv", "TaskDBLifeCycle", "Task", "TaskTable", "Log", "LogTable", "Message", "MessageTable"]

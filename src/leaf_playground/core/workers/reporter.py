@@ -128,10 +128,10 @@ class MetricReporter:
         return self._cal_metrics()
 
     def generate_reports(
-            self,
-            scene_config: SceneConfig,
-            evaluator_configs: List["leaf_playground.core.workers.MetricEvaluatorConfig"],
-            logs: List[LogBody],
+        self,
+        scene_config: SceneConfig,
+        evaluator_configs: List["leaf_playground.core.workers.MetricEvaluatorConfig"],
+        logs: List[LogBody],
     ):
         metrics = self.metrics_data
 

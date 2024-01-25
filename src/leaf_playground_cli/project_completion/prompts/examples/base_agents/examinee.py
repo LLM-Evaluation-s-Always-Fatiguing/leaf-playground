@@ -22,7 +22,4 @@ class Examinee(SceneAIAgent, ABC, role_definition=ROLE_DEFINITION):
         pass
 
 
-__all__ = [
-    "ExamineeConfig",
-    "Examinee"
-]
+__all__ = ["ExamineeConfig", "Examinee"]

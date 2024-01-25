@@ -12,11 +12,7 @@ ROLE_DEFINITION = SCENE_DEFINITION.get_role_definition("examiner")
 ExaminerConfig = SceneStaticAgentConfig.create_config_model(ROLE_DEFINITION)
 
 
-class Examiner(
-    SceneStaticAgent,
-    role_definition=ROLE_DEFINITION,
-    cls_description=ROLE_DEFINITION.description
-):
+class Examiner(SceneStaticAgent, role_definition=ROLE_DEFINITION, cls_description=ROLE_DEFINITION.description):
     config_cls = ExaminerConfig
     config: config_cls
 
@@ -27,10 +23,7 @@ class Examiner(
         self._questions = []
         self._ds_config: DatasetConfig = None
 
-    async def prepare_samples(
-            self,
-            ds_config: DatasetConfig,
-    ) -> None:
+    async def prepare_samples(self, ds_config: DatasetConfig) -> None:
         self._cur = 0
         self._questions = prepare_samples(ds_config)
         self._ds_config = ds_config
@@ -39,9 +32,10 @@ class Examiner(
         sample = ExaminerSample(
             sender=self.profile,
             receivers=receivers,
-            content=Text(text=self._questions[self._cur][QUESTION_COL],
-                         display_text=self._questions[self._cur][QUESTION_COL]),
-            sample_id=self._cur
+            content=Text(
+                text=self._questions[self._cur][QUESTION_COL], display_text=self._questions[self._cur][QUESTION_COL]
+            ),
+            sample_id=self._cur,
         )
         self._cur += 1
         return sample
@@ -53,7 +47,4 @@ class Examiner(
         return self._questions[sample_id][ANSWER_COL]
 
 
-__all__ = [
-    "ExaminerConfig",
-    "Examiner"
-]
+__all__ = ["ExaminerConfig", "Examiner"]

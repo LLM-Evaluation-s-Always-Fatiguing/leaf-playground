@@ -19,10 +19,7 @@ def check_is_leaf_project(directory: str):
 
 
 def add_and_show_message(
-    state: ProgramState,
-    msg_wrapper: Union[system, user, assistant],
-    msg: Union[str, SglGen],
-    show: bool = True
+    state: ProgramState, msg_wrapper: Union[system, user, assistant], msg: Union[str, SglGen], show: bool = True
 ):
     if isinstance(msg, SglGen) and not msg.name:
         raise ValueError("Must set name to SglGen instance")
@@ -51,7 +48,7 @@ def load_code(reference_file: Optional[str], default: Optional[str]):
 
 
 def extract_code_and_save(code: str, file_name: str, save_dir: str):
-    pattern = r'```python\n# ' + file_name + r'.py(.*?)```'
+    pattern = r"```python\n# " + file_name + r".py(.*?)```"
     match = re.search(pattern, code, re.DOTALL)
     if match:
         code = match.group(1).strip()
@@ -126,19 +123,22 @@ class Pipeline:
             definition_doc=jinja2.Template(load_prompt("docs", "definition.prompt")).render(
                 data_message_module_reference=load_prompt("docs", "references", "data_message_module.prompt"),
                 data_environment_module_reference=load_prompt("docs", "references", "data_environment_module.prompt"),
-                core_definition_module_reference=load_prompt("docs", "references", "core_definition_module.prompt")
+                core_definition_module_reference=load_prompt("docs", "references", "core_definition_module.prompt"),
             ),
             scene_definition_example=load_code(
-                reference_file=None if not self.config.reference_pkg_path else
-                os.path.join(self.config.reference_pkg_path, "scene_definition.py"),
-                default=None if self.config.reference_pkg_path else load_prompt("examples", "scene_definition.py")
+                reference_file=(
+                    None
+                    if not self.config.reference_pkg_path
+                    else os.path.join(self.config.reference_pkg_path, "scene_definition.py")
+                ),
+                default=None if self.config.reference_pkg_path else load_prompt("examples", "scene_definition.py"),
             ),
             project_name=self.config.target_project_config["name"],
             project_description=input(
-                jinja2.Template(
-                    load_prompt("user_inputs", "ask_for_project_description.prompt")
-                ).render(project_name=self.config.target_project_config["name"])
-            )
+                jinja2.Template(load_prompt("user_inputs", "ask_for_project_description.prompt")).render(
+                    project_name=self.config.target_project_config["name"]
+                )
+            ),
         )
 
         _finished = False
@@ -153,19 +153,33 @@ class Pipeline:
                 add_and_show_message(
                     s,
                     system,
-                    system_msg.format("先响应用户的回复，然后一步步地思考（think step by step）并使用自然语言将需求细化，暂时不要提问")
+                    system_msg.format(
+                        "先响应用户的回复，然后一步步地思考（think step by step）并使用自然语言将需求细化，暂时不要提问"
+                    ),
                 )
                 add_and_show_message(s, assistant, gen("detailed_solution", max_tokens=4096))
                 add_and_show_message(
-                    s, system, system_msg.format("判断是否需要向用户提问或寻求改进意见，直接回答“是”或“否”，不要说其他的话")
+                    s,
+                    system,
+                    system_msg.format("判断是否需要向用户提问或寻求改进意见，直接回答“是”或“否”，不要说其他的话"),
                 )
                 add_and_show_message(s, assistant, gen("judgement", max_tokens=2, temperature=0.0), False)
                 if "否" in s.get_var("judgement"):
                     break
-                add_and_show_message(s, system, system_msg.format("先告知用户你接下来要做的事情，然后分点列出你需要向用户提问的全部问题或向用户寻求改进意见"))
+                add_and_show_message(
+                    s,
+                    system,
+                    system_msg.format(
+                        "先告知用户你接下来要做的事情，然后分点列出你需要向用户提问的全部问题或向用户寻求改进意见"
+                    ),
+                )
                 add_and_show_message(s, assistant, gen("questions", max_tokens=128))
                 add_and_show_message(s, user, input())
-                add_and_show_message(s, system, system_msg.format("根据用户回复判断是否需要修改需求细节，直接回答“是”或“否”，不要说其他的话"))
+                add_and_show_message(
+                    s,
+                    system,
+                    system_msg.format("根据用户回复判断是否需要修改需求细节，直接回答“是”或“否”，不要说其他的话"),
+                )
                 add_and_show_message(s, assistant, gen("judgement", max_tokens=2, temperature=0.0), False)
                 if "否" in s.get_var("judgement"):
                     break
@@ -174,18 +188,22 @@ class Pipeline:
                 add_and_show_message(
                     s,
                     system,
-                    system_msg.format("结合用户在一开始给你的指南并根据最新细化的需求，生成 scene_definition.py，然后询问用户是否有需要补充或修改的")
+                    system_msg.format(
+                        "结合用户在一开始给你的指南并根据最新细化的需求，生成 scene_definition.py，然后询问用户是否有需要补充或修改的"
+                    ),
                 )
                 add_and_show_message(s, assistant, gen("scene_definition.py", max_tokens=4096))
                 add_and_show_message(s, user, input())
-                add_and_show_message(s, system, "根据用户的回复判断你是否需要对 scene_definition.py 进行修改？直接回答“是”或“否”，不要说其他的话")
+                add_and_show_message(
+                    s,
+                    system,
+                    "根据用户的回复判断你是否需要对 scene_definition.py 进行修改？直接回答“是”或“否”，不要说其他的话",
+                )
                 add_and_show_message(s, assistant, gen("judgement", max_tokens=2, temperature=0.0), False)
                 if "否" in s.get_var("judgement"):
                     break
 
-            extract_code_and_save(
-                s.get_var("scene_definition.py"), "scene_definition", self.config.target_pkg_path
-            )
+            extract_code_and_save(s.get_var("scene_definition.py"), "scene_definition", self.config.target_pkg_path)
 
             _finished = True
 
@@ -195,9 +213,7 @@ class Pipeline:
             time.sleep(0.01)
 
     def _agent_completion(self):
-        target_scene_definition = load_code(
-            os.path.join(self.config.target_pkg_path, "scene_definition.py"), None
-        )
+        target_scene_definition = load_code(os.path.join(self.config.target_pkg_path, "scene_definition.py"), None)
         if not target_scene_definition:
             raise NotImplementedError("must implement scene_definition.py before complete agents' code")
 
@@ -206,7 +222,7 @@ class Pipeline:
             domain_concept=load_prompt("docs", "domain_concept.prompt"),
             base_agent_dev_doc=jinja2.Template(load_prompt("docs", "base_agent_dev.prompt")).render(
                 core_scene_agent_module_reference=load_prompt("docs", "references", "core_scene_agent_module.prompt"),
-                data_message_module_reference=load_prompt("docs", "references", "data_message_module.prompt")
+                data_message_module_reference=load_prompt("docs", "references", "data_message_module.prompt"),
             ),
             static_agent_module_name="examiner",
             static_agent_example_code=load_prompt("examples", "base_agents", "examiner.py"),
@@ -222,34 +238,48 @@ class Pipeline:
             nonlocal _finished
 
             add_and_show_message(s, user, initial_msg, False)
-            add_and_show_message(s, system, "请你首先根据 scene_definition.py 的信息提取出所有角色名，并判断他们是动态还是静态的角色")
+            add_and_show_message(
+                s, system, "请你首先根据 scene_definition.py 的信息提取出所有角色名，并判断他们是动态还是静态的角色"
+            )
             add_and_show_message(s, assistant, gen("retrieve_role_info", max_tokens=512, temperature=0.0), False)
             add_and_show_message(s, system, "接下来，你需要依次生成各角色的智能体模块代码")
             while True:
-                add_and_show_message(s, system, "请你明确现在你要生成的是哪个角色的智能体模块代码？直接给我角色名，不要说其他的话。")
+                add_and_show_message(
+                    s, system, "请你明确现在你要生成的是哪个角色的智能体模块代码？直接给我角色名，不要说其他的话。"
+                )
                 add_and_show_message(s, assistant, gen("role_name", max_tokens=16, temperature=0.1), False)
                 role_name = s.get_var("role_name")
                 add_and_show_message(
                     s,
                     system,
-                    f"首先告知用户你接下来要生成的角色是哪个，然后另起一行，根据用户指定的格式，结合 scene_definition.py 中对于角色 {role_name} 的定义，"
-                    f"依据用户给你的指南并参考示例代码，生成该角色的智能体模块代码，直接给出代码，并在代码生成完毕后向用户征询改进建议"
+                    "首先告知用户你接下来要生成的角色是哪个，然后另起一行，根据用户指定的格式，结合"
+                    f" scene_definition.py 中对于角色 {role_name} 的定义，"
+                    "依据用户给你的指南并参考示例代码，生成该角色的智能体模块代码，直接给出代码，并在代码生成完毕后向用户征询改进建议",
                 )
                 add_and_show_message(s, assistant, gen(f"{role_name}.py", max_tokens=4096, temperature=0.5))
                 while True:
                     add_and_show_message(s, user, input())
-                    add_and_show_message(s, system, "请你根据用户的反馈判断是否需要修改代码实现？直接回答“是”或“否”，不要说其他的话")
+                    add_and_show_message(
+                        s, system, "请你根据用户的反馈判断是否需要修改代码实现？直接回答“是”或“否”，不要说其他的话"
+                    )
                     add_and_show_message(s, assistant, gen("judgement", max_tokens=2, temperature=0.0), False)
                     if "否" in s.get_var("judgement"):
                         break
-                    add_and_show_message(s, system, f"请你结合用户的反馈修改 {role_name}.py 代码，直接给出代码，并在代码生成完毕后再次向用户征询改进建议")
+                    add_and_show_message(
+                        s,
+                        system,
+                        f"请你结合用户的反馈修改 {role_name}.py 代码，直接给出代码，并在代码生成完毕后再次向用户征询改进建议",
+                    )
                     add_and_show_message(s, assistant, gen(f"{role_name}.py", max_tokens=4096, temperature=0.5))
                 extract_code_and_save(
-                    s.get_var(f"{role_name}.py"),
-                    role_name,
-                    os.path.join(self.config.target_pkg_path, "agents")
+                    s.get_var(f"{role_name}.py"), role_name, os.path.join(self.config.target_pkg_path, "agents")
                 )
-                add_and_show_message(s, system, "请你判断你是否已经生成完 scene_definition.py 中定义的全部角色的智能体模块代码？直接回答“是”或“否”，不要说其他的话")
+                add_and_show_message(
+                    s,
+                    system,
+                    "请你判断你是否已经生成完 scene_definition.py"
+                    " 中定义的全部角色的智能体模块代码？直接回答“是”或“否”，不要说其他的话",
+                )
                 add_and_show_message(s, assistant, gen("judgement", max_tokens=2, temperature=0.0), False)
                 if "是" in s.get_var("judgement"):
                     break
@@ -262,16 +292,14 @@ class Pipeline:
             time.sleep(0.01)
 
     def _scene_completion(self):
-        target_scene_definition = load_code(
-            os.path.join(self.config.target_pkg_path, "scene_definition.py"), None
-        )
+        target_scene_definition = load_code(os.path.join(self.config.target_pkg_path, "scene_definition.py"), None)
         if not target_scene_definition:
             raise NotImplementedError("must implement scene_definition.py before complete agents' code")
 
         agent_modules = []
         for root, dirs, files in os.walk(os.path.join(self.config.target_pkg_path, "agents")):
             for file in files:
-                if file.endswith('.py') and "__init__" not in file:
+                if file.endswith(".py") and "__init__" not in file:
                     agent_modules.append(os.path.join(root, file))
         if not agent_modules:
             raise NotImplementedError("must implement all agents base class that defined in scene_definition.py")
@@ -281,20 +309,21 @@ class Pipeline:
             domain_concept=load_prompt("docs", "domain_concept.prompt"),
             scene_dev_doc=jinja2.Template(load_prompt("docs", "scene.prompt")).render(
                 core_scene_module_reference=load_prompt("docs", "references", "core_scene_module.prompt"),
-                data_log_module_reference=load_prompt("docs", "references", "data_log_module.prompt")
+                data_log_module_reference=load_prompt("docs", "references", "data_log_module.prompt"),
             ),
             scene_example_code=load_code(
-                reference_file=None if not self.config.reference_pkg_path else
-                os.path.join(self.config.reference_pkg_path, "scene.py"),
-                default=None if self.config.reference_pkg_path else load_prompt("examples", "scene.py")
+                reference_file=(
+                    None
+                    if not self.config.reference_pkg_path
+                    else os.path.join(self.config.reference_pkg_path, "scene.py")
+                ),
+                default=None if self.config.reference_pkg_path else load_prompt("examples", "scene.py"),
             ),
             scene_definition_code=target_scene_definition,
-            agents_code="\n\n".join(
-                [
-                    f"```python\n# {agent_module}\n\n{load_code(agent_module, None)}\n```"
-                    for agent_module in agent_modules
-                ]
-            ),
+            agents_code="\n\n".join([
+                f"```python\n# {agent_module}\n\n{load_code(agent_module, None)}\n```"
+                for agent_module in agent_modules
+            ]),
         )
 
         _finished = False
@@ -304,34 +333,46 @@ class Pipeline:
             nonlocal _finished
 
             add_and_show_message(s, user, initial_msg, False)
-            add_and_show_message(s, system, "请你首先根据 scene_definition.py 的信息，自行描述一遍完整的场景运行流程，并询问用户是否需要调整")
+            add_and_show_message(
+                s,
+                system,
+                "请你首先根据 scene_definition.py 的信息，自行描述一遍完整的场景运行流程，并询问用户是否需要调整",
+            )
             add_and_show_message(s, assistant, gen("scene_flow_desc", max_tokens=4096, temperature=0.5))
             while True:
                 add_and_show_message(s, user, input())
-                add_and_show_message(s, system, "请你根据用户的反馈判断是否需要调整场景运行流程的描述？直接回答“是”或“否”，不要说其他的话")
+                add_and_show_message(
+                    s,
+                    system,
+                    "请你根据用户的反馈判断是否需要调整场景运行流程的描述？直接回答“是”或“否”，不要说其他的话",
+                )
                 add_and_show_message(s, assistant, gen("judgement", max_tokens=2, temperature=0.0), False)
                 if "否" in s.get_var("judgement"):
                     break
-                add_and_show_message(s, system, "请你结合用户的反馈调整场景运行流程的描述，并再次询问用户是否需要进一步地调整")
+                add_and_show_message(
+                    s, system, "请你结合用户的反馈调整场景运行流程的描述，并再次询问用户是否需要进一步地调整"
+                )
                 add_and_show_message(s, assistant, gen("scene_flow_desc", max_tokens=4096, temperature=0.5))
             add_and_show_message(
                 s,
                 system,
                 f"请你根据用户指定的格式，结合上面的信息，依据用户给你的指南并参考示例代码，生成 scene.py 代码，"
-                f"直接给出代码，并在代码生成完毕后向用户征询改进建议"
+                f"直接给出代码，并在代码生成完毕后向用户征询改进建议",
             )
             add_and_show_message(s, assistant, gen("scene.py", max_tokens=4096, temperature=0.5))
             while True:
                 add_and_show_message(s, user, input())
-                add_and_show_message(s, system, "请你根据用户的反馈判断是否需要修改代码实现？直接回答“是”或“否”，不要说其他的话")
+                add_and_show_message(
+                    s, system, "请你根据用户的反馈判断是否需要修改代码实现？直接回答“是”或“否”，不要说其他的话"
+                )
                 add_and_show_message(s, assistant, gen("judgement", max_tokens=2, temperature=0.0), False)
                 if "否" in s.get_var("judgement"):
                     break
                 add_and_show_message(
                     s,
                     system,
-                    "请你结合用户的反馈修改 scene.py 代码，直接给出代码，并在代码生成完毕后再次向用户征询改进建议"
-                    )
+                    "请你结合用户的反馈修改 scene.py 代码，直接给出代码，并在代码生成完毕后再次向用户征询改进建议",
+                )
                 add_and_show_message(s, assistant, gen("scene.py", max_tokens=4096, temperature=0.5))
             extract_code_and_save(s.get_var("scene.py"), "scene", self.config.target_pkg_path)
 

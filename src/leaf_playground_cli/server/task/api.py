@@ -18,7 +18,10 @@ from pydantic import BaseModel, Field
 
 from leaf_playground._type import Singleton
 from leaf_playground.core.scene_engine import (
-    SceneEngineState, SceneObjConfig, MetricEvaluatorObjsConfig, ReporterObjConfig
+    SceneEngineState,
+    SceneObjConfig,
+    MetricEvaluatorObjsConfig,
+    ReporterObjConfig,
 )
 from leaf_playground.data.log_body import LogType
 from leaf_playground.data.socket_data import SocketData, SocketOperation
@@ -98,7 +101,7 @@ class TaskManager(Singleton):
         self,
         server_port: int = 8000,
         server_host: str = "127.0.0.1",
-        runtime_env: TaskRunTimeEnv = TaskRunTimeEnv.LOCAL
+        runtime_env: TaskRunTimeEnv = TaskRunTimeEnv.LOCAL,
     ):
         self.hub: Hub = Hub.get_instance()
         self.db: DB = DB.get_instance()
@@ -136,7 +139,7 @@ class TaskManager(Singleton):
             host=get_local_ip(),
             payload=payload.model_dump_json(by_alias=True),
             runtime_env=self.runtime_env,
-            results_dir=os.path.join(self.result_dir, tid)
+            results_dir=os.path.join(self.result_dir, tid),
         )
         self._tasks[tid] = TaskProxy(tid)
 
@@ -175,17 +178,17 @@ class TaskManager(Singleton):
 
         subprocess.Popen(
             (
-                f"docker run --rm "
+                "docker run --rm "
                 f"-p {task.port}:{task.port} "
                 f"-v {task.results_dir}:/tmp/result "
                 f"--name {container_name} "
                 f"{image_name} .leaf/app.py "
                 f"--id {task.id} "
                 f"--port {task.port} "
-                f"--host 0.0.0.0 "
+                "--host 0.0.0.0 "
                 f"--secret_key {self._tasks[task.id].secret_key} "
                 f"--server_url http://{self.server_host}:{self.server_port} "
-                f"--docker"
+                "--docker"
             ).split()
         )
         return container_name
@@ -198,7 +201,7 @@ class TaskManager(Singleton):
         if secret_key != self._tasks[task.id].secret_key:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="incorrect secret key, not allowed to update task status."
+                detail="incorrect secret key, not allowed to update task status.",
             )
         return task
 
@@ -269,12 +272,7 @@ class TaskManager(Singleton):
         await self.get_and_validate_task(task_id, secret_key)
         await self.db.update_log(log)
 
-    async def websocket_connection(
-        self,
-        task_id: str,
-        websocket: WebSocket,
-        human_id: Optional[str] = None
-    ):
+    async def websocket_connection(self, task_id: str, websocket: WebSocket, human_id: Optional[str] = None):
         async def _get_and_send_logs():
             nonlocal last_check_time
 
@@ -296,10 +294,7 @@ class TaskManager(Singleton):
                 if last_check_time is None:
                     socket_operation = SocketOperation.CREATE
                 await websocket.send_json(
-                    SocketData(
-                        data=log_data,
-                        operation=socket_operation
-                    ).model_dump(mode="json")
+                    SocketData(data=log_data, operation=socket_operation).model_dump(mode="json")
                 )
 
             if logs:
@@ -348,36 +343,23 @@ class TaskManager(Singleton):
                         return
 
     async def update_task_log_metric_record(
-        self,
-        task_id: str,
-        log_id: str,
-        agent_id: str,
-        record: LogEvalMetricRecord,
+        self, task_id: str, log_id: str, agent_id: str, record: LogEvalMetricRecord
     ):
         task = await self.get_task(task_id)
         url = f"{task.base_http_url}/logs/{log_id}/record/metric/update?agent_id={agent_id}"
 
         async with self.http_session.post(
-            url=url,
-            headers={'Content-Type': 'application/json'},
-            json=record.model_dump(mode="json", by_alias=True)
+            url=url, headers={"Content-Type": "application/json"}, json=record.model_dump(mode="json", by_alias=True)
         ) as resp:
             if resp.status != 200:
                 raise HTTPException(status_code=resp.status, detail=await resp.text())
 
-    async def update_task_log_compare_record(
-        self,
-        task_id: str,
-        log_id: str,
-        record: LogEvalCompareRecord
-    ):
+    async def update_task_log_compare_record(self, task_id: str, log_id: str, record: LogEvalCompareRecord):
         task = await self.get_task(task_id)
         url = f"{task.base_http_url}/logs/{log_id}/record/compare/update"
 
         async with self.http_session.post(
-            url=url,
-            headers={'Content-Type': 'application/json'},
-            json=record.model_dump(mode="json", by_alias=True)
+            url=url, headers={"Content-Type": "application/json"}, json=record.model_dump(mode="json", by_alias=True)
         ) as resp:
             if resp.status != 200:
                 raise HTTPException(status_code=resp.status, detail=await resp.text())
@@ -398,8 +380,7 @@ class TaskManager(Singleton):
 
 @task_router.post("/create", response_model=Task, response_model_include={"id"})
 async def create_task(
-    payload: TaskCreationPayload,
-    task_manager: TaskManager = Depends(TaskManager.get_instance)
+    payload: TaskCreationPayload, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ) -> Task:
     return await task_manager.create_task(payload)
 
@@ -431,17 +412,14 @@ async def close_task(task_id: str, task_manager: TaskManager = Depends(TaskManag
 
 @task_router.post("/{task_id}/delete")
 async def delete_task(
-    task_id: str,
-    background_tasks: BackgroundTasks,
-    task_manager: TaskManager = Depends(TaskManager.get_instance)
+    task_id: str, background_tasks: BackgroundTasks, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     background_tasks.add_task(task_manager.delete_task, task_id)
 
 
 @task_router.get("/{task_id}/agents_connected", response_class=JSONResponse)
 async def get_task_agents_connected(
-    task_id: str,
-    task_manager: TaskManager = Depends(TaskManager.get_instance)
+    task_id: str, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ) -> JSONResponse:
     return JSONResponse(content=await task_manager.get_task_agents_connected(task_id))
 
@@ -463,10 +441,7 @@ async def get_task_status(task: Task = Depends(TaskManager.http_get_task_by_id))
 
 @task_router.patch("/{task_id}/status")
 async def update_task_status(
-    task_id: str,
-    task_status: str,
-    secret_key: str,
-    task_manager: TaskManager = Depends(TaskManager.get_instance)
+    task_id: str, task_status: str, secret_key: str, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     await task_manager.update_task_status(task_id=task_id, task_status=task_status, secret_key=secret_key)
 
@@ -489,29 +464,21 @@ async def get_history_tasks(task_manager: TaskManager = Depends(TaskManager.get_
 
 @task_router.post("/{task_id}/logs/insert")
 async def insert_log(
-    task_id: str,
-    secret_key: str,
-    log: Log,
-    task_manager: TaskManager = Depends(TaskManager.get_instance)
+    task_id: str, secret_key: str, log: Log, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     await task_manager.insert_task_log(task_id, secret_key, log)
 
 
 @task_router.patch("/{task_id}/logs/update")
 async def update_log(
-    task_id: str,
-    secret_key: str,
-    log: Log,
-    task_manager: TaskManager = Depends(TaskManager.get_instance)
+    task_id: str, secret_key: str, log: Log, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     await task_manager.update_task_log(task_id, secret_key, log)
 
 
 @task_router.websocket("/{task_id}/logs/ws")
 async def stream_logs(
-    task_id: str,
-    websocket: WebSocket,
-    task_manager: TaskManager = Depends(TaskManager.get_instance),
+    task_id: str, websocket: WebSocket, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     await websocket.accept()
     await task_manager.websocket_connection(task_id, websocket)
@@ -519,10 +486,7 @@ async def stream_logs(
 
 @task_router.websocket("/{task_id}/human/{agent_id}/ws")
 async def human_connection(
-    task_id: str,
-    agent_id: str,
-    websocket: WebSocket,
-    task_manager: TaskManager = Depends(TaskManager.get_instance),
+    task_id: str, agent_id: str, websocket: WebSocket, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     await websocket.accept()
     await task_manager.websocket_connection(task_id, websocket, agent_id)
@@ -537,7 +501,7 @@ async def update_metric_record(
     log_id: str,
     agent_id: str,
     record: LogEvalMetricRecord,
-    task_manager: TaskManager = Depends(TaskManager.get_instance)
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
 ):
     await task_manager.update_task_log_metric_record(task_id, log_id, agent_id, record)
 
@@ -547,17 +511,14 @@ async def update_compare_record(
     task_id: str,
     log_id: str,
     record: LogEvalCompareRecord,
-    task_manager: TaskManager = Depends(TaskManager.get_instance)
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
 ):
     await task_manager.update_task_log_compare_record(task_id, log_id, record)
 
 
 @task_router.post("/{task_id}/messages/insert")
 async def insert_message(
-    task_id: str,
-    secret_key: str,
-    message: Message,
-    task_manager: TaskManager = Depends(TaskManager.get_instance)
+    task_id: str, secret_key: str, message: Message, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     await task_manager.insert_task_message(task_id, secret_key, message)
 

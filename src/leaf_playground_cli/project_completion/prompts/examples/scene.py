@@ -19,18 +19,11 @@ class MmluSceneLogBody(ActionLogBody):
 
 
 MmluSceneConfig = SceneConfig.create_config_model(
-    SCENE_DEFINITION,
-    additional_config_fields={
-        "dataset_config": (DatasetConfig, Field(default=...))
-    }
+    SCENE_DEFINITION, additional_config_fields={"dataset_config": (DatasetConfig, Field(default=...))}
 )
 
 
-class MmluScene(
-    Scene,
-    scene_definition=SCENE_DEFINITION,
-    log_body_class=MmluSceneLogBody
-):
+class MmluScene(Scene, scene_definition=SCENE_DEFINITION, log_body_class=MmluSceneLogBody):
     config_cls = MmluSceneConfig
     config: config_cls
 
@@ -51,7 +44,7 @@ class MmluScene(
                     sender=examinee.profile,
                     receivers=[self.examiner.profile],
                     content=Text(text=""),
-                    sample_id=s.sample_id
+                    sample_id=s.sample_id,
                 )
             self.message_pool.put_message(answer)
             ground_truth = self.examiner.get_golden_answer(s.sample_id)
@@ -60,7 +53,7 @@ class MmluScene(
                 response=answer.id,
                 ground_truth=Text(text=ground_truth) if ground_truth else None,
                 log_msg=f"examinee [{examinee.name}] answers to sample [{s.sample_id}]",
-                action_belonged_chain=examinee.role_definition.get_action_definition("answer").belonged_chain
+                action_belonged_chain=examinee.role_definition.get_action_definition("answer").belonged_chain,
             )
             self.logger.add_log(log)
             self.notify_evaluators_record(log)
@@ -79,16 +72,11 @@ class MmluScene(
                     log_msg=f"examiner sends sample [{sample.sample_id}] to all examinees",
                     action_belonged_chain=self.examiner.role_definition.get_action_definition(
                         "send_sample"
-                    ).belonged_chain
+                    ).belonged_chain,
                 )
             )
 
-            await asyncio.gather(
-                *[examinee_answer(examinee, sample) for examinee in self.examinees]
-            )
+            await asyncio.gather(*[examinee_answer(examinee, sample) for examinee in self.examinees])
 
 
-__all__ = [
-    "MmluSceneConfig",
-    "MmluScene"
-]
+__all__ = ["MmluSceneConfig", "MmluScene"]

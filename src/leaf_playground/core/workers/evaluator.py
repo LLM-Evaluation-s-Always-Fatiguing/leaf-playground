@@ -46,14 +46,14 @@ _MetricRecordValue = Any
 
 class MetricEvaluatorProxy(Process):
     def __init__(
-            self,
-            config_cls: Type["MetricEvaluatorConfig"],
-            config_data: dict,
-            record_metrics: List[_MetricName],
-            compare_metrics: List[_MetricName],
-            manager: Manager,
-            queue: multiprocessing.Queue,
-            result_cache: dict,
+        self,
+        config_cls: Type["MetricEvaluatorConfig"],
+        config_data: dict,
+        record_metrics: List[_MetricName],
+        compare_metrics: List[_MetricName],
+        manager: Manager,
+        queue: multiprocessing.Queue,
+        result_cache: dict,
     ):
         super().__init__(daemon=True)
 
@@ -149,13 +149,13 @@ class MetricEvaluatorProxy(Process):
 
 class MetricEvaluatorMetaClass(ABCMeta):
     def __new__(
-            cls,
-            name,
-            bases,
-            attrs,
-            *,
-            metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
-            cls_description: str = None,
+        cls,
+        name,
+        bases,
+        attrs,
+        *,
+        metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
+        cls_description: str = None,
     ):
         # create proxy class on the fly
         evaluator_proxy_class = new_class(
@@ -222,13 +222,13 @@ class MetricEvaluatorMetaClass(ABCMeta):
         return new_cls
 
     def __init__(
-            cls,
-            name,
-            bases,
-            attrs,
-            *,
-            metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
-            cls_description: str = None,
+        cls,
+        name,
+        bases,
+        attrs,
+        *,
+        metric_definitions: List[Union[CompareMetricDefinition, MetricDefinition]] = None,
+        cls_description: str = None,
     ):
         super().__init__(name, bases, attrs)
 
@@ -279,11 +279,11 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     obj_for_import: DynamicObject
 
     def __init__(
-            self,
-            config: config_cls,
-            scene_config: SceneConfig,
-            logger: Logger,
-            reporter: "leaf_playground.core.workers.MetricReporter",
+        self,
+        config: config_cls,
+        scene_config: SceneConfig,
+        logger: Logger,
+        reporter: "leaf_playground.core.workers.MetricReporter",
     ):
         super().__init__(config=config)
 
@@ -337,23 +337,21 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     @staticmethod
     @abstractmethod
     def _init_evaluator(
-            config: MetricEvaluatorConfig, record_metrics: List[_MetricName], compare_metrics: List[_MetricName]
+        config: MetricEvaluatorConfig, record_metrics: List[_MetricName], compare_metrics: List[_MetricName]
     ) -> Any:
         pass
 
     @staticmethod
     @abstractmethod
     async def _record(
-            response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any,
-            **kwargs
+        response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any, **kwargs
     ) -> Dict[_MetricName, RecordOutput]:
         pass
 
     @staticmethod
     @abstractmethod
     async def _compare(
-            response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any,
-            **kwargs
+        response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any, **kwargs
     ) -> Dict[_MetricName, CompareOutput]:
         pass
 
@@ -404,16 +402,14 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
                 "human_compare_records",
             },
         )
-        self.queue.put_nowait(
-            (
-                pickle.dumps(response),
-                pickle.dumps(references),
-                pickle.dumps(log.ground_truth),
-                pickle.dumps(kwargs),
-                is_compare,
-                id_,
-            )
-        )
+        self.queue.put_nowait((
+            pickle.dumps(response),
+            pickle.dumps(references),
+            pickle.dumps(log.ground_truth),
+            pickle.dumps(kwargs),
+            is_compare,
+            id_,
+        ))
         while id_ not in self.result_cache:
             await asyncio.sleep(0.1)  # sleep longer to let scene's main process have more CPU time slice
         return {k: (CompareOutput if is_compare else RecordOutput)(**v) for k, v in self.result_cache.pop(id_).items()}
