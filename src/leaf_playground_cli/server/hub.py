@@ -83,9 +83,7 @@ class Project(BaseModel):
         self.dockerfile = self._get_dockerfile()
 
     def update_config(self):
-        with open(
-            os.path.join(self.work_dir, ".leaf", "project_config.json"), "r", encoding="utf-8"
-        ) as f:
+        with open(os.path.join(self.work_dir, ".leaf", "project_config.json"), "r", encoding="utf-8") as f:
             proj_config = json.load(f)
         for k, v in proj_config.items():
             if k in self.model_fields_set:
@@ -125,9 +123,7 @@ class Hub(Singleton):
 
             if os.path.exists(os.path.join(hub_dir, ".leaf")):
                 work_dir = hub_dir
-                with open(
-                    os.path.join(work_dir, ".leaf", "project_config.json"), "r", encoding="utf-8"
-                ) as f:
+                with open(os.path.join(work_dir, ".leaf", "project_config.json"), "r", encoding="utf-8") as f:
                     try:
                         project = Project(**json.load(f), work_dir=work_dir)
                     except:
@@ -209,16 +205,14 @@ async def get_project_dockerfile(project: Project = Depends(Hub.http_get_project
 def validate_file_path(file_path: str):
     if file_path.startswith(".") and not file_path.startswith("./"):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="relevant path must starts with './'"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="relevant path must starts with './'"
         )
     return file_path
 
 
 @hub_router.get("/{project_id}/assets/download_image", response_class=JSONResponse)
 async def get_project_image_asset(
-    project: Project = Depends(Hub.http_get_project_by_id),
-    file_path: str = Depends(validate_file_path),
+    project: Project = Depends(Hub.http_get_project_by_id), file_path: str = Depends(validate_file_path)
 ) -> JSONResponse:
     """
     retrieve a project's image asset by giving project_id and file_path, support both local path and http url,
@@ -231,8 +225,7 @@ async def get_project_image_asset(
                     image_data = await response.read()
                 else:
                     raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"can't connect to URL [{file_path}]."
+                        status_code=status.HTTP_404_NOT_FOUND, detail=f"can't connect to URL [{file_path}]."
                     )
     else:
         if file_path.startswith("."):

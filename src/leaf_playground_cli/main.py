@@ -46,7 +46,7 @@ def create_new_project(name: Annotated[str, typer.Argument(metavar="project_name
             "project_name_camel_case": "".join([each.capitalize() for each in project_name.split("_")]),
             "leaf_version": leaf_version,
             "created_at": created,
-            "last_update": created
+            "last_update": created,
         },
         no_input=True,
     )
@@ -72,7 +72,7 @@ def complete_project(
         openai_api_key=api_key,
         definition_completion=not disable_definition_completion,
         agent_completion=not disable_agent_completion,
-        scene_completion=not disable_scene_completion
+        scene_completion=not disable_scene_completion,
     )
     pipeline = Pipeline(config)
     pipeline.run()
@@ -99,12 +99,12 @@ def update_project_structure(target: Annotated[str, typer.Argument(metavar="targ
             "project_name_camel_case": "".join([each.capitalize() for each in project_name.split("_")]),
             "leaf_version": leaf_version,
             "created_at": created_at,
-            "last_update": last_update
+            "last_update": last_update,
         },
         no_input=True,
         overwrite_if_exists=True,
         skip_if_file_exists=True,
-        keep_project_on_failure=True
+        keep_project_on_failure=True,
     )
 
     # TODO: update project_config if there is update on field level
@@ -309,7 +309,7 @@ def start_server(
             hub_dir=Path(hub_dir),
             server_port=port,
             server_host=get_local_ip(),
-            runtime_env=TaskRunTimeEnv[runtime_env.upper()]
+            runtime_env=TaskRunTimeEnv[runtime_env.upper()],
         )
     )
 

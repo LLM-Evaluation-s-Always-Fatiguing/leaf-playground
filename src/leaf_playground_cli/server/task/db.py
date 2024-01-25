@@ -50,11 +50,7 @@ class DB(Singleton):
                 succeed = False
         return 200 if succeed else 500
 
-    async def _update(
-        self,
-        obj_getter: Callable[[AsyncSession], Any],
-        **kwargs
-    ) -> int:
+    async def _update(self, obj_getter: Callable[[AsyncSession], Any], **kwargs) -> int:
         async with AsyncSession(self.engine) as session:
             obj = await run_asynchronously(obj_getter, session)
             if not obj:
@@ -92,7 +88,7 @@ class DB(Singleton):
         if status_code == 500:
             raise HTTPException(
                 status_code=500,
-                detail=f"task [{tid}] update succeeded but session commit failed, maybe try again later"
+                detail=f"task [{tid}] update succeeded but session commit failed, maybe try again later",
             )
 
     async def get_task(self, tid: str) -> Task:
@@ -104,7 +100,9 @@ class DB(Singleton):
 
     async def get_task_by_life_cycle(self, life_cycle: TaskDBLifeCycle) -> List[Task]:
         async with AsyncSession(self.engine) as session:
-            tasks = (await session.execute(select(TaskTable).where(TaskTable.live_cycle == life_cycle))).scalars().all()
+            tasks = (
+                (await session.execute(select(TaskTable).where(TaskTable.live_cycle == life_cycle))).scalars().all()
+            )
         if not tasks:
             return []
         return [task.to_task() for task in tasks]
@@ -195,7 +193,7 @@ class DB(Singleton):
         if status_code == 500:
             raise HTTPException(
                 status_code=500,
-                detail=f"log [{log_id}] update succeeded but session commit failed, maybe try again later"
+                detail=f"log [{log_id}] update succeeded but session commit failed, maybe try again later",
             )
 
     async def get_log_by_id(self, log_id: str) -> Log:
@@ -206,19 +204,13 @@ class DB(Singleton):
         return log.to_log()
 
     async def get_logs_by_tid_with_update_time_constraint(
-        self,
-        tid: str,
-        last_checked_dt: Optional[datetime] = None
+        self, tid: str, last_checked_dt: Optional[datetime] = None
     ) -> List[Log]:
         if not last_checked_dt:
             statement: Select = select(LogTable).where(LogTable.tid == tid)
         else:
-            statement: Select = select(LogTable).where(
-                LogTable.tid == tid, LogTable.db_last_update > last_checked_dt
-            )
-        statement = statement.order_by(
-            LogTable.db_last_update if last_checked_dt is not None else LogTable.created_at
-        )
+            statement: Select = select(LogTable).where(LogTable.tid == tid, LogTable.db_last_update > last_checked_dt)
+        statement = statement.order_by(LogTable.db_last_update if last_checked_dt is not None else LogTable.created_at)
         async with AsyncSession(self.engine) as session:
             logs = (await session.execute(statement)).scalars().all()
         if not logs:

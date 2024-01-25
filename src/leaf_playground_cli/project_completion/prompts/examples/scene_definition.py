@@ -43,29 +43,19 @@ SCENE_DEFINITION = SceneDefinition(
                     name="prepare_samples",
                     description="prepare samples based on dataset config.",
                     signature=ActionSignatureDefinition(
-                        parameters=[
-                            ActionSignatureParameterDefinition(
-                                name="ds_config",
-                                annotation=DatasetConfig
-                            )
-                        ],
-                        return_annotation=None
-                    )
+                        parameters=[ActionSignatureParameterDefinition(name="ds_config", annotation=DatasetConfig)],
+                        return_annotation=None,
+                    ),
                 ),
                 ActionDefinition(
                     name="send_sample",
                     description="pick one sample and broadcast to all examinees.",
                     signature=ActionSignatureDefinition(
-                        parameters=[
-                            ActionSignatureParameterDefinition(
-                                name="receivers",
-                                annotation=List[Profile]
-                            )
-                        ],
-                        return_annotation=ExaminerSample
-                    )
-                )
-            ]
+                        parameters=[ActionSignatureParameterDefinition(name="receivers", annotation=List[Profile])],
+                        return_annotation=ExaminerSample,
+                    ),
+                ),
+            ],
         ),
         RoleDefinition(
             name="examinee",
@@ -78,17 +68,11 @@ SCENE_DEFINITION = SceneDefinition(
                     description="answering the question sent by examiner",
                     signature=ActionSignatureDefinition(
                         parameters=[
-                            ActionSignatureParameterDefinition(
-                                name="sample",
-                                annotation=ExaminerSample
-                            ),
-                            ActionSignatureParameterDefinition(
-                                name="examiner",
-                                annotation=Profile
-                            )
+                            ActionSignatureParameterDefinition(name="sample", annotation=ExaminerSample),
+                            ActionSignatureParameterDefinition(name="examiner", annotation=Profile),
                         ],
                         return_annotation=ExamineeAnswer,
-                        is_static_method=False
+                        is_static_method=False,
                     ),
                     metrics=[
                         MetricDefinition(
@@ -98,19 +82,14 @@ SCENE_DEFINITION = SceneDefinition(
                             record_display_type=DisplayType.BOOLEAN_RADIO,
                             expect_resp_msg_type=ExamineeAnswer,
                             agg_method=DynamicAggregationFn.create_dynamic_fn(fn=accuracy_fn),
-                            is_comparison=False
+                            is_comparison=False,
                         )
                     ],
                 )
-            ]
-        )
+            ],
+        ),
     ],
-    env_vars=[]
+    env_vars=[],
 )
 
-__all__ = [
-    "ExaminerSample",
-    "ExamineeAnswer",
-    "MessageType",
-    "SCENE_DEFINITION"
-]
+__all__ = ["ExaminerSample", "ExamineeAnswer", "MessageType", "SCENE_DEFINITION"]
