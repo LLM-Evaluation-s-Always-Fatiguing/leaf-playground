@@ -32,4 +32,12 @@ def get_static_dir(current: str, max_layers: Optional[int] = None):
     return static_dir
 
 
-__all__ = ["get_project_root_path", "get_static_dir"]
+def get_dataset_dir(current: str, max_layers: Optional[int] = None):
+    root_dir = get_project_root_path(current, max_layers)
+    static_dir = join(root_dir, "dataset")
+    if not exists(static_dir):
+        raise DirNotFoundError(f"static dir not found in project {root_dir}")
+    return static_dir
+
+
+__all__ = ["get_project_root_path", "get_static_dir", "get_dataset_dir"]
