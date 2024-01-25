@@ -168,13 +168,13 @@ class TaskManager(Singleton):
 
     def _create_task_in_docker(self, task: Task):
         container_name = f"leaf-scene-{task.id}"
-        image_name = f"leaf-scene-{self.hub.get_project(json.loads(task.payload)['project_id']).name}"
-        work_dir = "/app"
+        project = self.hub.get_project(json.loads(task.payload)['project_id'])
+        image_name = f"leaf-scene-{project.name}"
 
         image_check = subprocess.run(f"docker images -q {image_name}", shell=True, capture_output=True, text=True)
         if not image_check.stdout.strip():
             print("Image not found, building Docker image...")
-            subprocess.run(f"cd {work_dir} && docker build . -t {image_name}", shell=True)
+            subprocess.run(f"cd {project.work_dir} && docker build . -t {image_name}", shell=True)
 
         subprocess.Popen(
             (
