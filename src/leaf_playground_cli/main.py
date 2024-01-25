@@ -1,9 +1,6 @@
 import json
 import os
 import re
-
-import click
-import requests
 import shutil
 import subprocess
 import sys
@@ -11,16 +8,18 @@ import zipfile
 from abc import ABC
 from collections import defaultdict
 from datetime import datetime
-from packaging import version
 from pathlib import Path
 from typing import List, Optional, Type
-from typing_extensions import Annotated
 from urllib.request import urlopen
 from uuid import uuid4
 
+import click
+import requests
 import typer
 from cookiecutter.main import cookiecutter
+from packaging import version
 from rich.progress import wrap_file
+from typing_extensions import Annotated
 
 from leaf_playground import __version__ as leaf_version
 from leaf_playground.core.scene import Scene
@@ -218,29 +217,48 @@ def publish_project(
     raise typer.Exit()
 
 
-__web_ui_version__ = "v0.4.0"
 __web_ui_release_site__ = (
     "https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-webui/releases/download"
 )
-__web_ui_download_url__ = __web_ui_release_site__ + f"/{__web_ui_version__}/webui-{__web_ui_version__}.zip"
-__web_ui_hash_url__ = __web_ui_release_site__ + f"/{__web_ui_version__}/webui-{__web_ui_version__}.zip.sha256"
+__web_ui_release_list_url__ = (
+    "https://api.github.com/repos/LLM-Evaluation-s-Always-Fatiguing/leaf-playground-webui/releases?per_page=100"
+)
 
 
-def download_web_ui() -> str:
+def get_latest_webui_releases(cli_version_str: str):
+    # cli_version like "0.4.0", try to get the latest web ui version starting with "v0.4."
+    cli_version = version.parse(cli_version_str)
+    webui_version_prefix = f"v{cli_version.major}.{cli_version.minor}."
+
+    response = requests.get(__web_ui_release_list_url__)
+    releases = response.json()
+    for release in releases:
+        if release["tag_name"].startswith(webui_version_prefix):
+            return release["tag_name"]
+
+    raise ValueError(f"can't find any web ui release version starts with {webui_version_prefix}")
+
+
+def download_web_ui(cli_version: str) -> str:
     leaf_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".leaf_workspace")
     tmp_dir = os.path.join(leaf_dir, "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
     web_ui_dir = os.path.join(leaf_dir, "web_ui")
     os.makedirs(web_ui_dir, exist_ok=True)
 
-    web_ui_file_name = os.path.split(__web_ui_download_url__)[-1]
-    web_ui_hash_file_name = os.path.split(__web_ui_hash_url__)[-1]
+    latest_web_ui_version = get_latest_webui_releases(cli_version)
+
+    web_ui_download_url = __web_ui_release_site__ + f"/{latest_web_ui_version}/webui-{latest_web_ui_version}.zip"
+    web_ui_hash_url = __web_ui_release_site__ + f"/{latest_web_ui_version}/webui-{latest_web_ui_version}.zip.sha256"
+
+    web_ui_file_name = os.path.split(web_ui_download_url)[-1]
+    web_ui_hash_file_name = os.path.split(web_ui_hash_url)[-1]
 
     web_ui_save_dir = os.path.join(web_ui_dir, os.path.splitext(web_ui_file_name)[0])
     web_ui_file_save_path = os.path.join(tmp_dir, web_ui_file_name)
 
     # check hash is the same
-    remote_hash = requests.get(__web_ui_hash_url__).content.decode(encoding="utf-8")
+    remote_hash = requests.get(web_ui_hash_url).content.decode(encoding="utf-8")
     local_hash_save_path = os.path.join(web_ui_dir, web_ui_hash_file_name)
     if os.path.exists(local_hash_save_path):
         with open(local_hash_save_path, "r", encoding="utf-8") as f:
@@ -254,7 +272,7 @@ def download_web_ui() -> str:
     if os.path.exists(web_ui_save_dir):
         shutil.rmtree(web_ui_save_dir)
     try:
-        response = urlopen(__web_ui_download_url__)
+        response = urlopen(web_ui_download_url)
         size = int(response.headers["Content-Length"])
         with open(web_ui_file_save_path, "wb") as local_file:
             with wrap_file(response, size, description="download web ui...") as remote_file:
@@ -289,7 +307,7 @@ def start_server(
         if web_ui_dir and not os.path.isdir(web_ui_dir):
             raise typer.BadParameter("value of argument '--web_ui' must be a local existed directory")
         if not web_ui_dir:
-            web_ui_dir = download_web_ui()
+            web_ui_dir = download_web_ui(leaf_version)
         server_url = f"http://127.0.0.1:{port}"
         subprocess.Popen(f"node {os.path.join(web_ui_dir, 'start.js')} --port={ui_port} --server={server_url}".split())
 
@@ -327,7 +345,7 @@ def get_version():
 
 @app.command(name="web-ui-version", help="bounded web ui version currently installed leaf-playground framework uses")
 def get_web_ui_version():
-    print(__web_ui_version__)
+    print(get_latest_webui_releases(leaf_version))
 
 
 # TODO: add command to migrate database using Alembic
