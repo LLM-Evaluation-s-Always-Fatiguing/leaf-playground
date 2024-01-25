@@ -46,7 +46,7 @@ class MetricEvaluatorObjConfig(_Config):
     evaluator_obj: DynamicObject = Field(default=...)
 
     def initialize_evaluator(
-        self, scene_config: SceneConfig, logger: Logger, reporter: MetricReporter
+            self, scene_config: SceneConfig, logger: Logger, reporter: MetricReporter
     ) -> MetricEvaluator:
         evaluator_cls: Type[MetricEvaluator] = dynamically_import_obj(self.evaluator_obj)
         evaluator_config_cls: Type[MetricEvaluatorConfig] = evaluator_cls.config_cls
@@ -62,7 +62,7 @@ class MetricEvaluatorObjsConfig(_Config):
     evaluators: List[MetricEvaluatorObjConfig] = Field(default=[])
 
     def initialize_evaluators(
-        self, scene_config: SceneConfig, logger: Logger, reporter: MetricReporter
+            self, scene_config: SceneConfig, logger: Logger, reporter: MetricReporter
     ) -> List[MetricEvaluator]:
         return [
             evaluator_obj_config.initialize_evaluator(scene_config=scene_config, logger=logger, reporter=reporter)
@@ -97,13 +97,13 @@ class SceneEngine(Singleton):
     state = SceneEngineStateProxy()
 
     def __init__(
-        self,
-        scene_config: SceneObjConfig,
-        evaluators_config: MetricEvaluatorObjsConfig,
-        reporter_config: ReporterObjConfig,
-        results_dir: str,
-        state_change_callbacks: List[Callable] = [],
-        log_handlers: Optional[List[LogHandler]] = None
+            self,
+            scene_config: SceneObjConfig,
+            evaluators_config: MetricEvaluatorObjsConfig,
+            reporter_config: ReporterObjConfig,
+            results_dir: str,
+            state_change_callbacks: List[Callable] = [],
+            log_handlers: Optional[List[LogHandler]] = None
     ):
         self._state_change_callbacks = state_change_callbacks
         self.state = SceneEngineState.PENDING
@@ -205,7 +205,7 @@ class SceneEngine(Singleton):
             raise ValueError(f"invalid mode {mode}")
 
     def get_evaluator_configs(
-        self, mode: Literal["pydantic", "dict", "json"] = "dict"
+            self, mode: Literal["pydantic", "dict", "json"] = "dict"
     ) -> Union[List[MetricEvaluatorConfig], List[dict], str]:
         if mode == "pydantic":
             return [evaluator.config for evaluator in self.evaluators]
@@ -252,6 +252,14 @@ class SceneEngine(Singleton):
                     else data.model_dump(mode="json")
                 )
                 for name, data in metrics_data["human_metrics"].items()
+            },
+            "merged_metrics": {
+                name: (
+                    [each.model_dump(mode="json") for each in data]
+                    if isinstance(data, list)
+                    else data.model_dump(mode="json")
+                )
+                for name, data in metrics_data["merged_metrics"].items()
             },
         }
         with open(join(save_dir, "metrics.json"), "w", encoding="utf-8") as f:
