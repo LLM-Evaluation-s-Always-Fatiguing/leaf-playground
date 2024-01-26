@@ -152,13 +152,13 @@ class Hub(Singleton):
             if not os.path.exists(resource_dir):
                 return
 
-            new_mounted_path.append(resource_dir)
+            new_mounted_path.append(route_path)
             if route_path in mounted_path:
                 route_idx = root_app.routes.index(mounted_routes[mounted_path.index(route_path)])
                 del root_app.routes[route_idx]
             root_app.mount(
                 route_path,
-                StaticFiles(directory=os.path.join(proj.work_dir, "static")),
+                StaticFiles(directory=resource_dir),
                 name=name,
             )
 
