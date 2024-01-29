@@ -5,10 +5,11 @@ from typing import List
 
 from sqlmodel import SQLModel, Field, Column, Relationship, DateTime, JSON
 
+from leaf_playground import __version__ as leaf_version
 from leaf_playground.core.scene_engine import SceneEngineState
-from leaf_playground.data.log_body import LogBody, LogType, ActionLogBody, SystemLogBody
+from leaf_playground.data.log_body import LogBody, LogType
 from leaf_playground.data.message import Message as LEAFMessage
-from leaf_playground.utils.import_util import dynamically_import_obj, DynamicObject
+from leaf_playground.utils.import_util import DynamicObject
 
 
 class TaskRunTimeEnv(Enum):
@@ -24,6 +25,8 @@ class TaskDBLifeCycle(Enum):
 class Task(SQLModel):
     id: str = Field(default=...)
     project_id: str = Field(default=...)
+    project_version: str = Field(default=...)
+    leaf_version: str = Field(default=leaf_version)
     port: int = Field(default=...)
     host: str = Field(default="http://127.0.0.1")
     payload: str = Field(default=...)
