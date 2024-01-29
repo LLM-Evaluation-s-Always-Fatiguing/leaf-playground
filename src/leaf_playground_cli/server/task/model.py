@@ -52,6 +52,7 @@ class TaskTable(Task, table=True):
 
     logs: List["LogTable"] = Relationship(back_populates="task")
     messages: List["MessageTable"] = Relationship(back_populates="task")
+    task_results: "TaskResultsTable" = Relationship(back_populates="task")
 
     live_cycle: TaskDBLifeCycle = Field(default=TaskDBLifeCycle.LIVING)
 
@@ -61,6 +62,35 @@ class TaskTable(Task, table=True):
     @classmethod
     def from_task(cls, task: Task) -> "TaskTable":
         return cls(**task.model_dump())
+
+
+class TaskResults(SQLModel):
+    __tablename__ = "task_results"
+
+    id: str = Field(default=...)
+    scene_config: dict = Field(default=...)
+    evaluator_configs: list = Field(default=...)
+    metrics: dict = Field(default=...)
+    charts: dict = Field(default=...)
+    logs: dict = Field(default=...)
+
+
+class TaskResultsTable(TaskResults, table=True):
+    id: str = Field(default=..., primary_key=True, foreign_key="task.id", index=True)
+    scene_config: dict = Field(default=..., sa_column=Column(JSON))
+    evaluator_configs: list = Field(default=..., sa_column=Column(JSON))
+    metrics: dict = Field(default=..., sa_column=Column(JSON))
+    charts: dict = Field(default=..., sa_column=Column(JSON))
+    logs: dict = Field(default=..., sa_column=Column(JSON))
+
+    task: TaskTable = Relationship(back_populates="task_results")
+
+    def to_task_results(self) -> TaskResults:
+        return TaskResults(**self.model_dump())
+
+    @classmethod
+    def from_task_results(cls, task_results: TaskResults) -> "TaskResultsTable":
+        return cls(**task_results.model_dump())
 
 
 class Log(SQLModel):
@@ -140,4 +170,15 @@ class MessageTable(Message, table=True):
         return cls(**message.model_dump())
 
 
-__all__ = ["TaskRunTimeEnv", "TaskDBLifeCycle", "Task", "TaskTable", "Log", "LogTable", "Message", "MessageTable"]
+__all__ = [
+    "TaskRunTimeEnv",
+    "TaskDBLifeCycle",
+    "Task",
+    "TaskTable",
+    "TaskResults",
+    "TaskResultsTable",
+    "Log",
+    "LogTable",
+    "Message",
+    "MessageTable"
+]

@@ -3,7 +3,7 @@ import json
 import warnings
 import os
 from abc import abstractmethod
-from typing import Dict, List, Literal, Any
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -81,7 +81,7 @@ class LogExporter(BaseModel):
         if self.extension not in ["json", "jsonl", "csv"]:
             raise NotImplementedError(f"file extension {self.extension} isn't support yet.")
 
-    def _export_to_json(self, logger: Logger, save_path: str):
+    def _export_to_json(self, logger: Logger) -> Union[List[dict], dict]:
         logs = []
         for log in logger.logs:
             log_dict = log.model_dump(mode="json")
@@ -95,27 +95,12 @@ class LogExporter(BaseModel):
                 log_dict["response"] = logger.message_pool.get_message_by_id(log.response).model_dump(mode="json")
             logs.append(log_dict)
 
-        with open(save_path, "w", encoding="utf-8") as f:
-            json.dump(logs, f, indent=4, ensure_ascii=False)
+        return logs
 
-    def _export_to_jsonl(self, logger: Logger, save_path: str):
-        with open(save_path, "w", encoding="utf-8") as f:
-            for log in logger.logs:
-                log_dict = log.model_dump(mode="json")
-                if isinstance(log, ActionLogBody):
-                    if log.references is not None:
-                        log_dict["references"] = (
-                            [
-                                logger.message_pool.get_message_by_id(ref).model_dump(mode="json")
-                                for ref in log.references
-                            ]
-                            if log.references
-                            else None
-                        )
-                    log_dict["response"] = logger.message_pool.get_message_by_id(log.response).model_dump(mode="json")
-                f.write(json.dumps(log_dict) + "\n")
+    def _export_to_jsonl(self, logger: Logger) -> List[dict]:
+        return self._export_to_json(logger)
 
-    def _export_to_csv(self, logger: Logger, save_path: str):
+    def _export_to_csv(self, logger: Logger) -> dict:
         data = {"log_id": [], "sender": [], "receivers": [], "message": []}
         for log in [log for log in logger.logs if isinstance(log, ActionLogBody)]:
             response = logger.message_pool.get_message_by_id(log.response)
@@ -123,17 +108,29 @@ class LogExporter(BaseModel):
             data["sender"].append(response.sender_name)
             data["receivers"].append([receiver.name for receiver in response.receivers])
             data["message"].append(response.content.display_text)
-        pd.DataFrame(data).to_csv(save_path, encoding="utf-8", index=False)
+        return data
 
-    def export(self, logger: Logger, save_dir: str):
-        save_path = os.path.join(save_dir, f"{self.file_name}.{self.extension}")
+    def export(self, logger: Logger, save_dir: Optional[str] = None) -> Optional[Union[dict, List[dict]]]:
         func_name = f"_export_to_{self.extension}"
         try:
-            getattr(self, func_name)(logger, save_path)
+            logs = getattr(self, func_name)(logger)
         except:
-            if os.path.exists(save_path):
-                os.remove(save_path)
             warnings.warn(f"{self.__class__.__name__}.{func_name} export log failed.")
+            return None
+        else:
+            if not save_dir:
+                return logs
+            save_path = os.path.join(save_dir, f"{self.file_name}.{self.extension}")
+            if self.extension == "csv":
+                pd.DataFrame(logs).to_csv(save_path, encoding="utf-8", index=False)
+            elif self.extension == "json":
+                with open(save_path, "w", encoding="utf-8") as f:
+                    json.dump(logs, f, indent=4, ensure_ascii=False)
+            else:
+                with open(save_path, "w", encoding="utf-8") as f:
+                    for log in logs:
+                        f.write(json.dumps(log) + "\n")
+            return logs
 
 
 class _KeptLogExporter(LogExporter):
