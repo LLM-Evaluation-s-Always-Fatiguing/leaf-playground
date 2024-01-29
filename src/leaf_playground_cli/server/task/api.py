@@ -6,6 +6,7 @@ import random
 import subprocess
 import sys
 import traceback
+from packaging import version
 
 import pandas as pd
 import websockets
@@ -20,6 +21,7 @@ from fastapi import status, APIRouter, BackgroundTasks, Depends, WebSocket, WebS
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from leaf_playground import __version__ as leaf_version
 from leaf_playground._type import Singleton
 from leaf_playground.core.scene_engine import (
     SceneEngineState,
@@ -140,11 +142,24 @@ class TaskManager(Singleton):
         with self._port_lock:
             self._task_ports.add(port)
 
+    def _check_version_compatible(self, origin: str, current: str):
+        origin_version = version.Version(origin)
+        current_version = version.Version(current)
+        return origin_version.major == current_version.major and origin_version.minor == current_version.minor
+
     async def create_task(self, payload: TaskCreationPayload) -> Task:
         tid = f"task_{payload.project_id}_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
+        project = self.hub.get_project(payload.project_id)
+        if not self._check_version_compatible(project.leaf_version, leaf_version):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"project [{project.id}]'s leaf_version [{project.leaf_version}] "
+                       f"not compatible with current leaf_version [{leaf_version}]"
+            )
         task = Task(
             id=tid,
             project_id=payload.project_id,
+            project_version=project.version,
             port=self.acquire_port(),
             host=get_local_ip(),
             payload=payload.model_dump_json(by_alias=True),
