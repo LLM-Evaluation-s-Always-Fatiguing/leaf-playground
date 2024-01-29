@@ -33,6 +33,8 @@ torch = "^2.0.0"
 transformers = {extras = ["agent"], version = "^4.36.2"}
 sentencepiece = "^0.1.99"
 accelerate = "^0.25.0"
+# postgre extra
+asyncpg = "^0.29.0"
 
 [tool.poetry.extras]
 transformers = ["torch", "transformers", "sentencepiece", "accelerate"]

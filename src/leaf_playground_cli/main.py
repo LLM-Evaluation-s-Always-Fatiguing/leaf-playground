@@ -295,13 +295,15 @@ def download_web_ui(cli_version: str) -> str:
 
 @app.command(name="start-server", help="start a leaf-playground server, will firstly download WEB UI if necessary.")
 def start_server(
-    hub_dir: Annotated[str, typer.Option("--hub")] = os.getcwd(),
-    port: Annotated[int, typer.Option("--port")] = 8000,
-    ui_port: Annotated[int, typer.Option(default="--ui_port")] = 3000,
-    dev_dir: Annotated[Optional[str], typer.Option("--dev_dir")] = None,
-    web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None,
-    no_web_ui: Annotated[Optional[bool], typer.Option("--no_web_ui")] = False,
-    runtime_env: Annotated[str, typer.Option("--runtime_env", click_type=click.Choice(["local", "docker"]))] = "local",
+    hub_dir: Annotated[str, typer.Option()] = os.getcwd(),
+    port: Annotated[int, typer.Option()] = 8000,
+    ui_port: Annotated[int, typer.Option()] = 3000,
+    dev_dir: Annotated[Optional[str], typer.Option()] = None,
+    web_ui_dir: Annotated[Optional[str], typer.Option()] = None,
+    no_web_ui: Annotated[Optional[bool], typer.Option()] = False,
+    runtime_env: Annotated[str, typer.Option(click_type=click.Choice(["local", "docker"]))] = "local",
+    db_type: Annotated[str, typer.Option(click_type=click.Choice(["sqlite", "postgresql"]))] = "sqlite",
+    db_url: Annotated[Optional[str], typer.Option()] = None,
 ):
     if not no_web_ui:
         if web_ui_dir and not os.path.isdir(web_ui_dir):
@@ -317,6 +319,7 @@ def start_server(
 
     from .server.app import config_server, AppConfig
     from .server.utils import get_local_ip
+    from .server.task.db import DBType
     from .server.task.model import TaskRunTimeEnv
 
     if not os.path.exists(hub_dir):
@@ -328,6 +331,8 @@ def start_server(
             server_port=port,
             server_host=get_local_ip(),
             runtime_env=TaskRunTimeEnv[runtime_env.upper()],
+            db_type=DBType.SQLite if db_type == "sqlite" else DBType.PostgreSQL,
+            db_url=db_url,
         )
     )
 

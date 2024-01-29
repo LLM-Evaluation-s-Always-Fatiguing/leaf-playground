@@ -1,6 +1,6 @@
 import os.path
 from contextlib import asynccontextmanager
-from typing import Literal
+from typing import Literal, Optional, Any
 
 from fastapi import FastAPI, Depends
 from fastapi.responses import JSONResponse
@@ -18,6 +18,8 @@ class AppConfig(BaseModel):
     server_port: int = Field(default=...)
     server_host: str = Field(default=...)
     runtime_env: TaskRunTimeEnv = Field(default=...)
+    db_type: DBType = Field(default=DBType.SQLite)
+    db_url: Optional[str] = Field(default=None)
 
 
 class AppInfo(BaseModel):
@@ -40,10 +42,17 @@ def config_server(config: AppConfig):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db = DB(f"sqlite+aiosqlite:///{os.path.join(app_config.hub_dir, '.leaf_workspace', '.leaf_playground.db')}")
+    db = DB(
+        app_config.db_type,
+        app_config.db_url or
+        os.path.join(app_config.hub_dir, ".leaf_workspace", ".leaf_playground.db")
+    )
     await db.wait_db_startup()
     Hub(hub_dir=app_config.hub_dir.as_posix())
-    TaskManager(server_port=app_config.server_port, runtime_env=app_config.runtime_env)
+    TaskManager(
+        server_port=app_config.server_port,
+        runtime_env=app_config.runtime_env,
+    )
 
     try:
         yield
