@@ -227,6 +227,17 @@ class DB(Singleton):
             return []
         return [log.to_log() for log in logs]
 
+    async def get_logs_by_tid_paginate(self, tid: str, skip: int = 0, limit: int = 20) -> List[Log]:
+        async with AsyncSession(self.engine) as session:
+            logs = (
+                await session.execute(
+                    select(LogTable).where(LogTable.tid == tid).order_by(LogTable.created_at).offset(skip).limit(limit)
+                )
+            ).scalars().all()
+        if not logs:
+            return []
+        return [log.to_log() for log in logs]
+
     async def insert_message(self, message: Message):
         status_code = await self._insert(MessageTable.from_message(message))
         if status_code != 200:
