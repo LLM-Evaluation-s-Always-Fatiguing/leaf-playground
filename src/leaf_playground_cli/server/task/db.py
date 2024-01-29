@@ -1,9 +1,11 @@
 import asyncio
 import traceback
 from datetime import datetime
-from typing import Any, Callable, List, Literal, Optional
+from enum import Enum
+from typing import Any, Callable, List, Optional
 
 from fastapi import HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import select, Select
@@ -15,10 +17,18 @@ from leaf_playground.utils.thread_util import run_asynchronously
 from .model import *
 
 
+class DBType(Enum):
+    SQLite = "SQLite"
+    PostgreSQL = "PostgreSQL"
+
+
 class DB(Singleton):
-    def __init__(self, db_url: str):
-        self.url = db_url
-        self.engine = create_async_engine(db_url)
+    def __init__(self, db_type: DBType, db_url: str):
+        if db_type == DBType.SQLite:
+            self.url = f"sqlite+aiosqlite:///{db_url}"
+        else:
+            self.url = f"postgresql+asyncpg://{db_url}"
+        self.engine = create_async_engine(self.url)
         asyncio.ensure_future(self._on_startup())
         asyncio.ensure_future(self._background_job())
 
@@ -229,5 +239,34 @@ class DB(Singleton):
                 raise HTTPException(status_code=404, detail=f"message [{message_id}] not found")
         return message.to_message()
 
+    async def save_task_results(self, task_results: TaskResults):
+        async def obj_getter(session: AsyncSession):
+            return await session.get(TaskResultsTable, task_results.id)
 
-__all__ = ["DB"]
+        async with AsyncSession(self.engine) as session:
+            task_results_exists = bool(await obj_getter(session))
+
+        if not task_results_exists:
+            status_code = await self._insert(TaskResultsTable.from_task_results(task_results))
+            if status_code != 200:
+                raise HTTPException(status_code=status_code, detail=f"insert task_results [{task_results.id}] failed")
+        else:
+            status_code = await self._update(obj_getter, **task_results.model_dump())
+            if status_code == 422:
+                raise HTTPException(status_code=status_code, detail=f"task_results [{task_results.id}] update failed")
+            if status_code == 500:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"task_results [{task_results.id}] update succeeded but session commit failed, "
+                           f"maybe try again later",
+                )
+
+    async def get_task_results_by_id(self, tid: str):
+        async with AsyncSession(self.engine) as session:
+            task_results = await session.get(TaskResultsTable, tid)
+            if not task_results:
+                raise HTTPException(status_code=404, detail=f"task_results [{tid}] not found")
+        return task_results.to_task_results()
+
+
+__all__ = ["DBType", "DB"]

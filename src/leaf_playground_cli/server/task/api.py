@@ -160,20 +160,19 @@ class TaskManager(Singleton):
 
     def _create_task_in_local(self, task: Task):
         work_dir = self.hub.get_project(json.loads(task.payload)["project_id"]).work_dir
-        process = subprocess.Popen(
-            (
-                f"{sys.executable} {os.path.join(work_dir, '.leaf', 'app.py')} "
-                f"--id {task.id} "
-                f"--port {task.port} "
-                f"--host {task.host} "
-                f"--secret_key {self._tasks[task.id].secret_key} "
-                f"--server_url http://{self.server_host}:{self.server_port} "
-                f"{'' if not self.debugger_config.debug else '--debug '}"
-                f"--debug_ide {self.debugger_config.ide_type.value} "
-                f"--debugger_server_host {self.debugger_config.host} "
-                f"--debugger_server_port {self.debugger_config.port}"
-            ).split()
+        cmd = (
+            f"{sys.executable} {os.path.join(work_dir, '.leaf', 'app.py')} "
+            f"--id {task.id} "
+            f"--port {task.port} "
+            f"--host {task.host} "
+            f"--secret_key {self._tasks[task.id].secret_key} "
+            f"--server_url http://{self.server_host}:{self.server_port} "
+            f"{'' if not self.debugger_config.debug else '--debug '}"
+            f"--debug_ide {self.debugger_config.ide_type.value} "
+            f"--debugger_server_host {self.debugger_config.host} "
+            f"--debugger_server_port {self.debugger_config.port}"
         )
+        process = subprocess.Popen(cmd.split())
         return process.pid
 
     def _create_task_in_docker(self, task: Task):
@@ -186,21 +185,20 @@ class TaskManager(Singleton):
             print("Image not found, building Docker image...")
             subprocess.run(f"cd {project.work_dir} && docker build . -t {image_name}", shell=True)
 
-        subprocess.Popen(
-            (
-                "docker run --rm "
-                f"-p {task.port}:{task.port} "
-                f"-v {task.results_dir}:/tmp/result "
-                f"--name {container_name} "
-                f"{image_name} .leaf/app.py "
-                f"--id {task.id} "
-                f"--port {task.port} "
-                "--host 0.0.0.0 "
-                f"--secret_key {self._tasks[task.id].secret_key} "
-                f"--server_url http://{self.server_host}:{self.server_port} "
-                "--docker"
-            ).split()
+        cmd = (
+            "docker run --rm "
+            f"-p {task.port}:{task.port} "
+            f"-v {task.results_dir}:/tmp/result "
+            f"--name {container_name} "
+            f"{image_name} .leaf/app.py "
+            f"--id {task.id} "
+            f"--port {task.port} "
+            "--host 0.0.0.0 "
+            f"--secret_key {self._tasks[task.id].secret_key} "
+            f"--server_url http://{self.server_host}:{self.server_port} "
+            "--docker"
         )
+        subprocess.Popen(cmd.split())
         return container_name
 
     async def get_task(self, task_id: str) -> Task:
@@ -273,6 +271,10 @@ class TaskManager(Singleton):
         async with self.http_session.post(url=url) as resp:
             if resp.status != 200:
                 raise HTTPException(status_code=resp.status, detail=await resp.text())
+
+    async def save_task_results_to_db(self, task_id: str, secret_key: str, task_results: TaskResults):
+        await self.get_and_validate_task(task_id, secret_key)
+        await self.db.save_task_results(task_results)
 
     async def insert_task_log(self, task_id: str, secret_key: str, log: Log):
         await self.get_and_validate_task(task_id, secret_key)
@@ -461,12 +463,22 @@ async def save_task_results(task_id: str, task_manager: TaskManager = Depends(Ta
     await task_manager.save_task_results(task_id)
 
 
+@task_router.post("/{task_id}/results/save")
+async def save_task_results_to_db(
+    task_id: str,
+    secret_key: str,
+    task_results: TaskResults,
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
+):
+    await task_manager.save_task_results_to_db(task_id, secret_key, task_results)
+
+
 @task_router.get("/history", response_class=JSONResponse)
 async def get_history_tasks(task_manager: TaskManager = Depends(TaskManager.get_instance)):
     tasks = await task_manager.get_history_tasks()
     return JSONResponse(
         content=[
-            task.model_dump(mode="json", include={"id", "project_id", "status", "created_at", "results_dir"})
+            task.model_dump(mode="json", include={"id", "project_id", "status", "created_at"})
             for task in tasks
         ]
     )
@@ -533,4 +545,10 @@ async def insert_message(
     await task_manager.insert_task_message(task_id, secret_key, message)
 
 
-__all__ = ["task_router", "TaskCreationPayload", "TaskManager", "LogEvalMetricRecord", "LogEvalCompareRecord"]
+__all__ = [
+    "task_router",
+    "TaskCreationPayload",
+    "TaskManager",
+    "LogEvalMetricRecord",
+    "LogEvalCompareRecord"
+]
