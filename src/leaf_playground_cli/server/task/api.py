@@ -1,11 +1,15 @@
 import asyncio
+import io
 import json
 import os
 import random
 import subprocess
 import sys
 import traceback
+
+import pandas as pd
 import websockets
+import zipfile
 from datetime import datetime
 from threading import Lock
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -13,7 +17,7 @@ from uuid import uuid4
 
 import aiohttp
 from fastapi import status, APIRouter, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from leaf_playground._type import Singleton
@@ -276,6 +280,9 @@ class TaskManager(Singleton):
         await self.get_and_validate_task(task_id, secret_key)
         await self.db.save_task_results(task_results)
 
+    async def get_task_results(self, task_id: str):
+        return await self.db.get_task_results_by_id(task_id)
+
     async def insert_task_log(self, task_id: str, secret_key: str, log: Log):
         await self.get_and_validate_task(task_id, secret_key)
         await self.db.insert_log(log)
@@ -471,6 +478,34 @@ async def save_task_results_to_db(
     task_manager: TaskManager = Depends(TaskManager.get_instance),
 ):
     await task_manager.save_task_results_to_db(task_id, secret_key, task_results)
+
+
+@task_router.get("/{task_id}/results/download")
+async def download_task_results(
+    task_id: str,
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
+):
+    task_results: TaskResults = await task_manager.get_task_results(task_id)
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
+        zip_file.writestr("scene_config.json", json.dumps(task_results.scene_config))
+        zip_file.writestr("evaluator_configs.json", json.dumps(task_results.evaluator_configs))
+        zip_file.writestr("metrics.json", json.dumps(task_results.metrics))
+        zip_file.writestr("charts.json", json.dumps(task_results.charts))
+        for name, logs in task_results.logs.items():
+            ext = name.split(".")[-1]
+            if ext == "json":
+                zip_file.writestr(name, json.dumps(logs))
+            if ext == "jsonl":
+                zip_file.writestr(name, "\n".join([json.dumps(log) for log in logs]))
+            if ext == "csv":
+                zip_file.writestr(name, pd.DataFrame(logs).to_csv(index=False, encoding="utf-8"))
+
+    zip_buffer.seek(0)
+
+    # 创建流式响应
+    return StreamingResponse(zip_buffer, media_type="application/x-zip-compressed")
 
 
 @task_router.get("/history", response_class=JSONResponse)
