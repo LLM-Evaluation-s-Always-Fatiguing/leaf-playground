@@ -306,22 +306,37 @@ class TaskManager(Singleton):
         await self.get_and_validate_task(task_id, secret_key)
         await self.db.update_log(log)
 
+    async def _transform_log(self, log: Log) -> dict:
+        log_data = log.model_dump(mode="json")
+        log_data.update(**log_data.pop("data"))
+        if log.log_type == LogType.ACTION:
+            if log_data["references"]:
+                references = []
+                for ref in log_data["references"]:
+                    references.append(await self.db.get_message_by_id(ref))
+                log_data["references"] = [ref.data for ref in references]
+            response = await self.db.get_message_by_id(log_data["response"])
+            log_data["response"] = response.data
+        return log_data
+
+    async def get_logs_paginate(self, task_id: str, skip: int = 0, limit: int = 20) -> List[dict]:
+        logs = await self.db.get_logs_by_tid_paginate(task_id, skip, limit)
+        if not logs:
+            return []
+
+        logs_data = []
+        for log in logs:
+            logs_data.append(await self._transform_log(log))
+
+        return logs_data
+
     async def websocket_connection(self, task_id: str, websocket: WebSocket, human_id: Optional[str] = None):
         async def _get_and_send_logs():
             nonlocal last_check_time
 
             logs = await self.db.get_logs_by_tid_with_update_time_constraint(task_id, last_checked_dt=last_check_time)
             for log in logs:
-                log_data = log.model_dump(mode="json")
-                log_data.update(**log_data.pop("data"))
-                if log.log_type == LogType.ACTION:
-                    if log_data["references"]:
-                        references = []
-                        for ref in log_data["references"]:
-                            references.append(await self.db.get_message_by_id(ref))
-                        log_data["references"] = [ref.data for ref in references]
-                    response = await self.db.get_message_by_id(log_data["response"])
-                    log_data["response"] = response.data
+                log_data = await self._transform_log(log)
                 socket_operation = (
                     SocketOperation.CREATE if log.created_at == log.last_update else SocketOperation.UPDATE
                 )
@@ -523,6 +538,19 @@ async def download_task_results(
     return StreamingResponse(zip_buffer, media_type="application/x-zip-compressed")
 
 
+@task_router.get(
+    "/{task_id}/metrics_and_charts",
+    response_model=TaskResults,
+    response_model_include={"metrics", "charts"}
+)
+async def get_metrics_and_charts(
+    task_id: str,
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
+):
+    task_results: TaskResults = await task_manager.get_task_results(task_id)
+    return task_results
+
+
 @task_router.get("/history", response_class=JSONResponse)
 async def get_history_tasks(task_manager: TaskManager = Depends(TaskManager.get_instance)):
     tasks = await task_manager.get_history_tasks()
@@ -546,6 +574,13 @@ async def update_log(
     task_id: str, secret_key: str, log: Log, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     await task_manager.update_task_log(task_id, secret_key, log)
+
+
+@task_router.get("/{task_id}/logs", response_class=JSONResponse)
+async def get_logs_paginate(
+    task_id: str, skip: int = 0, limit: int = 20, task_manager: TaskManager = Depends(TaskManager.get_instance)
+) -> JSONResponse:
+    return JSONResponse(content=await task_manager.get_logs_paginate(task_id, skip, limit))
 
 
 @task_router.websocket("/{task_id}/logs/ws")
