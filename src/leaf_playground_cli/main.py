@@ -324,6 +324,14 @@ def start_server(
 
     if not os.path.exists(hub_dir):
         raise typer.BadParameter(f"zoo [{hub_dir}] not exist.")
+    if db_type == "postgresql":
+        try:
+            import asyncpg
+        except ImportError:
+            raise typer.BadParameter(
+                "asyncpg not installed, witch is required when dy_type='postgresql', "
+                "you can use `pip install leaf-playground[postgresql]` to include the extra dependency."
+            )
 
     config_server(
         config=AppConfig(
