@@ -46,6 +46,22 @@ Make sure you have `Python` and `Node.js` installed on your computer, if not, yo
 ```shell
 pip install leaf-playground
 ```
+<div>
+  <img alt="Static Badge" src="https://img.shields.io/badge/introduced%20in-0.5.0-brightgreen">
+  If you want to save data in PostgreSQL instead of SQLite, you need to include the '<b>postgresql</b>' extra dependency:
+</div>
+
+```shell
+pip install leaf-playground[postgresql]
+```
+<div>
+  <img alt="Static Badge" src="https://img.shields.io/badge/introduced%20in-0.5.0-brightgreen">
+  If you are a framework or scenario simulation project developer who want to debug the code, you need to include the '<b>debug</b>' extra dependency:
+</div>
+
+```shell
+pip install leaf-playground[debug]
+```
 
 ### Install from source
 To install **leaf-playground** from the source, you need to clone the project by using `git clone`, then in your local `leaf-playground` directory, run:
