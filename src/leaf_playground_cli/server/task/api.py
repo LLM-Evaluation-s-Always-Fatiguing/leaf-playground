@@ -1,11 +1,16 @@
 import asyncio
+import io
 import json
 import os
 import random
 import subprocess
 import sys
 import traceback
+from packaging import version
+
+import pandas as pd
 import websockets
+import zipfile
 from datetime import datetime
 from threading import Lock
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -13,9 +18,10 @@ from uuid import uuid4
 
 import aiohttp
 from fastapi import status, APIRouter, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from leaf_playground import __version__ as leaf_version
 from leaf_playground._type import Singleton
 from leaf_playground.core.scene_engine import (
     SceneEngineState,
@@ -130,11 +136,24 @@ class TaskManager(Singleton):
         with self._port_lock:
             self._task_ports.add(port)
 
+    def _check_version_compatible(self, origin: str, current: str):
+        origin_version = version.Version(origin)
+        current_version = version.Version(current)
+        return origin_version.major == current_version.major and origin_version.minor == current_version.minor
+
     async def create_task(self, payload: TaskCreationPayload) -> Task:
         tid = f"task_{payload.project_id}_" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid4().hex[:8]
+        project = self.hub.get_project(payload.project_id)
+        if not self._check_version_compatible(project.leaf_version, leaf_version):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"project [{project.id}]'s leaf_version [{project.leaf_version}] "
+                       f"not compatible with current leaf_version [{leaf_version}]"
+            )
         task = Task(
             id=tid,
             project_id=payload.project_id,
+            project_version=project.version,
             port=self.acquire_port(),
             host=get_local_ip(),
             payload=payload.model_dump_json(by_alias=True),
@@ -154,16 +173,15 @@ class TaskManager(Singleton):
 
     def _create_task_in_local(self, task: Task):
         work_dir = self.hub.get_project(json.loads(task.payload)["project_id"]).work_dir
-        process = subprocess.Popen(
-            (
-                f"{sys.executable} {os.path.join(work_dir, '.leaf', 'app.py')} "
-                f"--id {task.id} "
-                f"--port {task.port} "
-                f"--host {task.host} "
-                f"--secret_key {self._tasks[task.id].secret_key} "
-                f"--server_url http://{self.server_host}:{self.server_port} "
-            ).split()
+        cmd = (
+            f"{sys.executable} {os.path.join(work_dir, '.leaf', 'app.py')} "
+            f"--id {task.id} "
+            f"--port {task.port} "
+            f"--host {task.host} "
+            f"--secret_key {self._tasks[task.id].secret_key} "
+            f"--server_url http://{self.server_host}:{self.server_port}"
         )
+        process = subprocess.Popen(cmd.split())
         return process.pid
 
     def _create_task_in_docker(self, task: Task):
@@ -176,21 +194,20 @@ class TaskManager(Singleton):
             print("Image not found, building Docker image...")
             subprocess.run(f"cd {project.work_dir} && docker build . -t {image_name}", shell=True)
 
-        subprocess.Popen(
-            (
-                "docker run --rm "
-                f"-p {task.port}:{task.port} "
-                f"-v {task.results_dir}:/tmp/result "
-                f"--name {container_name} "
-                f"{image_name} .leaf/app.py "
-                f"--id {task.id} "
-                f"--port {task.port} "
-                "--host 0.0.0.0 "
-                f"--secret_key {self._tasks[task.id].secret_key} "
-                f"--server_url http://{self.server_host}:{self.server_port} "
-                "--docker"
-            ).split()
+        cmd = (
+            "docker run --rm "
+            f"-p {task.port}:{task.port} "
+            f"-v {task.results_dir}:/tmp/result "
+            f"--name {container_name} "
+            f"{image_name} .leaf/app.py "
+            f"--id {task.id} "
+            f"--port {task.port} "
+            "--host 0.0.0.0 "
+            f"--secret_key {self._tasks[task.id].secret_key} "
+            f"--server_url http://{self.server_host}:{self.server_port} "
+            "--docker"
         )
+        subprocess.Popen(cmd.split())
         return container_name
 
     async def get_task(self, task_id: str) -> Task:
@@ -264,6 +281,13 @@ class TaskManager(Singleton):
             if resp.status != 200:
                 raise HTTPException(status_code=resp.status, detail=await resp.text())
 
+    async def save_task_results_to_db(self, task_id: str, secret_key: str, task_results: TaskResults):
+        await self.get_and_validate_task(task_id, secret_key)
+        await self.db.save_task_results(task_results)
+
+    async def get_task_results(self, task_id: str):
+        return await self.db.get_task_results_by_id(task_id)
+
     async def insert_task_log(self, task_id: str, secret_key: str, log: Log):
         await self.get_and_validate_task(task_id, secret_key)
         await self.db.insert_log(log)
@@ -272,22 +296,42 @@ class TaskManager(Singleton):
         await self.get_and_validate_task(task_id, secret_key)
         await self.db.update_log(log)
 
+    async def _transform_log(self, log: Log) -> dict:
+        log_data = log.model_dump(mode="json")
+        log_data.update(**log_data.pop("data"))
+        if log.log_type == LogType.ACTION:
+            if log_data["references"]:
+                references = []
+                for ref in log_data["references"]:
+                    references.append(await self.db.get_message_by_id(ref))
+                log_data["references"] = [ref.data for ref in references]
+            response = await self.db.get_message_by_id(log_data["response"])
+            log_data["response"] = response.data
+        return log_data
+
+    async def get_logs_paginate(
+        self, task_id: str, skip: int = 0, limit: int = 20, log_type: Optional[LogType] = None
+    ) -> List[dict]:
+        logs = await self.db.get_logs_by_tid_paginate(task_id, skip, limit, log_type)
+        if not logs:
+            return []
+
+        logs_data = []
+        for log in logs:
+            logs_data.append(await self._transform_log(log))
+
+        return logs_data
+
+    async def count_logs(self, task_id: str, log_type: Optional[LogType] = None) -> int:
+        return await self.db.count_num_logs_by_tid(task_id, log_type)
+
     async def websocket_connection(self, task_id: str, websocket: WebSocket, human_id: Optional[str] = None):
         async def _get_and_send_logs():
             nonlocal last_check_time
 
             logs = await self.db.get_logs_by_tid_with_update_time_constraint(task_id, last_checked_dt=last_check_time)
             for log in logs:
-                log_data = log.model_dump(mode="json")
-                log_data.update(**log_data.pop("data"))
-                if log.log_type == LogType.ACTION:
-                    if log_data["references"]:
-                        references = []
-                        for ref in log_data["references"]:
-                            references.append(await self.db.get_message_by_id(ref))
-                        log_data["references"] = [ref.data for ref in references]
-                    response = await self.db.get_message_by_id(log_data["response"])
-                    log_data["response"] = response.data
+                log_data = await self._transform_log(log)
                 socket_operation = (
                     SocketOperation.CREATE if log.created_at == log.last_update else SocketOperation.UPDATE
                 )
@@ -451,12 +495,63 @@ async def save_task_results(task_id: str, task_manager: TaskManager = Depends(Ta
     await task_manager.save_task_results(task_id)
 
 
+@task_router.post("/{task_id}/results/save")
+async def save_task_results_to_db(
+    task_id: str,
+    secret_key: str,
+    task_results: TaskResults,
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
+):
+    await task_manager.save_task_results_to_db(task_id, secret_key, task_results)
+
+
+@task_router.get("/{task_id}/results/download")
+async def download_task_results(
+    task_id: str,
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
+):
+    task_results: TaskResults = await task_manager.get_task_results(task_id)
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
+        zip_file.writestr("scene_config.json", json.dumps(task_results.scene_config))
+        zip_file.writestr("evaluator_configs.json", json.dumps(task_results.evaluator_configs))
+        zip_file.writestr("metrics.json", json.dumps(task_results.metrics))
+        zip_file.writestr("charts.json", json.dumps(task_results.charts))
+        for name, logs in task_results.logs.items():
+            ext = name.split(".")[-1]
+            if ext == "json":
+                zip_file.writestr(name, json.dumps(logs))
+            if ext == "jsonl":
+                zip_file.writestr(name, "\n".join([json.dumps(log) for log in logs]))
+            if ext == "csv":
+                zip_file.writestr(name, pd.DataFrame(logs).to_csv(index=False, encoding="utf-8"))
+
+    zip_buffer.seek(0)
+
+    # 创建流式响应
+    return StreamingResponse(zip_buffer, media_type="application/x-zip-compressed")
+
+
+@task_router.get(
+    "/{task_id}/metrics_and_charts",
+    response_model=TaskResults,
+    response_model_include={"metrics", "charts"}
+)
+async def get_metrics_and_charts(
+    task_id: str,
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
+):
+    task_results: TaskResults = await task_manager.get_task_results(task_id)
+    return task_results
+
+
 @task_router.get("/history", response_class=JSONResponse)
 async def get_history_tasks(task_manager: TaskManager = Depends(TaskManager.get_instance)):
     tasks = await task_manager.get_history_tasks()
     return JSONResponse(
         content=[
-            task.model_dump(mode="json", include={"id", "project_id", "status", "created_at", "results_dir"})
+            task.model_dump(mode="json", include={"id", "project_id", "status", "created_at"})
             for task in tasks
         ]
     )
@@ -474,6 +569,24 @@ async def update_log(
     task_id: str, secret_key: str, log: Log, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ):
     await task_manager.update_task_log(task_id, secret_key, log)
+
+
+@task_router.get("/{task_id}/logs", response_class=JSONResponse)
+async def get_logs_paginate(
+    task_id: str,
+    skip: int = 0,
+    limit: int = 20,
+    log_type: Optional[LogType] = None,
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
+) -> JSONResponse:
+    return JSONResponse(content=await task_manager.get_logs_paginate(task_id, skip, limit, log_type))
+
+
+@task_router.get("/{task_id}/logs/count", response_class=JSONResponse)
+async def count_num_logs(
+    task_id: str, log_type: Optional[LogType] = None, task_manager: TaskManager = Depends(TaskManager.get_instance)
+):
+    return JSONResponse(content={"count": await task_manager.count_logs(task_id, log_type)})
 
 
 @task_router.websocket("/{task_id}/logs/ws")
@@ -523,4 +636,10 @@ async def insert_message(
     await task_manager.insert_task_message(task_id, secret_key, message)
 
 
-__all__ = ["task_router", "TaskCreationPayload", "TaskManager", "LogEvalMetricRecord", "LogEvalCompareRecord"]
+__all__ = [
+    "task_router",
+    "TaskCreationPayload",
+    "TaskManager",
+    "LogEvalMetricRecord",
+    "LogEvalCompareRecord"
+]

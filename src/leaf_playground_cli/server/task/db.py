@@ -1,24 +1,34 @@
 import asyncio
 import traceback
 from datetime import datetime
-from typing import Any, Callable, List, Literal, Optional
+from enum import Enum
+from typing import Any, Callable, List, Optional
 
 from fastapi import HTTPException
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy import select, Select
+from sqlalchemy import func, select, Select
 
 from leaf_playground._type import Singleton
 from leaf_playground.core.scene_engine import SceneEngineState
+from leaf_playground.data.log_body import LogType
 from leaf_playground.utils.thread_util import run_asynchronously
 
 from .model import *
 
 
+class DBType(Enum):
+    SQLite = "SQLite"
+    PostgreSQL = "PostgreSQL"
+
+
 class DB(Singleton):
-    def __init__(self, db_url: str):
-        self.url = db_url
-        self.engine = create_async_engine(db_url)
+    def __init__(self, db_type: DBType, db_url: str):
+        if db_type == DBType.SQLite:
+            self.url = f"sqlite+aiosqlite:///{db_url}"
+        else:
+            self.url = f"postgresql+asyncpg://{db_url}"
+        self.engine = create_async_engine(self.url)
         asyncio.ensure_future(self._on_startup())
         asyncio.ensure_future(self._background_job())
 
@@ -204,18 +214,47 @@ class DB(Singleton):
         return log.to_log()
 
     async def get_logs_by_tid_with_update_time_constraint(
-        self, tid: str, last_checked_dt: Optional[datetime] = None
+        self, tid: str, last_checked_dt: Optional[datetime] = None, log_type: Optional[LogType] = None
     ) -> List[Log]:
-        if not last_checked_dt:
-            statement: Select = select(LogTable).where(LogTable.tid == tid)
-        else:
-            statement: Select = select(LogTable).where(LogTable.tid == tid, LogTable.db_last_update > last_checked_dt)
-        statement = statement.order_by(LogTable.db_last_update if last_checked_dt is not None else LogTable.created_at)
+        whereclause = (LogTable.tid == tid,)
+        if last_checked_dt:
+            whereclause += (LogTable.db_last_update > last_checked_dt,)
+        if log_type:
+            whereclause += (LogTable.log_type == log_type,)
+        statement = select(LogTable)\
+            .where(*whereclause)\
+            .order_by(LogTable.db_last_update if last_checked_dt is not None else LogTable.created_at)
         async with AsyncSession(self.engine) as session:
             logs = (await session.execute(statement)).scalars().all()
         if not logs:
             return []
         return [log.to_log() for log in logs]
+
+    async def get_logs_by_tid_paginate(
+        self, tid: str, skip: int = 0, limit: int = 20, log_type: Optional[LogType] = None
+    ) -> List[Log]:
+        whereclause = (LogTable.tid == tid,)
+        if log_type:
+            whereclause += (LogTable.log_type == log_type,)
+        statement = select(LogTable).where(*whereclause).order_by(LogTable.created_at).offset(skip).limit(limit)
+        async with AsyncSession(self.engine) as session:
+            logs = (
+                await session.execute(statement)
+            ).scalars().all()
+        if not logs:
+            return []
+        return [log.to_log() for log in logs]
+
+    async def count_num_logs_by_tid(self, tid: str, log_type: Optional[LogType] = None):
+        whereclause = (LogTable.tid == tid,)
+        if log_type:
+            whereclause += (LogTable.log_type == log_type,)
+        statement = select(func.count()).where(*whereclause).select_from(LogTable)
+        async with AsyncSession(self.engine) as session:
+            count = (
+                await session.execute(statement)
+            ).scalar()
+        return count
 
     async def insert_message(self, message: Message):
         status_code = await self._insert(MessageTable.from_message(message))
@@ -229,5 +268,34 @@ class DB(Singleton):
                 raise HTTPException(status_code=404, detail=f"message [{message_id}] not found")
         return message.to_message()
 
+    async def save_task_results(self, task_results: TaskResults):
+        async def obj_getter(session: AsyncSession):
+            return await session.get(TaskResultsTable, task_results.id)
 
-__all__ = ["DB"]
+        async with AsyncSession(self.engine) as session:
+            task_results_exists = bool(await obj_getter(session))
+
+        if not task_results_exists:
+            status_code = await self._insert(TaskResultsTable.from_task_results(task_results))
+            if status_code != 200:
+                raise HTTPException(status_code=status_code, detail=f"insert task_results [{task_results.id}] failed")
+        else:
+            status_code = await self._update(obj_getter, **task_results.model_dump())
+            if status_code == 422:
+                raise HTTPException(status_code=status_code, detail=f"task_results [{task_results.id}] update failed")
+            if status_code == 500:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"task_results [{task_results.id}] update succeeded but session commit failed, "
+                           f"maybe try again later",
+                )
+
+    async def get_task_results_by_id(self, tid: str):
+        async with AsyncSession(self.engine) as session:
+            task_results = await session.get(TaskResultsTable, tid)
+            if not task_results:
+                raise HTTPException(status_code=404, detail=f"task_results [{tid}] not found")
+        return task_results.to_task_results()
+
+
+__all__ = ["DBType", "DB"]
