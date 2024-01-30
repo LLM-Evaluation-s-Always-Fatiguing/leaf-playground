@@ -21,8 +21,9 @@ class AppConfig(BaseModel):
     runtime_env: TaskRunTimeEnv = Field(default=...)
     db_type: DBType = Field(default=DBType.SQLite)
     db_url: Optional[str] = Field(default=None)
-    server_debugger_config: DebuggerConfig = Field(default=DebuggerConfig())
-    project_debugger_config: DebuggerConfig = Field(default=DebuggerConfig())
+    server_debugger_config: DebuggerConfig = Field(default=DebuggerConfig(port=3456))
+    project_debugger_config: DebuggerConfig = Field(default=DebuggerConfig(port=3457))
+    evaluator_debugger_config: DebuggerConfig = Field(default=DebuggerConfig(port=3458))
 
 
 class AppInfo(BaseModel):
@@ -58,6 +59,7 @@ async def lifespan(app: FastAPI):
         server_port=app_config.server_port,
         runtime_env=app_config.runtime_env,
         debugger_config=app_config.project_debugger_config,
+        evaluator_debugger_config=app_config.evaluator_debugger_config
     )
 
     try:
