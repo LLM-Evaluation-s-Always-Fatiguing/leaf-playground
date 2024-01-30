@@ -319,8 +319,10 @@ class TaskManager(Singleton):
             log_data["response"] = response.data
         return log_data
 
-    async def get_logs_paginate(self, task_id: str, skip: int = 0, limit: int = 20) -> List[dict]:
-        logs = await self.db.get_logs_by_tid_paginate(task_id, skip, limit)
+    async def get_logs_paginate(
+        self, task_id: str, skip: int = 0, limit: int = 20, log_type: Optional[LogType] = None
+    ) -> List[dict]:
+        logs = await self.db.get_logs_by_tid_paginate(task_id, skip, limit, log_type)
         if not logs:
             return []
 
@@ -330,8 +332,8 @@ class TaskManager(Singleton):
 
         return logs_data
 
-    async def count_logs(self, task_id: str) -> int:
-        return await self.db.count_num_logs_by_tid(task_id)
+    async def count_logs(self, task_id: str, log_type: Optional[LogType] = None) -> int:
+        return await self.db.count_num_logs_by_tid(task_id, log_type)
 
     async def websocket_connection(self, task_id: str, websocket: WebSocket, human_id: Optional[str] = None):
         async def _get_and_send_logs():
@@ -581,14 +583,20 @@ async def update_log(
 
 @task_router.get("/{task_id}/logs", response_class=JSONResponse)
 async def get_logs_paginate(
-    task_id: str, skip: int = 0, limit: int = 20, task_manager: TaskManager = Depends(TaskManager.get_instance)
+    task_id: str,
+    skip: int = 0,
+    limit: int = 20,
+    log_type: Optional[LogType] = None,
+    task_manager: TaskManager = Depends(TaskManager.get_instance),
 ) -> JSONResponse:
-    return JSONResponse(content=await task_manager.get_logs_paginate(task_id, skip, limit))
+    return JSONResponse(content=await task_manager.get_logs_paginate(task_id, skip, limit, log_type))
 
 
 @task_router.get("/{task_id}/logs/count", response_class=JSONResponse)
-async def count_num_logs(task_id: str, task_manager: TaskManager = Depends(TaskManager.get_instance)):
-    return JSONResponse(content={"count": await task_manager.count_logs(task_id)})
+async def count_num_logs(
+    task_id: str, log_type: Optional[LogType] = None, task_manager: TaskManager = Depends(TaskManager.get_instance)
+):
+    return JSONResponse(content={"count": await task_manager.count_logs(task_id, log_type)})
 
 
 @task_router.websocket("/{task_id}/logs/ws")
