@@ -5,10 +5,9 @@ from enum import Enum
 from typing import Any, Callable, List, Optional
 
 from fastapi import HTTPException
-from fastapi.encoders import jsonable_encoder
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy import select, Select
+from sqlalchemy import func, select, Select
 
 from leaf_playground._type import Singleton
 from leaf_playground.core.scene_engine import SceneEngineState
@@ -237,6 +236,15 @@ class DB(Singleton):
         if not logs:
             return []
         return [log.to_log() for log in logs]
+
+    async def count_num_logs_by_tid(self, tid: str):
+        async with AsyncSession(self.engine) as session:
+            count = (
+                await session.execute(
+                    select(func.count()).where(LogTable.tid == tid).select_from(LogTable)
+                )
+            ).scalar()
+        return count
 
     async def insert_message(self, message: Message):
         status_code = await self._insert(MessageTable.from_message(message))

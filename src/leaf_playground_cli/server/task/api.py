@@ -330,6 +330,9 @@ class TaskManager(Singleton):
 
         return logs_data
 
+    async def count_logs(self, task_id: str) -> int:
+        return await self.db.count_num_logs_by_tid(task_id)
+
     async def websocket_connection(self, task_id: str, websocket: WebSocket, human_id: Optional[str] = None):
         async def _get_and_send_logs():
             nonlocal last_check_time
@@ -581,6 +584,11 @@ async def get_logs_paginate(
     task_id: str, skip: int = 0, limit: int = 20, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ) -> JSONResponse:
     return JSONResponse(content=await task_manager.get_logs_paginate(task_id, skip, limit))
+
+
+@task_router.get("/{task_id}/logs/count", response_class=JSONResponse)
+async def count_num_logs(task_id: str, task_manager: TaskManager = Depends(TaskManager.get_instance)):
+    return JSONResponse(content={"count": await task_manager.count_logs(task_id)})
 
 
 @task_router.websocket("/{task_id}/logs/ws")
