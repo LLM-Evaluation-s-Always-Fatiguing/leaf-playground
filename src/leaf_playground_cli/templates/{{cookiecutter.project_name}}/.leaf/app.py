@@ -47,8 +47,6 @@ debugger_config = DebuggerConfig(
     port=args.debugger_server_port,
     debug=args.debug
 )
-
-
 if args.debug:
     os.environ["EVALUATOR_DEBUG"] = "True"
     os.environ["EVALUATOR_DEBUG_IDE"] = args.debug_ide
