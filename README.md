@@ -31,6 +31,7 @@ Below are sister projects of **leaf-playground**:
 - **Local server support**: one-click local service deployment for scenario simulation tasks management and execution.
 - **Containerization**: containerization support for running scenario simulation tasks.
 - **Auto generate projects**: auto-generate and auto-complete code for scenario simulation projects.
+- **Debug Friendly**: support remote debugger across processes in Pycharm professional IDE.
 
 ## Installation
 
@@ -80,7 +81,7 @@ https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground/assets/7544
 - [x] support manage task status(pause, restart, interrupt, etc.)
 - [ ] support full task data persistence
   - [x] save task info, logs and message in database
-  - [ ] save task results in database or remote file system
+  - [x] save task results in database or remote file system
   - [ ] support for resuming runtime state and information from checkpoint and continuing execution
 - [ ] support complete project automatically
   - [x] complete scene definition automatically
