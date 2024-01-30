@@ -94,6 +94,23 @@ class MetricEvaluatorProxy(Process):
         return MetricEvaluatorState(self._state.value.decode("utf-8"))
 
     def run(self):
+        print("DEBUG", os.environ.get("DEBUG", None))
+        if os.environ.get("DEBUG", None) == "True":
+            from leaf_playground_cli.utils.debug_utils import maybe_set_debugger, DebuggerConfig, IDEType
+
+            try:
+                maybe_set_debugger(
+                    DebuggerConfig(
+                        debug=True,
+                        ide_type=IDEType.PyCharm if os.environ["DEBUG_IDE"] == "pycharm" else IDEType.VSCode,
+                        host=os.environ["DEBUGGER_SERVER_HOST"],
+                        port=int(os.environ["DEBUGGER_SERVER_PORT"])
+                    ),
+                    patch_multiprocessing=False
+                )
+            except Exception as e:
+                print(e)
+
         self._state.value = MetricEvaluatorState.INITIALIZING.value.encode("utf-8")
         try:
             evaluator = self._init_evaluator(

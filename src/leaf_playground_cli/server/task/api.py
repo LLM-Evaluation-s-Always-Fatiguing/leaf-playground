@@ -30,6 +30,7 @@ from .db import *
 from .model import *
 from ..hub import Hub
 from ..utils import get_local_ip
+from ...utils.debug_utils import DebuggerConfig
 
 
 task_router = APIRouter(prefix="/task")
@@ -102,6 +103,7 @@ class TaskManager(Singleton):
         server_port: int = 8000,
         server_host: str = "127.0.0.1",
         runtime_env: TaskRunTimeEnv = TaskRunTimeEnv.LOCAL,
+        debugger_config: DebuggerConfig = DebuggerConfig(),
     ):
         self.hub: Hub = Hub.get_instance()
         self.db: DB = DB.get_instance()
@@ -116,7 +118,11 @@ class TaskManager(Singleton):
         self._task_ports = set(list(range(10000, 65535))) - {server_port}
         self._port_lock = Lock()
 
+        if debugger_config.debug and runtime_env != TaskRunTimeEnv.LOCAL:
+            raise NotImplementedError(f"running projects in {runtime_env.value} with debug mode is not supported yet.")
+
         self.runtime_env = runtime_env
+        self.debugger_config = debugger_config
 
         self._tasks: Dict[str, TaskProxy] = {}
 
@@ -162,6 +168,10 @@ class TaskManager(Singleton):
                 f"--host {task.host} "
                 f"--secret_key {self._tasks[task.id].secret_key} "
                 f"--server_url http://{self.server_host}:{self.server_port} "
+                f"{'' if not self.debugger_config.debug else '--debug '}"
+                f"--debug_ide {self.debugger_config.ide_type.value} "
+                f"--debugger_server_host {self.debugger_config.host} "
+                f"--debugger_server_port {self.debugger_config.port}"
             ).split()
         )
         return process.pid

@@ -231,6 +231,11 @@ def get_latest_webui_releases(cli_version_str: str):
     webui_version_prefix = f"v{cli_version.major}.{cli_version.minor}."
 
     response = requests.get(__web_ui_release_list_url__)
+    if response.status_code != 200:
+        raise requests.RequestException(
+            f"request {__web_ui_release_list_url__} to get releases failed with [{response.status_code}]: "
+            f"{response.content}"
+        )
     releases = response.json()
     for release in releases:
         if release["tag_name"].startswith(webui_version_prefix):
@@ -302,6 +307,11 @@ def start_server(
     web_ui_dir: Annotated[Optional[str], typer.Option("--web_ui_dir")] = None,
     no_web_ui: Annotated[Optional[bool], typer.Option("--no_web_ui")] = False,
     runtime_env: Annotated[str, typer.Option("--runtime_env", click_type=click.Choice(["local", "docker"]))] = "local",
+    debug: Annotated[bool, typer.Option()] = False,
+    debugger_host: Annotated[str, typer.Option()] = "localhost",
+    debugger_ide: Annotated[str, typer.Option(click_type=click.Choice(["pycharm", "vscode"]))] = "pycharm",
+    debugger_port_for_server: Annotated[int, typer.Option()] = 3456,
+    debugger_port_for_project: Annotated[int, typer.Option()] = 3457,
 ):
     if not no_web_ui:
         if web_ui_dir and not os.path.isdir(web_ui_dir):
@@ -318,9 +328,20 @@ def start_server(
     from .server.app import config_server, AppConfig
     from .server.utils import get_local_ip
     from .server.task.model import TaskRunTimeEnv
+    from .utils.debug_utils import DebuggerConfig, IDEType
 
     if not os.path.exists(hub_dir):
         raise typer.BadParameter(f"zoo [{hub_dir}] not exist.")
+
+    if debug and runtime_env != "local":
+        reset_to_local = input(
+            "You are using debug mode, which currently only support runtime_env='local', "
+            f"but get runtime_env='{runtime_env}', reset to 'local'?(y/n):"
+        )
+        if reset_to_local.lower() == "y":
+            runtime_env = "local"
+        else:
+            raise typer.BadParameter("can only use debug mode when runtime_env='local'")
 
     config_server(
         config=AppConfig(
@@ -328,6 +349,18 @@ def start_server(
             server_port=port,
             server_host=get_local_ip(),
             runtime_env=TaskRunTimeEnv[runtime_env.upper()],
+            server_debugger_config=DebuggerConfig(
+                ide_type=IDEType.PyCharm if debugger_ide == "pycharm" else IDEType.VSCode,
+                host=debugger_host,
+                port=debugger_port_for_server,
+                debug=debug
+            ),
+            project_debugger_config=DebuggerConfig(
+                ide_type=IDEType.PyCharm if debugger_ide == "pycharm" else IDEType.VSCode,
+                host=debugger_host,
+                port=debugger_port_for_project,
+                debug=debug
+            )
         )
     )
 
