@@ -11,6 +11,7 @@ from leaf_playground import __version__ as leaf_version
 from .hub import *
 from .task import *
 from .task.model import TaskRunTimeEnv
+from ..utils.debug_utils import maybe_set_debugger, DebuggerConfig
 
 
 class AppConfig(BaseModel):
@@ -20,6 +21,9 @@ class AppConfig(BaseModel):
     runtime_env: TaskRunTimeEnv = Field(default=...)
     db_type: DBType = Field(default=DBType.SQLite)
     db_url: Optional[str] = Field(default=None)
+    server_debugger_config: DebuggerConfig = Field(default=DebuggerConfig(port=3456))
+    project_debugger_config: DebuggerConfig = Field(default=DebuggerConfig(port=3457))
+    evaluator_debugger_config: DebuggerConfig = Field(default=DebuggerConfig(port=3458))
 
 
 class AppInfo(BaseModel):
@@ -33,6 +37,8 @@ app_info: AppInfo = None
 
 
 def config_server(config: AppConfig):
+    maybe_set_debugger(config.server_debugger_config, patch_multiprocessing=False)
+
     global app_config, app_info
     app_config = config
     app_info = AppInfo(hub_dir=app_config.hub_dir.as_posix())
@@ -52,6 +58,8 @@ async def lifespan(app: FastAPI):
     TaskManager(
         server_port=app_config.server_port,
         runtime_env=app_config.runtime_env,
+        debugger_config=app_config.project_debugger_config,
+        evaluator_debugger_config=app_config.evaluator_debugger_config
     )
 
     try:

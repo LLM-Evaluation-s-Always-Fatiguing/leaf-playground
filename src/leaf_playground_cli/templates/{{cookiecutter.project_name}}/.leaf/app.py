@@ -21,6 +21,8 @@ from leaf_playground.core.scene_engine import SceneEngine, SceneEngineState
 from leaf_playground.data.log_body import LogBody, ActionLogBody
 from leaf_playground.data.message import MessagePool
 from leaf_playground_cli.server.task import *
+from leaf_playground_cli.utils.debug_utils import maybe_set_debugger, IDEType, DebuggerConfig
+
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -31,7 +33,25 @@ parser.add_argument("--host", type=str)
 parser.add_argument("--secret_key", type=str)
 parser.add_argument("--server_url", type=str)
 parser.add_argument("--docker", action="store_true")
+parser.add_argument("--debug", action="store_true")
+parser.add_argument("--debug_ide", type=str, choices=["pycharm", "vscode"])
+parser.add_argument("--debugger_server_host", type=str, default="localhost")
+parser.add_argument("--debugger_server_port", type=int, default=3457)
+parser.add_argument("--debugger_server_port_evaluator", type=int, default=3458)
 args = parser.parse_args()
+
+
+debugger_config = DebuggerConfig(
+    ide_type=IDEType.PyCharm if args.debug_ide == "pycharm" else IDEType.VSCode,
+    host=args.debugger_server_host,
+    port=args.debugger_server_port,
+    debug=args.debug
+)
+if args.debug:
+    os.environ["EVALUATOR_DEBUG"] = "True"
+    os.environ["EVALUATOR_DEBUG_IDE"] = args.debug_ide
+    os.environ["EVALUATOR_DEBUGGER_SERVER_HOST"] = args.debugger_server_host
+    os.environ["EVALUATOR_DEBUGGER_SERVER_PORT"] = str(args.debugger_server_port_evaluator)
 
 
 def save_task_results_to_db(self, save_dir: Optional[str] = None):
@@ -227,6 +247,11 @@ class AppManager(Singleton):
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
+    maybe_set_debugger(
+        debugger_config,
+        patch_multiprocessing=False
+    )
+
     create_engine()
     app_manager = AppManager()
 
