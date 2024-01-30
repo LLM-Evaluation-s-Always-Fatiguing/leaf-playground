@@ -109,7 +109,8 @@ class TaskManager(Singleton):
         server_port: int = 8000,
         server_host: str = "127.0.0.1",
         runtime_env: TaskRunTimeEnv = TaskRunTimeEnv.LOCAL,
-        debugger_config: DebuggerConfig = DebuggerConfig(),
+        debugger_config: DebuggerConfig = DebuggerConfig(port=3457),
+        evaluator_debugger_config: DebuggerConfig = DebuggerConfig(port=3458),
     ):
         self.hub: Hub = Hub.get_instance()
         self.db: DB = DB.get_instance()
@@ -129,6 +130,7 @@ class TaskManager(Singleton):
 
         self.runtime_env = runtime_env
         self.debugger_config = debugger_config
+        self.evaluator_debugger_config = evaluator_debugger_config
 
         self._tasks: Dict[str, TaskProxy] = {}
 
@@ -189,7 +191,8 @@ class TaskManager(Singleton):
             f"{'' if not self.debugger_config.debug else '--debug '}"
             f"--debug_ide {self.debugger_config.ide_type.value} "
             f"--debugger_server_host {self.debugger_config.host} "
-            f"--debugger_server_port {self.debugger_config.port}"
+            f"--debugger_server_port {self.debugger_config.port} "
+            f"--debugger_server_port_evaluator {self.evaluator_debugger_config.port}"
         )
         process = subprocess.Popen(cmd.split())
         return process.pid

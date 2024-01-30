@@ -314,6 +314,7 @@ def start_server(
     debugger_ide: Annotated[str, typer.Option(click_type=click.Choice(["pycharm", "vscode"]))] = "pycharm",
     debugger_port_for_server: Annotated[int, typer.Option()] = 3456,
     debugger_port_for_project: Annotated[int, typer.Option()] = 3457,
+    debugger_port_for_evaluator: Annotated[int, typer.Option()] = 3458,
 ):
     if not no_web_ui:
         if web_ui_dir and not os.path.isdir(web_ui_dir):
@@ -371,6 +372,12 @@ def start_server(
                 ide_type=IDEType.PyCharm if debugger_ide == "pycharm" else IDEType.VSCode,
                 host=debugger_host,
                 port=debugger_port_for_project,
+                debug=debug
+            ),
+            evaluator_debugger_config=DebuggerConfig(
+                ide_type=IDEType.PyCharm if debugger_ide == "pycharm" else IDEType.VSCode,
+                host=debugger_host,
+                port=debugger_port_for_evaluator,
                 debug=debug
             ),
         )

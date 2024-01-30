@@ -36,7 +36,8 @@ parser.add_argument("--docker", action="store_true")
 parser.add_argument("--debug", action="store_true")
 parser.add_argument("--debug_ide", type=str, choices=["pycharm", "vscode"])
 parser.add_argument("--debugger_server_host", type=str, default="localhost")
-parser.add_argument("--debugger_server_port", type=int, default=3456)
+parser.add_argument("--debugger_server_port", type=int, default=3457)
+parser.add_argument("--debugger_server_port_evaluator", type=int, default=3458)
 args = parser.parse_args()
 
 
@@ -49,10 +50,10 @@ debugger_config = DebuggerConfig(
 
 
 if args.debug:
-    os.environ["DEBUG"] = "True"
-    os.environ["DEBUG_IDE"] = args.debug_ide
-    os.environ["DEBUGGER_SERVER_HOST"] = args.debugger_server_host
-    os.environ["DEBUGGER_SERVER_PORT"] = str(args.debugger_server_port)
+    os.environ["EVALUATOR_DEBUG"] = "True"
+    os.environ["EVALUATOR_DEBUG_IDE"] = args.debug_ide
+    os.environ["EVALUATOR_DEBUGGER_SERVER_HOST"] = args.debugger_server_host
+    os.environ["EVALUATOR_DEBUGGER_SERVER_PORT"] = str(args.debugger_server_port_evaluator)
 
 
 def save_task_results_to_db(self, save_dir: Optional[str] = None):
