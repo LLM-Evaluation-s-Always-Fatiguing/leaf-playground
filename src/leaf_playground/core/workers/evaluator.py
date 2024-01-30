@@ -94,7 +94,6 @@ class MetricEvaluatorProxy(Process):
         return MetricEvaluatorState(self._state.value.decode("utf-8"))
 
     def run(self):
-        print("DEBUG", os.environ.get("DEBUG", None))
         if os.environ.get("DEBUG", None) == "True":
             from leaf_playground_cli.utils.debug_utils import maybe_set_debugger, DebuggerConfig, IDEType
 
@@ -109,7 +108,7 @@ class MetricEvaluatorProxy(Process):
                     patch_multiprocessing=False
                 )
             except Exception as e:
-                print(e)
+                pass
 
         self._state.value = MetricEvaluatorState.INITIALIZING.value.encode("utf-8")
         try:
