@@ -38,6 +38,7 @@ asyncpg = "^0.29.0"
 
 [tool.poetry.extras]
 transformers = ["torch", "transformers", "sentencepiece", "accelerate"]
+postgresql = ["asyncpg"]
 
 [tool.black]
 line-length = 119
