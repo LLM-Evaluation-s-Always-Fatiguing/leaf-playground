@@ -52,7 +52,7 @@ if args.debug:
     os.environ["DEBUG"] = "True"
     os.environ["DEBUG_IDE"] = args.debug_ide
     os.environ["DEBUGGER_SERVER_HOST"] = args.debugger_server_host
-    os.environ["DEBUGGER_SERVER_PORT"] = str(args.debugger_server_port
+    os.environ["DEBUGGER_SERVER_PORT"] = str(args.debugger_server_port)
 
 
 def save_task_results_to_db(self, save_dir: Optional[str] = None):

@@ -343,7 +343,6 @@ def start_server(
                 "asyncpg not installed, witch is required when dy_type='postgresql', "
                 "you can use `pip install leaf-playground[postgresql]` to include the extra dependency."
             )
-
     if debug and runtime_env != "local":
         reset_to_local = input(
             "You are using debug mode, which currently only support runtime_env='local', "

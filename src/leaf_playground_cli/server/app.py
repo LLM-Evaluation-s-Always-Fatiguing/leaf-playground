@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
     TaskManager(
         server_port=app_config.server_port,
         runtime_env=app_config.runtime_env,
-        debugger_config=app_config.project_debugger_config
+        debugger_config=app_config.project_debugger_config,
     )
 
     try:
