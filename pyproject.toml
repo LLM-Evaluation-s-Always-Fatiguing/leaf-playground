@@ -35,10 +35,13 @@ sentencepiece = "^0.1.99"
 accelerate = "^0.25.0"
 # postgre extra
 asyncpg = "^0.29.0"
+# debug extra
+pydevd-pycharm = "^233.13763.11"
 
 [tool.poetry.extras]
 transformers = ["torch", "transformers", "sentencepiece", "accelerate"]
 postgresql = ["asyncpg"]
+debug = ["pydevd-pycharm"]
 
 [tool.black]
 line-length = 119

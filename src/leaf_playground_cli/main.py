@@ -231,6 +231,11 @@ def get_latest_webui_releases(cli_version_str: str):
     webui_version_prefix = f"v{cli_version.major}.{cli_version.minor}."
 
     response = requests.get(__web_ui_release_list_url__)
+    if response.status_code != 200:
+        raise requests.RequestException(
+            f"request {__web_ui_release_list_url__} to get releases failed with [{response.status_code}]: "
+            f"{response.content}"
+        )
     releases = response.json()
     for release in releases:
         if release["tag_name"].startswith(webui_version_prefix):
@@ -304,6 +309,12 @@ def start_server(
     runtime_env: Annotated[str, typer.Option(click_type=click.Choice(["local", "docker"]))] = "local",
     db_type: Annotated[str, typer.Option(click_type=click.Choice(["sqlite", "postgresql"]))] = "sqlite",
     db_url: Annotated[Optional[str], typer.Option()] = None,
+    debug: Annotated[bool, typer.Option()] = False,
+    debugger_host: Annotated[str, typer.Option()] = "localhost",
+    debugger_ide: Annotated[str, typer.Option(click_type=click.Choice(["pycharm", "vscode"]))] = "pycharm",
+    debugger_port_for_server: Annotated[int, typer.Option()] = 3456,
+    debugger_port_for_project: Annotated[int, typer.Option()] = 3457,
+    debugger_port_for_evaluator: Annotated[int, typer.Option()] = 3458,
 ):
     if not no_web_ui:
         if web_ui_dir and not os.path.isdir(web_ui_dir):
@@ -321,6 +332,7 @@ def start_server(
     from .server.utils import get_local_ip
     from .server.task.db import DBType
     from .server.task.model import TaskRunTimeEnv
+    from .utils.debug_utils import DebuggerConfig, IDEType
 
     if not os.path.exists(hub_dir):
         raise typer.BadParameter(f"zoo [{hub_dir}] not exist.")
@@ -332,6 +344,15 @@ def start_server(
                 "asyncpg not installed, witch is required when dy_type='postgresql', "
                 "you can use `pip install leaf-playground[postgresql]` to include the extra dependency."
             )
+    if debug and runtime_env != "local":
+        reset_to_local = input(
+            "You are using debug mode, which currently only support runtime_env='local', "
+            f"but get runtime_env='{runtime_env}', reset to 'local'?(y/n):"
+        )
+        if reset_to_local.lower() == "y":
+            runtime_env = "local"
+        else:
+            raise typer.BadParameter("can only use debug mode when runtime_env='local'")
 
     config_server(
         config=AppConfig(
@@ -341,6 +362,24 @@ def start_server(
             runtime_env=TaskRunTimeEnv[runtime_env.upper()],
             db_type=DBType.SQLite if db_type == "sqlite" else DBType.PostgreSQL,
             db_url=db_url,
+            server_debugger_config=DebuggerConfig(
+                ide_type=IDEType.PyCharm if debugger_ide == "pycharm" else IDEType.VSCode,
+                host=debugger_host,
+                port=debugger_port_for_server,
+                debug=debug
+            ),
+            project_debugger_config=DebuggerConfig(
+                ide_type=IDEType.PyCharm if debugger_ide == "pycharm" else IDEType.VSCode,
+                host=debugger_host,
+                port=debugger_port_for_project,
+                debug=debug
+            ),
+            evaluator_debugger_config=DebuggerConfig(
+                ide_type=IDEType.PyCharm if debugger_ide == "pycharm" else IDEType.VSCode,
+                host=debugger_host,
+                port=debugger_port_for_evaluator,
+                debug=debug
+            ),
         )
     )
 
