@@ -11,6 +11,7 @@ from sqlalchemy import func, select, Select
 
 from leaf_playground._type import Singleton
 from leaf_playground.core.scene_engine import SceneEngineState
+from leaf_playground.data.log_body import LogType
 from leaf_playground.utils.thread_util import run_asynchronously
 
 from .model import *
@@ -213,36 +214,45 @@ class DB(Singleton):
         return log.to_log()
 
     async def get_logs_by_tid_with_update_time_constraint(
-        self, tid: str, last_checked_dt: Optional[datetime] = None
+        self, tid: str, last_checked_dt: Optional[datetime] = None, log_type: Optional[LogType] = None
     ) -> List[Log]:
-        if not last_checked_dt:
-            statement: Select = select(LogTable).where(LogTable.tid == tid)
-        else:
-            statement: Select = select(LogTable).where(LogTable.tid == tid, LogTable.db_last_update > last_checked_dt)
-        statement = statement.order_by(LogTable.db_last_update if last_checked_dt is not None else LogTable.created_at)
+        whereclause = (LogTable.tid == tid,)
+        if last_checked_dt:
+            whereclause += (LogTable.db_last_update > last_checked_dt,)
+        if log_type:
+            whereclause += (LogTable.log_type == log_type,)
+        statement = select(LogTable)\
+            .where(*whereclause)\
+            .order_by(LogTable.db_last_update if last_checked_dt is not None else LogTable.created_at)
         async with AsyncSession(self.engine) as session:
             logs = (await session.execute(statement)).scalars().all()
         if not logs:
             return []
         return [log.to_log() for log in logs]
 
-    async def get_logs_by_tid_paginate(self, tid: str, skip: int = 0, limit: int = 20) -> List[Log]:
+    async def get_logs_by_tid_paginate(
+        self, tid: str, skip: int = 0, limit: int = 20, log_type: Optional[LogType] = None
+    ) -> List[Log]:
+        whereclause = (LogTable.tid == tid,)
+        if log_type:
+            whereclause += (LogTable.log_type == log_type,)
+        statement = select(LogTable).where(*whereclause).order_by(LogTable.created_at).offset(skip).limit(limit)
         async with AsyncSession(self.engine) as session:
             logs = (
-                await session.execute(
-                    select(LogTable).where(LogTable.tid == tid).order_by(LogTable.created_at).offset(skip).limit(limit)
-                )
+                await session.execute(statement)
             ).scalars().all()
         if not logs:
             return []
         return [log.to_log() for log in logs]
 
-    async def count_num_logs_by_tid(self, tid: str):
+    async def count_num_logs_by_tid(self, tid: str, log_type: Optional[LogType] = None):
+        whereclause = (LogTable.tid == tid,)
+        if log_type:
+            whereclause += (LogTable.log_type == log_type,)
+        statement = select(func.count()).where(*whereclause).select_from(LogTable)
         async with AsyncSession(self.engine) as session:
             count = (
-                await session.execute(
-                    select(func.count()).where(LogTable.tid == tid).select_from(LogTable)
-                )
+                await session.execute(statement)
             ).scalar()
         return count
 
