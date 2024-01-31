@@ -1,17 +1,18 @@
-<h1>
-  <p align="center">
-    <strong>leaf-playground</strong>
-  </p>
-</h1>
-<p align="center">
-    <a href="https://pypi.org/project/leaf-playground/">
-        <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/leaf-playground.svg">
+<div align="center">
+  <a href="https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground">
+    <img alt="Logo" src="docs/leaf-playground-logo.svg" width="550">
+  </a>
+  <p>
+    <a target="_blank" href="https://pypi.org/project/leaf-playground/">
+      <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/leaf-playground.svg?color=369B5A&labelColor=black&logo=github&style=plastic">
     </a>
-    <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/w/LLM-Evaluation-s-Always-Fatiguing/leaf-playground">
-    <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dd/leaf-playground">
-    <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/leaf-playground">
-    <img alt="Static Badge" src="https://img.shields.io/badge/node.js-%E2%89%A518.19.0-brightgreen">
-</p>
+    <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/w/LLM-Evaluation-s-Always-Fatiguing/leaf-playground?color=369B5A&labelColor=black&logo=github&style=plastic">
+    <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dd/leaf-playground?color=369B5A&labelColor=black&logo=github&style=plastic">
+    <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/leaf-playground?color=369B5A&labelColor=black&logo=github&style=plastic">
+    <img alt="Static Badge" src="https://img.shields.io/badge/node.js-%E2%89%A518.19.0-brightgreen?color=369B5A&labelColor=black&logo=github&style=plastic">
+  </p>
+</div>
+
 
 ## Introduction
 
