@@ -1,6 +1,6 @@
 <h1>
   <p align="center">
-    <strong>leaf-playground</strong>
+    <img src="docs/leaf-playground-logo.png">
   </p>
 </h1>
 <p align="center">
