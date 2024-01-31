@@ -48,7 +48,7 @@ pip install leaf-playground
 ```
 <div>
   <img alt="Static Badge" src="https://img.shields.io/badge/introduced%20in-0.5.0-brightgreen">
-  If you want to save data in PostgreSQL instead of SQLite, you need to include the '<b>postgresql</b>' extra dependency:
+  If you want to save data in PostgreSQL instead of SQLite, you need to include the <code><b>postgresql</b></code> extra dependency:
 </div>
 
 ```shell
@@ -56,7 +56,7 @@ pip install leaf-playground[postgresql]
 ```
 <div>
   <img alt="Static Badge" src="https://img.shields.io/badge/introduced%20in-0.5.0-brightgreen">
-  If you are a framework or scenario simulation project developer who want to debug the code, you need to include the '<b>debug</b>' extra dependency:
+  If you are a framework or scenario simulation project developer who want to debug the code, you need to include the <code><b>debug</b></code> extra dependency:
 </div>
 
 ```shell
