@@ -1,6 +1,6 @@
 <div align="center">
-  <a href="https://github.com/microsoft/promptbench">
-    <img alt="Logo" src="docs/leaf-playground-logo.png" width="800">
+  <a href="https://github.com/LLM-Evaluation-s-Always-Fatiguing/leaf-playground">
+    <img alt="Logo" src="docs/leaf-playground-logo.svg" width="800">
   </a>
   <p align="center">
       <a href="https://pypi.org/project/leaf-playground/">
