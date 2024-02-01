@@ -54,19 +54,9 @@ if args.debug:
     os.environ["EVALUATOR_DEBUGGER_SERVER_PORT"] = str(args.debugger_server_port_evaluator)
 
 
-def save_task_results_to_db(self, save_dir: Optional[str] = None):
-    if save_dir:
-        os.makedirs(save_dir, exist_ok=True)
-
+def save_task_results_to_db(self, save_dir=None):
     scene_config = self.get_scene_config(mode="dict")
     evaluator_configs = self.get_evaluator_configs(mode="dict")
-
-    if save_dir:
-        with open(os.path.join(save_dir, "scene_config.json"), "w", encoding="utf-8") as f:
-            json.dump(scene_config, f, indent=4, ensure_ascii=False)
-
-        with open(os.path.join(save_dir, "evaluator_configs.json"), "w", encoding="utf-8") as f:
-            json.dump(evaluator_configs, f, indent=4, ensure_ascii=False)
 
     logs = {}
     for exporter in self.scene.scene_definition.log_exporters:
@@ -105,13 +95,6 @@ def save_task_results_to_db(self, save_dir: Optional[str] = None):
             for name, data in metrics["merged_metrics"].items()
         },
     }
-
-    if save_dir:
-        with open(os.path.join(save_dir, "metrics.json"), "w", encoding="utf-8") as f:
-            json.dump(metrics, f, indent=4, ensure_ascii=False)
-
-        with open(os.path.join(save_dir, "charts.json"), "w", encoding="utf-8") as f:
-            json.dump(charts, f, indent=4, ensure_ascii=False)
 
     task_results = TaskResults(
         id=args.id,
@@ -196,17 +179,11 @@ def create_engine():
         resp = requests.get(f"{args.server_url}/task/{args.id}/payload")
         payload = TaskCreationPayload(**resp.json())
 
-        if args.docker:
-            results_dir = "/tmp/result"
-        else:
-            resp = requests.get(f"{args.server_url}/task/{args.id}/results_dir")
-            results_dir = resp.json()["results_dir"]
-
         scene_engine = SceneEngine(
             scene_config=payload.scene_obj_config,
             evaluators_config=payload.metric_evaluator_objs_config,
             reporter_config=payload.reporter_obj_config,
-            results_dir=results_dir,
+            results_dir=None,
             state_change_callbacks=[scene_engine_state_change_callback],
             log_handlers=[DBLogHandler.get_instance()]
         )
@@ -328,7 +305,7 @@ async def close_engine(
 ):
     if scene_engine.state not in [SceneEngineState.INTERRUPTED, SceneEngineState.FAILED, SceneEngineState.FINISHED]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="task not done!")
-    scene_engine.save(scene_engine._results_dir)
+    save_task_results_to_db(scene_engine)
     app_manager.shutdown_event.set()
 
 
@@ -336,7 +313,7 @@ async def close_engine(
 async def save_engine(
     scene_engine: SceneEngine = Depends(SceneEngine.get_instance)
 ):
-    scene_engine.save(scene_engine._results_dir)
+    save_task_results_to_db(scene_engine)
 
 
 @app.post("/logs/{log_id}/record/metric/update")

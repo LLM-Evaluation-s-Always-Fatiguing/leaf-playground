@@ -115,10 +115,6 @@ class TaskManager(Singleton):
         self.hub: Hub = Hub.get_instance()
         self.db: DB = DB.get_instance()
         self.http_session = aiohttp.ClientSession()
-        self.result_dir = os.path.join(self.hub.hub_dir, ".leaf_workspace", "results")
-        self.tmp_dir = os.path.join(self.hub.hub_dir, ".leaf_workspace", "tmp")
-        os.makedirs(self.result_dir, exist_ok=True)
-        os.makedirs(self.tmp_dir, exist_ok=True)
 
         self.server_port = server_port
         self.server_host = server_host
@@ -166,7 +162,6 @@ class TaskManager(Singleton):
             host=get_local_ip(),
             payload=payload.model_dump_json(by_alias=True),
             runtime_env=self.runtime_env,
-            results_dir=os.path.join(self.result_dir, tid),
         )
         self._tasks[tid] = TaskProxy(tid)
 
@@ -210,7 +205,6 @@ class TaskManager(Singleton):
         cmd = (
             "docker run --rm "
             f"-p {task.port}:{task.port} "
-            f"-v {task.results_dir}:/tmp/result "
             f"--name {container_name} "
             f"{image_name} .leaf/app.py "
             f"--id {task.id} "
@@ -479,11 +473,6 @@ async def get_task_agents_connected(
     task_id: str, task_manager: TaskManager = Depends(TaskManager.get_instance)
 ) -> JSONResponse:
     return JSONResponse(content=await task_manager.get_task_agents_connected(task_id))
-
-
-@task_router.get("/{task_id}/results_dir", response_class=JSONResponse)
-async def get_task_results_dir(task: Task = Depends(TaskManager.http_get_task_by_id)) -> JSONResponse:
-    return JSONResponse(content={"results_dir": task.results_dir})
 
 
 @task_router.get("/{task_id}/payload", response_model=TaskCreationPayload)
