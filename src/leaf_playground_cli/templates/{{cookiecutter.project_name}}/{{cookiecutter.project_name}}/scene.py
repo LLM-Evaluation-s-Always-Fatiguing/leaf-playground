@@ -23,8 +23,8 @@ class {{ cookiecutter.project_name_camel_case }}Scene(
     config_cls = {{ cookiecutter.project_name_camel_case }}SceneConfig
     config: config_cls
 
-    def __init__(self, config: config_cls, logger: Logger):
-        super().__init__(config=config, logger=logger)
+    def __init__(self, config: config_cls):
+        super().__init__(config=config)
         # TODO: additional initialization logic here
 
     async def _run(self):
