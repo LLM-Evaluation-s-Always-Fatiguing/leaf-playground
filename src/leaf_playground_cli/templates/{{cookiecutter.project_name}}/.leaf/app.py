@@ -224,20 +224,24 @@ class AppManager(Singleton):
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    maybe_set_debugger(
-        debugger_config,
-        patch_multiprocessing=False
-    )
-
-    create_engine()
-    app_manager = AppManager()
-
     try:
-        yield
+        maybe_set_debugger(
+            debugger_config,
+            patch_multiprocessing=False
+        )
+
+        create_engine()
+        app_manager = AppManager()
     except:
         traceback.print_exc()
+        update_task_status(task_status="failed")
+    else:
+        try:
+            yield
+        except:
+            traceback.print_exc()
 
-    app_manager.shutdown_task.cancel()
+        app_manager.shutdown_task.cancel()
 
 
 app = FastAPI(lifespan=lifespan)
