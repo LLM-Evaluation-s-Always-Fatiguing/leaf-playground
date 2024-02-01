@@ -146,6 +146,17 @@ class DB(Singleton):
                     await session.rollback()
                     raise
 
+        async def _delete_task_results(sessions: AsyncSession):
+            task_results = await sessions.get(TaskResultsTable, tid)
+            if not task_results:
+                return
+            try:
+                await sessions.delete(task_results)
+                await sessions.commit()
+            except:
+                await sessions.rollback()
+                raise
+
         async def _delete_task():
             session = AsyncSession(self.engine)
             task = await session.get(TaskTable, tid)
@@ -168,6 +179,13 @@ class DB(Singleton):
                 await _delete_logs_batchify(session)
                 # then delete messages
                 await _delete_messages_batchify(session)
+            except:
+                traceback.print_exc()
+                await session.close()
+                raise
+            # delete task results
+            try:
+                await _delete_task_results(session)
             except:
                 traceback.print_exc()
                 await session.close()
