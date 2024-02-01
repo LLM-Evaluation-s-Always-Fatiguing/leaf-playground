@@ -3,3 +3,4 @@
 !.leaf
 !{{ cookiecutter.project_name }}
 !dataset
+!requirements.txt
