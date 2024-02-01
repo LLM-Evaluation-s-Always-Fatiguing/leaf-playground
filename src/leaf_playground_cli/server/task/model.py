@@ -1,7 +1,6 @@
-import asyncio
 from datetime import datetime
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 from sqlmodel import SQLModel, Field, Column, Relationship, DateTime, JSON
 
@@ -33,7 +32,6 @@ class Task(SQLModel):
     status: str = Field(default=SceneEngineState.PENDING.value)
     runtime_env: TaskRunTimeEnv = Field(default=TaskRunTimeEnv.LOCAL)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    results_dir: str = Field(default=...)
 
     @property
     def base_http_url(self) -> str:
