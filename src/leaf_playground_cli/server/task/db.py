@@ -39,7 +39,6 @@ class DB(Singleton):
 
     async def _on_startup(self):
         async with self.engine.begin() as conn:
-            # 创建所有表结构
             await conn.run_sync(SQLModel.metadata.create_all)
         self._run.set()
 
