@@ -1,10 +1,7 @@
 import asyncio
 import io
 import json
-import os
 import random
-import subprocess
-import sys
 import traceback
 from packaging import version
 
@@ -13,7 +10,7 @@ import websockets
 import zipfile
 from datetime import datetime
 from threading import Lock
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
 import aiohttp
@@ -34,6 +31,8 @@ from leaf_playground.data.socket_data import SocketData, SocketOperation
 
 from .db import *
 from .model import *
+from .runtime_env import RunTimeEnv
+from .runtime_env import *
 from ..hub import Hub
 from ..utils import get_local_ip
 from ...utils.debug_utils import DebuggerConfig
@@ -63,46 +62,6 @@ class TaskCreationPayload(BaseModel):
         return Hub.get_instance().get_project(self.project_id).work_dir
 
 
-class TaskProxy:
-    def __init__(self, tid: str):
-        self.id = tid
-        self.db: DB = DB.get_instance()
-
-        self._secret_key: str = uuid4().hex
-        self._shutdown_event: asyncio.Event = asyncio.Event()
-        self._runtime_id: Union[int, str] = None  # pid or docker container name
-
-        asyncio.create_task(self.maybe_shutdown(), name=f"{self.id}_shutdown")
-
-    async def maybe_shutdown(self):
-        await self._shutdown_event.wait()
-        await asyncio.sleep(3)
-
-        pid = self.runtime_id
-        task = await self.db.get_task(self.id)
-        if task.runtime_env == "docker":
-            subprocess.run(f"docker stop {pid}".split())
-
-    async def get_task(self) -> Task:
-        return await self.db.get_task(self.id)
-
-    @property
-    def secret_key(self) -> str:
-        return self._secret_key
-
-    @property
-    def shutdown_event(self) -> asyncio.Event:
-        return self._shutdown_event
-
-    @property
-    def runtime_id(self) -> int:
-        return self._runtime_id
-
-    @runtime_id.setter
-    def runtime_id(self, pid: int):
-        self._runtime_id = pid
-
-
 class TaskManager(Singleton):
     def __init__(
         self,
@@ -125,10 +84,11 @@ class TaskManager(Singleton):
             raise NotImplementedError(f"running projects in {runtime_env.value} with debug mode is not supported yet.")
 
         self.runtime_env = runtime_env
+        self.runtime_cls = RUNTIME_LOOKUP_TABLE[self.runtime_env]
         self.debugger_config = debugger_config
         self.evaluator_debugger_config = evaluator_debugger_config
 
-        self._tasks: Dict[str, TaskProxy] = {}
+        self._tasks: Dict[str, RunTimeEnv] = {}
 
     def acquire_port(self) -> int:
         with self._port_lock:
@@ -163,59 +123,11 @@ class TaskManager(Singleton):
             payload=payload.model_dump_json(by_alias=True),
             runtime_env=self.runtime_env,
         )
-        self._tasks[tid] = TaskProxy(tid)
+        self._tasks[tid] = self.runtime_cls(task, self)
 
-        await self.db.insert_task(task)
-
-        if task.runtime_env == "docker":
-            self._tasks[tid].runtime_id = self._create_task_in_docker(task)
-        else:
-            self._tasks[tid].runtime_id = self._create_task_in_local(task)
+        await self._tasks[tid].start()
 
         return task
-
-    def _create_task_in_local(self, task: Task):
-        work_dir = self.hub.get_project(json.loads(task.payload)["project_id"]).work_dir
-        cmd = (
-            f"{sys.executable} {os.path.join(work_dir, '.leaf', 'app.py')} "
-            f"--id {task.id} "
-            f"--port {task.port} "
-            f"--host {task.host} "
-            f"--secret_key {self._tasks[task.id].secret_key} "
-            f"--server_url http://{self.server_host}:{self.server_port} "
-            f"{'' if not self.debugger_config.debug else '--debug '}"
-            f"--debug_ide {self.debugger_config.ide_type.value} "
-            f"--debugger_server_host {self.debugger_config.host} "
-            f"--debugger_server_port {self.debugger_config.port} "
-            f"--debugger_server_port_evaluator {self.evaluator_debugger_config.port}"
-        )
-        process = subprocess.Popen(cmd.split())
-        return process.pid
-
-    def _create_task_in_docker(self, task: Task):
-        container_name = f"leaf-scene-{task.id}"
-        project = self.hub.get_project(json.loads(task.payload)['project_id'])
-        image_name = f"leaf-scene-{project.name}"
-
-        image_check = subprocess.run(f"docker images -q {image_name}", shell=True, capture_output=True, text=True)
-        if not image_check.stdout.strip():
-            print("Image not found, building Docker image...")
-            subprocess.run(f"cd {project.work_dir} && docker build . -t {image_name}", shell=True)
-
-        cmd = (
-            "docker run --rm "
-            f"-p {task.port}:{task.port} "
-            f"--name {container_name} "
-            f"{image_name} .leaf/app.py "
-            f"--id {task.id} "
-            f"--port {task.port} "
-            "--host 0.0.0.0 "
-            f"--secret_key {self._tasks[task.id].secret_key} "
-            f"--server_url http://{self.server_host}:{self.server_port} "
-            "--docker"
-        )
-        subprocess.Popen(cmd.split())
-        return container_name
 
     async def get_task(self, task_id: str) -> Task:
         return await self.db.get_task(task_id)
