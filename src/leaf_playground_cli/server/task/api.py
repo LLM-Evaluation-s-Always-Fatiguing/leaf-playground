@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import aiohttp
 from fastapi import status, APIRouter, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -340,6 +341,10 @@ class TaskManager(Singleton):
 
         return await db.get_task(task_id)
 
+    @classmethod
+    async def http_get_task_results_by_id(cls, task_id: str) -> TaskResults:
+        return await TaskManager.get_instance().get_task_results(task_id)
+
 
 @task_router.post("/create", response_model=Task, response_model_include={"id"})
 async def create_task(
@@ -421,25 +426,26 @@ async def save_task_results_to_db(
 
 @task_router.get("/{task_id}/results/download")
 async def download_task_results(
-    task_id: str,
-    task_manager: TaskManager = Depends(TaskManager.get_instance),
+    task_results: TaskResults = Depends(TaskManager.http_get_task_results_by_id),
 ):
-    task_results: TaskResults = await task_manager.get_task_results(task_id)
-
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
-        zip_file.writestr("scene_config.json", json.dumps(task_results.scene_config))
-        zip_file.writestr("evaluator_configs.json", json.dumps(task_results.evaluator_configs))
-        zip_file.writestr("metrics.json", json.dumps(task_results.metrics))
-        zip_file.writestr("charts.json", json.dumps(task_results.charts))
+        zip_file.writestr(
+            "scene_config.json", json.dumps(task_results.scene_config, ensure_ascii=False)
+        )
+        zip_file.writestr(
+            "evaluator_configs.json", json.dumps(task_results.evaluator_configs, ensure_ascii=False)
+        )
+        zip_file.writestr("metrics.json", json.dumps(task_results.metrics, ensure_ascii=False))
+        zip_file.writestr("charts.json", json.dumps(task_results.charts, ensure_ascii=False))
         for name, logs in task_results.logs.items():
             ext = name.split(".")[-1]
             if ext == "json":
-                zip_file.writestr(name, json.dumps(logs))
+                zip_file.writestr(name, json.dumps(logs, ensure_ascii=False))
             if ext == "jsonl":
-                zip_file.writestr(name, "\n".join([json.dumps(log) for log in logs]))
+                zip_file.writestr(name, "\n".join([json.dumps(log, ensure_ascii=False) for log in logs]))
             if ext == "csv":
-                zip_file.writestr(name, pd.DataFrame(logs).to_csv(index=False, encoding="utf-8"))
+                zip_file.writestr(name, pd.DataFrame(logs).to_csv(index=False, encoding="utf_8_sig"))  # TODO: fix Chinese
 
     zip_buffer.seek(0)
 
@@ -453,10 +459,8 @@ async def download_task_results(
     response_model_include={"metrics", "charts"}
 )
 async def get_metrics_and_charts(
-    task_id: str,
-    task_manager: TaskManager = Depends(TaskManager.get_instance),
+    task_results: TaskResults = Depends(TaskManager.http_get_task_results_by_id)
 ):
-    task_results: TaskResults = await task_manager.get_task_results(task_id)
     return task_results
 
 
