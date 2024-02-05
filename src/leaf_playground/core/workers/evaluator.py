@@ -67,9 +67,9 @@ class MetricEvaluatorProxy(Process):
         self._record_metrics = record_metrics
         self._compare_metrics = compare_metrics
 
-    def __init_subclass__(cls, _init_evaluator, _record, _compare, **kwargs):
+    def __init_subclass__(cls, _init_eval_tools, _record, _compare, **kwargs):
         super().__init_subclass__(**kwargs)
-        cls._init_evaluator = _init_evaluator
+        cls._init_eval_tools = _init_eval_tools
         cls._record = _record
         cls._compare = _compare
 
@@ -112,7 +112,7 @@ class MetricEvaluatorProxy(Process):
 
         self._state.value = MetricEvaluatorState.INITIALIZING.value.encode("utf-8")
         try:
-            evaluator = self._init_evaluator(
+            evaluator = self._init_eval_tools(
                 self._config_cls(**self._config_data), self._record_metrics, self._compare_metrics
             )
         except:
@@ -178,7 +178,7 @@ class MetricEvaluatorMetaClass(ABCMeta):
             name=f"{name}Proxy",
             bases=(MetricEvaluatorProxy,),
             kwds={
-                "_init_evaluator": attrs["_init_evaluator"],
+                "_init_eval_tools": attrs["_init_eval_tools"],
                 "_record": attrs["_record"],
                 "_compare": attrs["_compare"],
             },
@@ -352,7 +352,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
 
     @staticmethod
     @abstractmethod
-    def _init_evaluator(
+    def _init_eval_tools(
         config: MetricEvaluatorConfig, record_metrics: List[_MetricName], compare_metrics: List[_MetricName]
     ) -> Any:
         pass
