@@ -354,20 +354,28 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     @abstractmethod
     def _init_eval_tools(
         config: MetricEvaluatorConfig, record_metrics: List[_MetricName], compare_metrics: List[_MetricName]
-    ) -> Any:
+    ) -> List[Any]:
         pass
 
     @staticmethod
     @abstractmethod
     async def _record(
-        response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any, **kwargs
+        response: Message,
+        references: Optional[List[Message]],
+        ground_truth: Optional[Media],
+        eval_tools: List[Any],
+        **kwargs
     ) -> Dict[_MetricName, RecordOutput]:
         pass
 
     @staticmethod
     @abstractmethod
     async def _compare(
-        response: Message, references: Optional[List[Message]], ground_truth: Optional[Media], evaluator: Any, **kwargs
+        response: Message,
+        references: Optional[List[Message]],
+        ground_truth: Optional[Media],
+        eval_tools: List[Any],
+        **kwargs
     ) -> Dict[_MetricName, CompareOutput]:
         pass
 
