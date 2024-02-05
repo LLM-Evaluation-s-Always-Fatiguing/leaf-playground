@@ -113,7 +113,7 @@ class PipelineConfig(BaseModel):
 
 class Pipeline:
     def __init__(self, config: PipelineConfig):
-        set_default_backend(OpenAI("gpt-4-1106-preview", api_key=config.openai_api_key))
+        set_default_backend(OpenAI("gpt-4-0125-preview", api_key=config.openai_api_key))
 
         self.config = config
 
@@ -173,8 +173,8 @@ class Pipeline:
                         "先告知用户你接下来要做的事情，然后分点列出你需要向用户提问的全部问题或向用户寻求改进意见"
                     ),
                 )
-                add_and_show_message(s, assistant, gen("questions", max_tokens=128))
-                add_and_show_message(s, user, input())
+                add_and_show_message(s, assistant, gen("questions", max_tokens=4096))
+                add_and_show_message(s, user, input("\nUser: "), False)
                 add_and_show_message(
                     s,
                     system,
@@ -193,7 +193,7 @@ class Pipeline:
                     ),
                 )
                 add_and_show_message(s, assistant, gen("scene_definition.py", max_tokens=4096))
-                add_and_show_message(s, user, input())
+                add_and_show_message(s, user, input("\nUser: "), False)
                 add_and_show_message(
                     s,
                     system,
@@ -258,7 +258,7 @@ class Pipeline:
                 )
                 add_and_show_message(s, assistant, gen(f"{role_name}.py", max_tokens=4096, temperature=0.5))
                 while True:
-                    add_and_show_message(s, user, input())
+                    add_and_show_message(s, user, input("\nUser: "), False)
                     add_and_show_message(
                         s, system, "请你根据用户的反馈判断是否需要修改代码实现？直接回答“是”或“否”，不要说其他的话"
                     )
@@ -340,7 +340,7 @@ class Pipeline:
             )
             add_and_show_message(s, assistant, gen("scene_flow_desc", max_tokens=4096, temperature=0.5))
             while True:
-                add_and_show_message(s, user, input())
+                add_and_show_message(s, user, input("\nUser: "), False)
                 add_and_show_message(
                     s,
                     system,
@@ -361,7 +361,7 @@ class Pipeline:
             )
             add_and_show_message(s, assistant, gen("scene.py", max_tokens=4096, temperature=0.5))
             while True:
-                add_and_show_message(s, user, input())
+                add_and_show_message(s, user, input("\nUser: "), False)
                 add_and_show_message(
                     s, system, "请你根据用户的反馈判断是否需要修改代码实现？直接回答“是”或“否”，不要说其他的话"
                 )
