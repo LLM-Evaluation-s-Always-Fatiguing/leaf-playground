@@ -362,7 +362,7 @@ class HumanConnection:
         self.agent.disconnect()
         self.state = WebSocketState.DISCONNECTED
 
-    def notify_human_to_input(self, data_schema: Optional[str] = None):
+    def notify_human_to_input(self, data_schema: Optional[dict] = None):
         self.events.put_nowait(SocketEvent(event="wait_human_input", data_schema=data_schema))
 
     def notify_human_to_not_input(self):
@@ -451,7 +451,7 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
         self.connection = None
         self.connected = False
 
-    async def wait_human_text_input(self, data_schema: Optional[str] = None) -> Optional[str]:
+    async def wait_human_text_input(self, data_schema: Optional[dict] = None) -> Optional[str]:
         if not self.connected:
             return None
         self.wait_human_input = True
