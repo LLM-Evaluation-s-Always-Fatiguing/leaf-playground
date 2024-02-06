@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import Field
 
@@ -19,6 +19,7 @@ class SocketData(Data):
 
 class SocketEvent(Data):
     event: str = Field(default=...)
+    data_schema: Optional[str] = Field(default=None)
     type: Literal["socket_event"] = Field(default="event")
 
 

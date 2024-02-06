@@ -2,7 +2,7 @@ import json
 from abc import ABC
 from typing import Literal, Optional, Union, Any
 
-from pydantic import Field
+from pydantic import Field, BaseModel
 from typing_extensions import Annotated
 
 from .base import Data
@@ -67,6 +67,5 @@ class Video(Media):
 
 
 MediaType = Annotated[Union[Text, Json, Audio, Image, Video], Field(discriminator="type")]
-
 
 __all__ = ["Media", "Text", "Json", "Image", "Audio", "Video", "MediaType"]
