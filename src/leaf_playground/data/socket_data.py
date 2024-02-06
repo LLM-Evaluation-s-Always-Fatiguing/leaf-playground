@@ -19,7 +19,7 @@ class SocketData(Data):
 
 class SocketEvent(Data):
     event: str = Field(default=...)
-    data_schema: Optional[str] = Field(default=None)
+    data_schema: Optional[dict] = Field(default=None)
     type: Literal["socket_event"] = Field(default="event")
 
 
