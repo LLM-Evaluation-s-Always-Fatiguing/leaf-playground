@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Type, Union
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
+from leaf_eval_tools._base import EvalTool, EvalToolConfig
 
 from .logger import Logger
 from ..scene_definition import CompareMetricDefinition, MetricDefinition, VALUE_DETYPE_2_DEFAULT_VALUE, SceneConfig
@@ -354,7 +355,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
     @abstractmethod
     def _init_eval_tools(
         config: MetricEvaluatorConfig, record_metrics: List[_MetricName], compare_metrics: List[_MetricName]
-    ) -> List[Any]:
+    ) -> List[EvalTool]:
         pass
 
     @staticmethod
@@ -363,7 +364,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         response: Message,
         references: Optional[List[Message]],
         ground_truth: Optional[Media],
-        eval_tools: List[Any],
+        eval_tools: List[EvalTool],
         **kwargs
     ) -> Dict[_MetricName, RecordOutput]:
         pass
@@ -374,7 +375,7 @@ class MetricEvaluator(_Configurable, ABC, metaclass=MetricEvaluatorMetaClass):
         response: Message,
         references: Optional[List[Message]],
         ground_truth: Optional[Media],
-        eval_tools: List[Any],
+        eval_tools: List[EvalTool],
         **kwargs
     ) -> Dict[_MetricName, CompareOutput]:
         pass
