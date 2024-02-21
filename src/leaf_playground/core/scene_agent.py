@@ -2,16 +2,16 @@ import asyncio
 from abc import abstractmethod, ABC, ABCMeta
 from inspect import signature
 from sys import _getframe
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type
 
 from pydantic import create_model, BaseModel, Field
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
+from leaf_ai_backends._base import AIBackend, AIBackendConfig
 
 from .scene_definition import RoleDefinition
 from .._config import _Config, _Configurable
 from .._type import Immutable
-from ..ai_backend.base import AIBackend, AIBackendConfig
 from ..data.environment import EnvironmentVariable
 from ..data.profile import Profile
 from ..data.socket_data import SocketEvent
@@ -304,20 +304,18 @@ class SceneDynamicAgent(SceneAgent, ABC):
 
 class SceneAIAgentConfig(SceneDynamicAgentConfig):
     ai_backend_config: AIBackendConfig = Field(default=...)
-    ai_backend_obj: DynamicObject = Field(default=..., exclude=True)
+    ai_backend_cls: Type[AIBackend] = Field(default=..., exclude=True)
 
     def model_post_init(self, __context) -> None:
-        self.valid(self.ai_backend_config, self.ai_backend_obj)
+        self.valid(self.ai_backend_config, self.ai_backend_cls)
 
     def create_backend_instance(self) -> AIBackend:
-        obj = dynamically_import_obj(self.ai_backend_obj)
-        return obj.from_config(config=self.ai_backend_config)
+        return self.ai_backend_cls(config=self.ai_backend_config)
 
     @staticmethod
-    def valid(ai_backend_config: AIBackendConfig, ai_backend_obj: DynamicObject):
-        ai_backend_cls = dynamically_import_obj(ai_backend_obj)
+    def valid(ai_backend_config: AIBackendConfig, ai_backend_cls: Type[AIBackend]):
         if not issubclass(ai_backend_cls, AIBackend):
-            raise TypeError(f"ai_backend_obj {ai_backend_obj.obj} should be a subclass of AIBackend")
+            raise TypeError(f"ai_backend_cls {ai_backend_cls.__name__} should be a subclass of AIBackend")
         if not isinstance(ai_backend_config, ai_backend_cls.config_cls):
             raise TypeError(f"ai_backend_config should be an instance of {ai_backend_cls.config_cls.__name__}")
 
