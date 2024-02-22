@@ -87,12 +87,12 @@ class _ActionHandler:
 
 class _HumanActionHandler(_ActionHandler):
     def __init__(
-        self,
-        human_agent: "SceneHumanAgent",
-        action_fn: callable,
-        action_name: str,
-        exec_timeout: int,
-        executable: asyncio.Event,
+            self,
+            human_agent: "SceneHumanAgent",
+            action_fn: callable,
+            action_name: str,
+            exec_timeout: int,
+            executable: asyncio.Event,
     ):
         super().__init__(action_fn, action_name, exec_timeout, executable)
         self.human_agent = human_agent
@@ -360,8 +360,8 @@ class HumanConnection:
         self.agent.disconnect()
         self.state = WebSocketState.DISCONNECTED
 
-    def notify_human_to_input(self):
-        self.events.put_nowait(SocketEvent(event="wait_human_input"))
+    def notify_human_to_input(self, data_schema: Optional[dict] = None):
+        self.events.put_nowait(SocketEvent(event="wait_human_input", data_schema=data_schema))
 
     def notify_human_to_not_input(self):
         self.events.put_nowait(SocketEvent(event="disable_human_input"))
@@ -449,11 +449,11 @@ class SceneHumanAgent(SceneDynamicAgent, ABC):
         self.connection = None
         self.connected = False
 
-    async def wait_human_text_input(self) -> Optional[str]:
+    async def wait_human_text_input(self, data_schema: Optional[dict] = None) -> Optional[str]:
         if not self.connected:
             return None
         self.wait_human_input = True
-        self.connection.notify_human_to_input()
+        self.connection.notify_human_to_input(data_schema)
         while not self.human_input:
             await asyncio.sleep(0.1)
         self.wait_human_input = False
